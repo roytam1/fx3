@@ -1,0 +1,19 @@
+
+
+html *:focus
+{
+  -moz-outline: 3px solid #FFFF00  !important;
+  -moz-outline-offset: 1px         !important;
+  -moz-outline-radius: 3px         !important;
+}
+
+html textarea:focus,html  button:focus,html  select:focus,html  input:focus
+{
+  -moz-outline-offset: -1px        !important;
+}
+
+html input[type="radio"]:focus
+{
+  -moz-outline-radius: 8px        !important;
+  -moz-outline-offset: 0px         !important;
+}

@@ -1,0 +1,51 @@
+{
+    IBClasses = (
+        {CLASS = ExtendedTableView; LANGUAGE = ObjC; SUPERCLASS = NSTableView; }, 
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            CLASS = NSPreferencePane; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                "_firstKeyView" = id; 
+                "_initialKeyView" = id; 
+                "_lastKeyView" = id; 
+                "_window" = id; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {
+                addWhitelistSite = id; 
+                clickEnableAdBlocking = id; 
+                clickEnableAnnoyanceBlocker = id; 
+                clickEnableImageResizing = id; 
+                clickEnableJS = id; 
+                clickEnableJava = id; 
+                clickEnablePopupBlocking = id; 
+                clickPreventAnimation = id; 
+                editWhitelist = id; 
+                editWhitelistDone = id; 
+                removeWhitelistSite = id; 
+            }; 
+            CLASS = OrgMozillaChimeraPreferenceWebFeatures; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                mAddButton = NSButton; 
+                mAddField = NSTextField; 
+                mEditWhitelist = NSButton; 
+                mEnableAdBlocking = NSButton; 
+                mEnableAnnoyanceBlocker = NSButton; 
+                mEnableJS = NSButton; 
+                mEnableJava = NSButton; 
+                mEnablePopupBlocking = NSButton; 
+                mImageResize = NSButton; 
+                mPreventAnimation = NSButton; 
+                mWhitelistPanel = id; 
+                mWhitelistTable = ExtendedTableView; 
+            }; 
+            SUPERCLASS = PreferencePaneBase; 
+        }, 
+        {CLASS = PreferencePaneBase; LANGUAGE = ObjC; SUPERCLASS = NSPreferencePane; }
+    ); 
+    IBVersion = 1; 
+}

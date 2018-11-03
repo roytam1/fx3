@@ -1,0 +1,92 @@
+<?xml version="1.0"?> 
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   Software distributed under the License is distributed on an "AS
+   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+  
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-download.dtd" >
+
+<window xmlns:html="http://www.w3.org/TR/REC-html40"
+		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        class="dialog"
+        onload="return StartUp('Composer');"  align="vertical" title="&title.label;">
+
+<html:script language="javascript" src="chrome://pref/content/PrefsWindow.js"/>
+  	<box class="header" align="horizontal">  
+	      <titledbutton class="left-header-text" value="&lHeader;"/>
+   		  <spring class="header-spring" flex="1"/>
+		  <titledbutton class="right-header-text" value="&rHeader;"/>
+	</box>
+
+	
+		<html:fieldset>
+					<html:legend align="left"> 
+			<html:div>&newmes;</html:div> 
+					</html:legend>
+	<html:div>
+		<html:input type="checkbox" id="pref:0:bool:offline.news.download.unread_only" />
+		<html:label for="pref:0:bool:offline.news.download.unread_only" accesskey="" tabindex="0">
+		&downOnlyCheck;			
+		</html:label>
+	</html:div>
+	<html:div>
+		<html:input type="checkbox" id="pref:0:bool:offline.news.download.by_date" />
+		<html:label for="pref:0:bool:offline.news.download.by_date" accesskey="" tabindex="0">			
+		&downDateCheck;
+		</html:label>
+	</html:div>
+	<html:p>
+	<html:div>
+		<html:input  type="radio" name="offline" id="pref:0:bool:offline.news.download.use_days" checked="true" />
+		<html:label for="pref:0:bool:offline.news.download.use_days" accesskey="f" tabindex="0">			
+		&fromRadio.label;
+		</html:label> 
+		<html:select id="pref:int:offline.news.download.increments">
+			<html:option value="0">&yesterday.select;</html:option>
+			<html:option value="1">&oneW.select;</html:option>
+			<html:option value="2">&twoW.select;</html:option>
+			<html:option value="3">&oneM.select;</html:option>
+			<html:option value="4">&sixM.select;</html:option>
+			<html:option value="5">&oneY.select;</html:option>
+		</html:select> 
+	</html:div>  
+	<html:div>
+		<html:input  type="radio" name="offline" id="pref:1:bool:offline.news.download.use_days" />
+		<html:label for="pref:1:bool:offline.news.download.use_days" accesskey="s" tabindex="0">			
+		&sinceRadio.label;
+		</html:label>
+		<html:input type="text" size="5" id="pref:30:char:offline.news.download.days" />&daysAgo;
+	</html:div> 
+	</html:p>
+	  </html:fieldset>
+
+		<html:fieldset>
+			<html:legend align="left"> 
+			<html:div>&Allmsg;</html:div> 
+					</html:legend>
+         <!--   <html:div>&offlineMsgs;</html:div>  -->
+			<box flex="100%"><html:div>
+				<titledbutton class="dialog push" value="&select;" align="left"/>
+			</html:div></box>
+		</html:fieldset>
+
+</window>
+

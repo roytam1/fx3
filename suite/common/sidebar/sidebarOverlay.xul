@@ -1,0 +1,87 @@
+<?xml version="1.0"?> <!-- -*- Mode: SGML; indent-tabs-mode: nil -*- -->
+<!--
+
+  The contents of this file are subject to the Netscape Public License
+  Version 1.1 (the "NPL"); you may not use this file except in
+  compliance with the NPL.  You may obtain a copy of the NPL at
+  http://www.mozilla.org/NPL/
+
+  Software distributed under the NPL is distributed on an "AS IS" basis,
+  WITHOUT WARRANTY OF ANY KIND, either express or implied. See the NPL
+  for the specific language governing rights and limitations under the
+  NPL.
+
+  The Initial Developer of this code under the NPL is Netscape
+  Communications Corporation.  Portions created by Netscape are
+  Copyright (C) 1999 Netscape Communications Corporation.  All Rights
+  Reserved.
+
+-->
+ 
+<?xml-stylesheet href="chrome://sidebar/skin/sidebarOverlay.css" type="text/css"?> 
+
+<!DOCTYPE window SYSTEM "chrome://sidebar/locale/sidebarOverlay.dtd">
+
+<overlay id="sidebarOverlay"
+  xmlns:html="http://www.w3.org/TR/REC-html40"
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+
+  <!-- Overlay the sidebar panels -->
+  <box id="sidebar-box" align="vertical" persist="hidden width">
+    <splitter id="title-box" class="sidebar-main-header" collapse="after"
+      persist="state" onclick="sidebarOpenClosePanel(this)">
+      <html:div class="panel-bar">
+        &sidebar.panels.label;
+      </html:div>
+      <spring flex="100%"/>
+      <titledbutton class="borderless"
+        value="&sidebar.customize.label;" 
+        onclick="sidebarCustomize();" />
+    </splitter>
+
+    <box id="sidebar-panels" align="vertical" flex="1*"
+      datasources="chrome://sidebar/content/local-panels.rdf 
+                   chrome://sidebar/content/remote-panels.rdf"
+      ref="urn:sidebar:current-panel-list" 
+      persist='open-panel-src'>
+      <template>
+        <rule>
+          <titledbutton uri="rdf:*" align="left"
+            value="rdf:http://home.netscape.com/NC-rdf#title"
+            class="panel-bar borderless" 
+            onclick="sidebarOpenClosePanel(this)"
+            iframe-src="rdf:http://home.netscape.com/NC-rdf#content" />
+          <html:iframe uri="rdf:*" content="true"
+            src="rdf:http://home.netscape.com/NC-rdf#content"
+            class="panel-frame" collapsed='true' flex='1*'/>
+        </rule>
+      </template>
+    </box>
+  </box>
+
+  <!-- Splitter on the right of sidebar -->
+  <splitter id="sidebar-splitter" collapse="before" persist="state hidden" 
+    chromeclass="extrachrome" onclick="dumpStats();">
+    <box id="topright-cap" align="vertical">
+      <spring flex="100%"/>
+    </box>
+    <spring flex="100%"/>
+    <grippy/>
+    <spring flex="100%"/>
+    <box id="bottomright-cap" align="vertical">
+    <spring flex="100%"/>
+    </box>
+  </splitter>
+
+  <!-- View->Sidebar toggle -->
+  <menupopup id="menu_View_Popup">
+      <menuitem id="menu_sidebar" type="checkbox" value="&sidebarCmd.label;"
+                oncommand="sidebarShowHide();" position="2"/>
+  </menupopup>
+
+  <!-- Scripts go last, because they peek at state to tweak menus -->
+  <html:script language="JavaScript"
+               src="chrome://sidebar/content/sidebarOverlay.js"/>
+
+</overlay>
+

@@ -1,0 +1,99 @@
+<?xml version="1.0"?> 
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   Software distributed under the License is distributed on an "AS
+   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+  
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-cache.dtd" >
+<window xmlns:html="http://www.w3.org/TR/REC-html40"
+		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        class="dialog"
+        onload="return StartUp('Cache');"  align="vertical" title="&title.label;">
+
+<html:script language="javascript" src="chrome://pref/content/PrefsWindow.js"/>
+<html:div flex="100%">
+
+	<box id="header" style="width:100%" align="horizontal">  
+		  <spring style="width:20px"/>
+		  <html:div style="vertical-align: middle;">
+		  <html:B>&lHeader;</html:B>
+		  </html:div>
+   		  <spring flex="100%"/>
+		  <html:div align="right">&rHeader;</html:div><spring style="width:5px"/>
+	</box>
+ 	<box align="vertical" style="width: 100%;">
+	<!--	<html:fieldset style="width: 100%;">  
+			<html:legend align="left">>
+				<html:div></html:div>
+			</html:legend> -->
+	
+		<html:div>&cachePara;</html:div><spring flex="100%"/>
+		<html:div></html:div>
+		<box align="horizontal" style="width: 100%;"> 
+			<html:div>&memCache;</html:div>
+			<spring style="width:5px"/>
+			<html:input name="disk" type="text" size="3" id="pref:string:browser.cache.memory_cache_size" />
+			<html:div>&kbyes;</html:div>
+			<titledbutton class="dialog push" name="clearm" value="&clearMemcacheButton.label;" />
+		</box> 
+		<box align="horizontal" style="width: 100%;"> 
+			<html:div>&diskCache;</html:div>
+			<spring style="width:5px"/>
+			<html:input name="disk" type="text" size="3" id="pref:string:browser.cache.disk_cache_size" />
+			<html:div>&kbyes;</html:div>
+			<titledbutton class="dialog push" name="clearm" value="&clearDiskcacheButton.label;" />
+		</box>
+		<box align="horizontal" style="width: 100%;"> 
+			<html:div>&diskCacheFolder;</html:div>
+			<html:input name="disk" type="text" size="20" id="pref:string:browser.cache.directory" />
+			<html:div>
+				<titledbutton class="dialog push" value="&chooseFolder;" align="left" onclick="PrefCacheSelectFolder()"/>
+			</html:div>
+		</box>
+
+	</box>
+
+	<box align="vertical" style="width: 100%;">
+				<html:div>&docCache;</html:div>
+		<html:div>
+    		<html:input name="cacheDocFreq" type="radio" id="pref:0:int:browser.cache.check_doc_frequency" />
+			<html:label for="pref:0:int:browser.cache.check_doc_frequency" accesskey="o" tabindex="0">
+			&oncePsessionRadio.label;
+			</html:label>
+		</html:div>
+		<html:div>
+    		<html:input name="cacheDocFreq" type="radio" id="pref:1:int:browser.cache.check_doc_frequency" />
+			<html:label for="pref:1:int:browser.cache.check_doc_frequency" accesskey="e" tabindex="0">
+			&everyTimeRadio.label;	
+			</html:label>
+		</html:div>
+    	<html:div>
+    		<html:input name="cacheDocFreq" type="radio" id="pref:2:int:browser.cache.check_doc_frequency" />
+			<html:label for="pref:2:int:browser.cache.check_doc_frequency" accesskey="n" tabindex="0">
+			&neverRadio.label;	
+			</html:label>
+		</html:div>	
+	</box>
+	<!--	</html:fieldset> -->
+</html:div>
+</window>
+

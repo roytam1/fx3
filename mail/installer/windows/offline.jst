@@ -1,0 +1,16 @@
+var err = initInstall("Offline Support", "Offline", "$Version$"); 
+logComment("initInstall: " + err);
+
+// Offline Extension
+
+var fProgram = getFolder("Program");
+logComment("fProgram: " + fProgram);
+
+err = addDirectory("", "$Version$", "bin", fProgram, "", true);
+logComment("addDirectory: " + err);
+
+err = getLastError();
+if (err==SUCCESS)
+    performInstall(); 
+else
+    cancelInstall(err);

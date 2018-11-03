@@ -1,0 +1,142 @@
+<?xml version="1.0"?> 
+
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+
+
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-advanced.dtd" >
+
+<window xmlns:html="http://www.w3.org/TR/REC-html40"
+		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        onload="return StartUp('Advanced');"
+        class="dialog"
+        align="horizontal" title="&window.title;">
+
+
+<html:script language="javascript" src="chrome://pref/content/PrefsWindow.js"/>
+<html:div flex="100%">
+
+
+	<box id="header" align="horizontal">  
+		  <spring style="width:20px"/>
+		  <html:div style="vertical-align: middle;">
+		  <html:B>&lHeader;</html:B>
+		  </html:div>
+   		  <spring flex="100%"/><spring style="width:20px" /> 
+		  <html:div align="right">&rHeader;</html:div><spring style="width:5px"/>
+	</box>
+
+
+	<box align="vertical" style="width: 100%;">
+			<html:fieldset style="width: 100%;">
+			<html:div>
+    		<html:input type="checkbox" id="pref:0:bool:advanced.always_load_images" />
+			<html:label for="pref:0:bool:advanced.always_load_images" accesskey="i" tabindex="0">
+				&autoLoadImgCheck.label;
+			</html:label>
+			</html:div>
+			<html:div>
+		    <html:input type="checkbox" id="pref:0:bool:advanced.java.allow" />
+				<html:label for="pref:0:bool:advanced.java.allow" accesskey="j" tabindex="0">
+					&enbJavaCheck.label;
+				</html:label>
+			</html:div>
+			<html:div>
+			<html:input type="checkbox" id="pref:0:bool:javascript.enabled" />
+				<html:label for="pref:0:bool:javascript.enabled" accesskey="r" tabindex="0">	
+					&enbJsCheck.label;
+				</html:label>
+			</html:div>
+			<html:div>	
+			<html:input type="checkbox" id="pref:0:bool:javascript.allow.mailnews" />
+				<html:label for="pref:0:bool:javascript.allow.mailnews" accesskey="m" tabindex="0">
+					&enbJsCheck.labelforMailNNews;
+				</html:label>
+			</html:div>
+			<html:div>
+			<html:input type="checkbox" id="pref:0:bool:css.allow" />
+				<html:label for="pref:0:bool:css.allow" accesskey="s" tabindex="0">
+					&enbCssCheck.label;
+				</html:label>
+			</html:div>
+			<html:div>
+			<html:input type="checkbox" id="pref:0:bool:advanced.mailftp" />
+				<html:label for="pref:0:bool:advanced.mailftp" accesskey="e" tabindex="0">
+					&sendAddFtpCheck.label;
+				</html:label>
+			</html:div>
+			<html:div>
+			<html:input type="checkbox" id="pref:0:bool:signon.rememberSignons" />
+				<html:label for="pref:0:bool:signon.rememberSignons" accesskey="r" tabindex="0">
+					&remSignCheck.label; 
+				</html:label>
+			</html:div>
+				
+	</html:fieldset>
+	</box>
+
+	<box align="vertical" style="width: 100%;">
+	<html:fieldset style="width: 100%;">
+			<html:div>
+			<html:label for="pref:string:wallet.Server" accesskey="c" tabindex="0">
+				&server.label;
+			</html:label> 
+			<html:input name="Wallet Server:" type="text"	id="pref:string:wallet.Server" size="25" /> 
+			</html:div> 
+			<spring style="height:10px" /> 
+	</html:fieldset>
+    </box>
+
+
+	<box align="vertical" style="width: 100%;">
+	<html:fieldset style="width: 100%;">
+			<html:legend align="left">
+				 <html:div>&cookies;</html:div> 
+			</html:legend>  
+			<html:div>
+    	    <html:input name="cookies" type="radio" id="pref:0:int:network.cookie.cookieBehavior"  />
+			<html:label for="pref:2:int:network.cookie.cookieBehavior" accesskey="a" tabindex="0">
+			   &accAllCookiesRadio.label;
+			</html:label>
+			</html:div>
+			<html:div>
+		    <html:input type="radio" name="cookies" id="pref:1:int:network.cookie.cookieBehavior" />
+			<html:label for="pref:0:int:network.cookie.cookieBehavior" accesskey="o" tabindex="0">
+			   &accpOrgCookiesRadio.label;
+			</html:label>
+			</html:div>
+			<html:div>
+			<html:input type="radio" name="cookies" id="pref:2:int:network.cookie.cookieBehavior" />
+				<html:label for="pref:1:int:network.cookie.cookieBehavior" accesskey="d" tabindex="0">	
+					&disCookRadio.label;
+				</html:label>
+			</html:div>
+			<html:div>	
+			<html:input type="checkbox" id="pref:0:bool:network.cookie.warnAboutCookies" />
+				<html:label for="pref:0:bool:network.cookie.warnAboutCookies" accesskey="w" tabindex="0">
+					&warnCookCheck.label;
+				</html:label>
+			</html:div>				
+	</html:fieldset> 
+	</box>  
+
+</html:div>
+</window>

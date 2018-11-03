@@ -1,0 +1,30 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            CLASS = NSPreferencePane; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                "_firstKeyView" = NSView; 
+                "_initialKeyView" = NSView; 
+                "_lastKeyView" = NSView; 
+                "_window" = NSWindow; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {checkboxClicked = id; }; 
+            CLASS = OrgMozillaChimeraPreferenceTabs; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                checkboxLoadTabsInBackground = NSButton; 
+                mTabBarVisiblity = NSButton; 
+                radioOpenForAE = NSMatrix; 
+                radioOpenTabsForCommand = NSMatrix; 
+            }; 
+            SUPERCLASS = PreferencePaneBase; 
+        }, 
+        {CLASS = PreferencePaneBase; LANGUAGE = ObjC; SUPERCLASS = NSPreferencePane; }
+    ); 
+    IBVersion = 1; 
+}

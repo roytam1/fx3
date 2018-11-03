@@ -1,0 +1,2 @@
+text/plain: javax.mail.internet.MimeMessage
+multipart/mixed: javax.mail.internet.MimeMultipart 

@@ -1,0 +1,72 @@
+<?xml version="1.0"?> 
+
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   Software distributed under the License is distributed on an "AS
+   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-offline.dtd" >
+<window xmlns:html="http://www.w3.org/TR/REC-html40"
+		    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        class="dialog"
+        onload="return StartUp('offline');"  title="&title.label;">
+
+<html:script language="javascript" src="PrefsWindow.js"/>
+<html:div flex="100%">
+<html:DIV ID="top">
+		<html:SPAN ID="lefttext">&header;</html:SPAN>
+</html:DIV>
+
+
+
+&header1;	
+<html:table>	
+      <html:tr><html:td>&descipt1;
+			</html:td></html:tr>
+			<html:tr><html:td><html:label>
+				<html:input name="state" type="radio" id="pref:0:int:offline.startup_state" />&prevRadio.label;
+				<html:br />&communRemember;
+			</html:label></html:td></html:tr>
+			<html:tr><html:td><html:label>
+				<html:input name="state" type="radio" id="pref:1:int:offline.startup_state" />&askOfflineRadio.label;
+				<html:br />&offlineStartAskEach;
+			</html:label></html:td></html:tr>
+
+</html:table>
+&heaeder2;
+<html:table>	
+	
+            
+			<html:tr><html:td><html:label><html:input name="offmail" type="radio" id="pref:0:int:offline.send.unsent_messages" />&unsentAskRadio.label;</html:label></html:td></html:tr>
+			<html:tr><html:td><html:label><html:input name="offmail" type="radio" id="pref:1:int:offline.send.unsent_messages" />&unsentAutoRadio.label;</html:label></html:td></html:tr>
+			<html:tr><html:td><html:label><html:input name="offmail" type="radio" id="pref:2:int:offline.send.unsent_messages" />&unsentDoNotRadio.label;</html:label></html:td></html:tr>
+</html:table>
+&header3;
+<html:table>		
+            
+			<html:tr><html:td><html:label>
+				<html:input type="checkbox" id="pref:0:bool:offline.prompt_synch_on_exit" />&promptSynchCheck.label;
+			</html:label></html:td></html:tr>
+
+</html:table>
+</html:div>
+</window>

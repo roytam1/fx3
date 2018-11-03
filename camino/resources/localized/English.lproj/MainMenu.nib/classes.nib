@@ -1,0 +1,123 @@
+{
+    IBClasses = (
+        {
+            CLASS = BookmarkMenu; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {mItemBeforeCustomItems = NSMenuItem; }; 
+            SUPERCLASS = NSMenu; 
+        }, 
+        {CLASS = BookmarkMenuBuilder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            CLASS = BrowserToolbarController; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = ToolbarController; 
+        }, 
+        {
+            ACTIONS = {
+                addBookmark = id; 
+                addBookmarkFolder = id; 
+                addBookmarkSeparator = id; 
+                fillForm = id; 
+                getInfo = id; 
+                showPageInfo = id; 
+            }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = GoMenu; LANGUAGE = ObjC; SUPERCLASS = HistoryMenu; }, 
+        {
+            CLASS = HistoryMenu; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {mItemBeforeHistoryItems = NSMenuItem; }; 
+            SUPERCLASS = NSMenu; 
+        }, 
+        {
+            ACTIONS = {
+                aboutPlugins = id; 
+                aboutServers = id; 
+                aboutWindow = id; 
+                biggerTextSize = id; 
+                clearHistory = id; 
+                closeTab = id; 
+                connectToServer = id; 
+                displayPreferencesWindow = id; 
+                doReload = id; 
+                doSearch = id; 
+                doStop = id; 
+                downloadsWindow = id; 
+                emptyCache = id; 
+                exportBookmarks = id; 
+                feedbackLink = id; 
+                findInPage = id; 
+                goBack = id; 
+                goForward = id; 
+                goHome = id; 
+                importBookmarks = id; 
+                infoLink = id; 
+                manageBookmarks = id; 
+                newTab = id; 
+                newWindow = id; 
+                nextTab = id; 
+                openFile = id; 
+                openLocation = id; 
+                openMenuBookmark = id; 
+                pageSetup = id; 
+                previousTab = id; 
+                printPage = id; 
+                releaseNoteLink = id; 
+                reloadWithCharset = id; 
+                resetBrowser = id; 
+                savePage = id; 
+                searchCustomizeLink = id; 
+                sendURL = id; 
+                setFileExtension = id; 
+                showCertificates = id; 
+                showHistory = id; 
+                smallerTextSize = id; 
+                supportLink = id; 
+                tipsTricksLink = id; 
+                toggleAutoCharsetDetection = id; 
+                toggleBookmarksToolbar = id; 
+                toggleOfflineMode = id; 
+                viewSource = id; 
+            }; 
+            CLASS = MainController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                mAddBookmarkMenuItem = NSMenuItem; 
+                mApplication = NSApplication; 
+                mBookmarksHelperMenu = NSMenu; 
+                mBookmarksMenu = BookmarkMenu; 
+                mBookmarksToolbarMenuItem = NSMenuItem; 
+                mCloseTabMenuItem = NSMenuItem; 
+                mCloseWindowMenuItem = NSMenuItem; 
+                mCreateBookmarksFolderMenuItem = NSMenuItem; 
+                mCreateBookmarksSeparatorMenuItem = NSMenuItem; 
+                mDockMenu = BookmarkMenu; 
+                mExportPanelView = NSView; 
+                mFilterView = NSView; 
+                mGoMenu = NSMenu; 
+                mServersSubmenu = NSMenu; 
+                mShowAllBookmarksMenuItem = NSMenuItem; 
+                mTextEncodingsMenu = NSMenu; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {load = id; }; 
+            CLASS = MyBrowserView; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {progress = id; progressSuper = id; status = id; urlbar = id; }; 
+            SUPERCLASS = NSView; 
+        }, 
+        {CLASS = NSObject; LANGUAGE = ObjC; }, 
+        {
+            CLASS = ToolbarController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {mBrowserView = id; mWindow = id; }; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

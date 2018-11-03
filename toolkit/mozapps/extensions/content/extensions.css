@@ -1,0 +1,28 @@
+extension {
+  -moz-binding: url("chrome://mozapps/content/extensions/extensions.xml#extension");
+  -moz-box-orient: vertical;
+}
+
+extension[state="downloading"] {
+  -moz-binding: url("chrome://mozapps/content/extensions/extensions.xml#extension-downloading");
+}
+
+extension[itemType="theme"] {
+  -moz-binding: url("chrome://mozapps/content/extensions/extensions.xml#theme");
+}
+
+extension[itemType="theme"][state="downloading"] {
+  -moz-binding: url("chrome://mozapps/content/extensions/extensions.xml#theme-downloading");
+}
+
+.themePreviewArea {
+  width: 0px;
+}
+
+extension[availableUpdateURL="none"] .extension-install-button-box {
+  display: none;
+}
+
+.extension-install-button-box {
+  display: -moz-box;
+}

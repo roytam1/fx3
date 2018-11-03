@@ -1,0 +1,194 @@
+<?xml version="1.0"?> 
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   Software distributed under the License is distributed on an "AS
+   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+<?xul-overlay href="chrome://pref/content/fontScalingOverlay.xul"?>
+
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-fonts.dtd" >
+<window xmlns:html="http://www.w3.org/TR/REC-html40"
+		    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        class="dialog"
+        id="fontPanel"
+        onload="StartUp('Fonts')"  title="&window.title;"
+    		align="vertical">
+
+<html:script language="javascript" src="PrefsWindow.js"/>
+    <box class="header" align="horizontal">  
+	      <titledbutton class="left-header-text" value="&lHeader;"/>
+   		  <spring class="header-spring" flex="1"/>
+		  <titledbutton class="right-header-text" value="&rHeader;"/>
+	</box>
+
+
+		<html:fieldset>
+	      <html:table width="100%">
+			  <html:tr>
+				  <html:td>
+					&encod.select;
+				  </html:td>
+
+				  <html:td>
+					<html:select>
+						<html:option>&encod1.option;</html:option>
+					</html:select>						
+				  </html:td>
+
+				  <html:td>
+				  
+				  </html:td>
+
+				  <html:td>
+				  
+				  </html:td>
+			  </html:tr>
+
+			   <html:tr>
+				  <html:td>
+  				     &varFont.select;
+				  </html:td>
+
+				  <html:td>
+				<html:select>
+					<html:option>&encod1.option;</html:option>
+				</html:select>
+				
+				  </html:td>
+
+				  <html:td>
+   				     &size.select;
+				  </html:td>
+
+				  <html:td>
+    				<html:select>
+						<html:option>&varFont.option;</html:option>
+     				</html:select>
+				  </html:td>
+			  </html:tr>
+
+              <html:tr>
+		          <html:td>
+				  				&fixedFont.Select;
+				  </html:td>
+
+				  <html:td>
+	  				<html:select>
+  					   <html:option>&encod1.option;</html:option>
+			    	</html:select>
+				  </html:td>
+
+				  <html:td>
+				  	    &size.select;
+				  </html:td>
+
+				  <html:td>
+	  				<html:select>
+						<html:option>&varFont.option;</html:option>
+       				</html:select>
+				  </html:td>
+			  </html:tr>
+
+			</html:table>
+	<html:br />
+	<html:div>
+	&header2;
+	</html:div>
+	<html:div>
+	<html:input name="fonts" type="radio" id="pref:0:int:browser.use_document_fonts" val="checked" />
+		<html:label for="pref:0:int:browser.use_document_fonts" accesskey="t" tabindex="0">
+			&useDefaultFont;
+		</html:label> 
+	</html:div>	
+	<html:div>
+	<html:input name="fonts" type="radio" id="pref:1:int:browser.use_document_fonts" val="checked" />
+		<html:label for="pref:1:int:browser.use_document_fonts" accesskey="t" tabindex="0">
+			&useDocFontNonDynamic;
+		</html:label>
+	</html:div>	
+	<html:div>
+	<html:input name="fonts" type="radio" id="pref:2:int:browser.use_document_fonts" val="checked" />
+		<html:label for="pref:2:int:browser.use_document_fonts" accesskey="t" tabindex="0">
+			&useDocFontDynamic;
+		</html:label>
+	</html:div>	
+		</html:fieldset>
+
+    
+<!--
+<html:table>
+		<html:tr>
+			<html:td>&encod.select;
+			</html:td>
+			<html:td>
+				<html:select id="pref">
+					<html:optgroup>
+						<html:option>&encod1.option;</html:option>
+					</html:optgroup>
+				</html:select>
+			</html:td>
+			<html:td>&size.select;
+				<html:select id="pref">
+					<html:optgroup>
+						<html:option>&size1.option;</html:option>
+					</html:optgroup>
+				</html:select>
+			</html:td></html:tr>
+		<html:tr>
+		<html:td>&varFont.select;</html:td>
+			<html:td>
+				<html:select  id="pref">
+					<html:optgroup>
+						<html:option>Filler</html:option>
+				  </html:optgroup>
+				</html:select>
+				</html:td>			
+				<html:td>&size.select;
+					<html:select id="pref">
+						<html:optgroup>
+							<html:option>&varFont.option;</html:option>
+						</html:optgroup>
+					</html:select>
+			</html:td>
+		</html:tr>
+			<html:tr>
+			<html:td>&fixedFont.Select;
+			</html:td>
+			<html:td>
+					<html:select class="combobox" id="pref">
+						<html:optgroup>
+							<html:option>&fixedFont.option;</html:option>
+						</html:optgroup>
+					</html:select>
+			</html:td>
+			<html:td></html:td>
+		</html:tr>
+</html:table>
+<html:br />
+       <html:table>
+			<html:tr><html:td>&header2;</html:td></html:tr>
+			<html:tr><html:td><html:label>
+					<html:input name="fonts" type="radio" id="pref:0:int:browser.use_document_fonts" val="checked" />&useDefaultFont;</html:label></html:td></html:tr>
+					<html:tr><html:td><html:label><html:input name="fonts" type="radio" id="pref:1:int:browser.use_document_fonts" />&useDocFontNonDynamic;</html:label></html:td></html:tr>
+					<html:tr><html:td><html:label><html:input name="fonts" type="radio" id="pref:2:int:browser.use_document_fonts" />&useDocFontDynamic;</html:label></html:td></html:tr>
+		</html:table>
+
+-->
+</window>

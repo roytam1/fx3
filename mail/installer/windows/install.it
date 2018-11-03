@@ -1,0 +1,3 @@
+#filter substitution
+AB_CD=@AB_CD@
+LANGPACK_TITLE=Language Pack

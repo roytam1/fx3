@@ -1,0 +1,99 @@
+<?xml version="1.0"?> 
+
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   Software distributed under the License is distributed on an "AS
+   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-appearance.dtd" >
+<window  xmlns:html="http://www.w3.org/TR/REC-html40"
+		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        class="dialog"
+		onload="StartUp('Appearance')" 
+		align="vertical">
+
+
+
+<html:script language="javascript" src="chrome://pref/content/PrefsWindow.js"/>
+ 
+	<box class="header" align="horizontal">  
+	      <titledbutton class="left-header-text" value="&lHeader;"/>
+   		  <spring class="header-spring" flex="1"/>
+		  <titledbutton class="right-header-text" value="&rHeader;"/>
+	</box>
+
+
+		<html:fieldset>
+			<html:legend align="left">
+			<html:div>&onStartLegend.label;</html:div> 
+			</html:legend>
+						<html:div>
+				<html:input type="checkbox" id="pref:0:bool:general.startup.browser" />
+				<html:label for="pref:0:bool:general.startup.browser" accesskey="n" tabindex="0">
+				&navCheck.label;
+				</html:label>
+			</html:div>
+			<html:div>
+				<html:input type="checkbox" id="pref:0:bool:general.startup.mail" />
+				<html:label for="pref:0:bool:general.startup.mail" accesskey="m" tabindex="0">
+				&mesCheck.label;
+				</html:label>
+			</html:div>
+			<html:div>
+				<html:input type="checkbox" id="pref:0:bool:general.startup.editor" />
+				<html:label for="pref:0:bool:general.startup.editor" accesskey="c" tabindex="0">
+				&compCheck.label;
+				</html:label>
+			</html:div>
+			<html:div>
+				<html:input type="checkbox" id="ref:0:bool:general.startup.calendar" />
+				<html:label for="pref:0:bool:general.startup.calendar" accesskey="a" tabindex="0">
+				&calCheck.label;
+				</html:label>
+			</html:div>
+		
+		</html:fieldset>
+
+		<html:fieldset>
+			<html:legend align="left">
+			<html:div>&showToolsLegend.label;</html:div> 
+			</html:legend>
+			<html:div>
+				<html:input name="showtoolbar" type="radio" id="pref:2:int:browser.chrome.toolbar_style" />
+				<html:label for="pref:2:int:browser.chrome.toolbar_style" accesskey="p" tabindex="0">
+				&picsNtextRadio.label;
+				</html:label>
+			</html:div>
+			<html:div>
+				<html:input name="showtoolbar" type="radio" id="pref:0:int:browser.chrome.toolbar_style" />
+				<html:label for="pref:0:int:browser.chrome.toolbar_style" accesskey="o" tabindex="0">
+				&picsOnlyRadio.label;
+				</html:label>
+			</html:div>
+			<html:div>
+				<html:input name="showtoolbar" type="radio" id="pref:1:int:browser.chrome.toolbar_style" />
+				<html:label for="pref:1:int:browser.chrome.toolbar_style" accesskey="t" tabindex="0">
+				&textonlyRadio.label;
+				</html:label>
+			</html:div>		
+		</html:fieldset>	
+</window>

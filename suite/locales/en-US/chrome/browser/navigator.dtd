@@ -1,0 +1,330 @@
+<!-- extracted from content/navigator.xul -->
+
+<!-- LOCALIZATION NOTE : FILE This file contains the browser main menu items --> 
+<!-- LOCALIZATION NOTE : FILE Do not translate accesskey and commandkey --> 
+
+<!-- LOCALIZATION NOTE (mainWindow.title): DONT_TRANSLATE --> 
+<!ENTITY mainWindow.title "Mozilla"> 
+<!-- LOCALIZATION NOTE (mainWindow.titlemodifier) : DONT_TRANSLATE --> 
+<!ENTITY mainWindow.titlemodifier "Mozilla"> 
+<!-- LOCALIZATION NOTE (mainWindow.titlemodifiermenuseparator): DONT_TRANSLATE -->
+<!ENTITY mainWindow.titlemodifiermenuseparator " - ">
+<!ENTITY viewsourcetitle.preface "Source for: ">
+<!-- LOCALIZATION NOTE (throbber.url): DONT_TRANSLATE --> 
+<!ENTITY throbber.url "http://www.mozilla.org"> 
+
+<!ENTITY browserCmd.label					"New Navigator Window">
+<!ENTITY browserCmd.accesskey				"n">
+<!ENTITY openCmd.label "Open Web Location...">
+<!ENTITY openCmd.accesskey "l">
+<!ENTITY openCmd.commandkey "l">
+<!ENTITY openFileCmd.label "Open File...">
+<!ENTITY openFileCmd.accesskey "o">
+<!ENTITY openFileCmd.commandkey "o">
+<!ENTITY sendPageCmd.label "Send Page">
+<!ENTITY sendPageCmd.accesskey "s">
+<!ENTITY sendLinkCmd.label "Send Link"> 
+<!ENTITY editPageCmd.label					"Edit Page">
+<!ENTITY editPageCmd.accesskey				"d">
+<!ENTITY offlineMenu.label "Offline">
+<!ENTITY offlineMenu.accesskey "f">
+<!ENTITY offlineGoOfflineCmd.label "Go Offline">
+<!ENTITY offlineGoOfflineCmd.accesskey "g">
+<!ENTITY offlineSynchronizeCmd.label "Synchronize">
+<!ENTITY offlineSynchronizeCmd.accesskey "s">
+<!ENTITY printSetupCmd.label "Print Setup...">
+<!ENTITY printSetupCmd.accesskey "r">
+<!ENTITY printPreviewCmd.label "Print Preview">
+<!ENTITY printPreviewCmd.accesskey "v">
+<!ENTITY printCmd.label "Print...">
+<!ENTITY printCmd.accesskey "p">
+<!ENTITY printCmd.commandkey "p">
+
+<!ENTITY viewMenu.label "View">
+<!ENTITY toolbarsCmd.label "Toolbars">
+<!ENTITY navbarCmd.label "Navigation ToolBar">
+<!ENTITY personalbarCmd.label "Personal Toolbar">
+<!ENTITY taskbarCmd.label "Taskbar">
+<!ENTITY enlargeTextSizeCmd.label "Enlarge Text Size">
+<!ENTITY reduceTextSizeCmd.label "Reduce Text Size">
+<!ENTITY useStyleSheetMenu.label "Use Stylesheet">
+<!ENTITY useStyleSheetDefaultCmd.label "Default">
+<!ENTITY useStyleSheetEasyReadingCmd.label "Easy Reading">
+<!ENTITY useStyleSheetMaxInfoCmd.label "Maximum Information">
+<!ENTITY useStlyleSheetBizarreCmd.label "Bizarre">
+<!ENTITY reloadCmd.label "Reload">
+<!ENTITY showImagesCmd.label "Show Images">
+<!ENTITY stopCmd.label "Stop">
+<!ENTITY pageSourceCmd.label "Page Source">
+<!ENTITY pageInfoCmd.label "Page Info">
+<!ENTITY translateMenu.label "Translate">
+<!ENTITY translateButton.label "Translate">
+<!ENTITY translateEngtoFrenCmd.label "English to French">
+<!ENTITY translateEngtoGermCmd.label "English to German">
+<!ENTITY translateEngtoItalianCmd.label "English to Italian">
+<!ENTITY translateEngtoJapaneseCmd.label "English to Japanese">
+<!ENTITY translateEngtoPortCmd.label "English to Portugese">
+<!ENTITY translateEngtoSpanCmd.label "English to Spanish">
+<!ENTITY translateFrentoEngCmd.label "French to English">
+<!ENTITY translateFrentoGermCmd.label "French to German">
+<!ENTITY translateFrentoSpanCmd.label "French to Spanish">
+<!ENTITY translateGermtoEngCmd.label "German to English">
+<!ENTITY translateGermtoFrenCmd.label "German to French">
+<!ENTITY translateGermtoSpanCmd.label "German to Spanish">
+<!ENTITY translateItaliantoEngCmd.label "Italian to English">
+<!ENTITY tanslateJapanesetoEngCmd.label "Japanese to English">
+<!ENTITY translatePorttoEngCmd.label "Portugese to English">
+<!ENTITY tanslateSpantoEngCmd.label "Spanish to English">
+<!ENTITY translateSpantoFrenCmd.label "Spanish to French">
+<!ENTITY translateSpantoGermCmd.label "Spanish to German">
+<!ENTITY dcharMenu.label "Character Set  ISO">
+<!ENTITY dcharMenu1.label "Character Set  Multibyte">
+<!ENTITY dcharMenu2.label "Character Set  Cyrillic">
+<!ENTITY dcharMenu3.label "Character Set  SE Asian/Armenian/Semitic">
+<!ENTITY dcharMenu4.label "Character Set  Macintosh">
+<!ENTITY dcharMenu5.label "Character Set  Windows">
+<!ENTITY dcharIso1Cmd.label "Western (ISO-8859-1)">
+<!ENTITY dcharIso2Cmd.label "Central European (ISO-8859-2)">
+<!ENTITY dcharIso3Cmd.label "South European (ISO-8859-3)">
+<!ENTITY dcharIso4Cmd.label "Baltic (ISO-8859-4)">
+<!ENTITY dcharIso9Cmd.label "Turkish (ISO-8859-9)">
+<!ENTITY dcharIso10Cmd.label "Nordic (ISO-8859-10)">
+<!ENTITY dcharIso13Cmd.label "Baltic (ISO-8859-13)">
+<!ENTITY dcharIso14Cmd.label "Celtic (ISO-8859-14)">
+<!ENTITY dcharIso15Cmd.label "Western (ISO-8859-15)">
+<!ENTITY dcharWinLat2Cmd.label "Central European (Windows-1250)"> 
+<!ENTITY dcharWinLat1Cmd.label "Western (Windows-1252)">
+<!ENTITY dcharWinLat5Cmd.label "Turkish (Windows-1254)">
+<!ENTITY dcharWinBalRimCmd.label "Baltic (Windows-1257)">
+<!ENTITY dcharMacRomCmd.label "Western (MacRoman)">
+<!ENTITY dcharMacCenEuroCmd.label "Central European (MacCE)">
+<!ENTITY dcharMacTurCmd.label "Turkish (MacTurkish)">
+<!ENTITY dcharMacCroaCmd.label "Croatian (MacCroatian)">
+<!ENTITY dcharMacRomanianCmd.label "Romanian (MacRomanian)">
+<!ENTITY dcharMacIceCmd.label "Icelandic (MacIcelandic)">
+<!ENTITY dcharJapanCmd.label "Japanese (ISO-2022-JP)">
+<!ENTITY dcharJapanShiftjsCmd.label "Japanese (Shift_JIS)">
+<!ENTITY dcharJapanEucCmd.label "Japanese (EUC-JP)">
+<!ENTITY dcharTradChiBigCmd.label "Chinese Traditional (Big5)">
+<!ENTITY dcharTriChiEucCmd.label "Chinese Traditional (EUC-TW)">
+<!ENTITY dcharSimpChiGbCmd.label "Chinese Simplified (GB2312)">
+<!ENTITY dcharKoreanCmd.label "Korean (EUC-KR)">
+<!ENTITY dcharUtf7Cmd.label "Unicode (UTF-7)">
+<!ENTITY dcharUtf8Cmd.label "Unicode (UTF-8)">
+<!ENTITY dcharIsoCyrCmd.label "Cyrillic (ISO-8859-5)">
+<!ENTITY dcharEcmaCyrCmd.label "Cyrillic (ISO-IR-111)">
+<!ENTITY dcharDosCyrCmd.label "Cyrillic (CP-866)">
+<!ENTITY dcharWinCyrCmd.label "Cyrillic (Windows-1251)">
+<!ENTITY dcharMacCyrCmd.label "Cyrillic (MacCyrillic)">
+<!ENTITY dcharMacUkrCmd.label "Cyrillic/Ukrainian (MacUkrainian)">
+<!ENTITY dcharRusCmd.label "Cyrillic (KOI8-R)">
+<!ENTITY dcharUkrCmd.label "Cyrillic/Ukrainian (KOI8-U)">
+<!ENTITY dcharIsoGreekCmd.label "Greek (ISO-8859-7)">
+<!ENTITY dcharWinGreekCmd.label "Greek (Windows-1253)">
+<!ENTITY dcharMacGreekCmd.label "Greek (MacGreek)">
+<!ENTITY dcharWinVietCmd.label "Vietnamese (Windows-1258)">
+<!ENTITY dcharVietTcnCmd.label "Vietnamese (TCVN5712)">
+<!ENTITY dcharVietViCmd.label "Vietnamese (VISCII)">
+<!ENTITY dcharVieVpCmd.label "Vietnamese (VPS)">
+<!ENTITY dcharThaiCmd.label "Thai (TIS-620)">
+<!ENTITY dcharArmCmd.label "Armenian (ARMSCII-8)">
+<!ENTITY dcharIso6Cmd.label ".Arabic (ISO-8859-6)">
+<!ENTITY dcharIso8Cmd.label ".Hebrew (ISO-8859-8)">
+<!ENTITY dcharCp1255Cmd.label "Hebrew (Windows-1255)">
+<!ENTITY dcharCp1256Cmd.label "Arabic (Windows-1256)">
+<!ENTITY searchMenu.label "Search">
+<!ENTITY findOnCmd.label "Find On this page...">
+<!ENTITY findAgainCmd.label "Find Again">
+<!ENTITY searchBookmarksHistoryCmd.label "Search Bookmarks/History">
+<!ENTITY searchInternetCmd.label "Search the Internet">
+<!ENTITY searchAllMailCmd.label "Search Mail/News">
+<!ENTITY searchAddressbookCmd.label "Search Addressbook">
+<!ENTITY searchComputerCmd.label "Search on this Computer...">
+<!ENTITY goMenu.label "Go">
+<!ENTITY goMenu.accesskey "g">
+<!ENTITY goBackCmd.label "Back">
+<!ENTITY goBackCmd.accesskey "b">
+<!ENTITY goBackCmd.commandkey "[">
+<!ENTITY goForwardCmd.label "Forward">
+<!ENTITY goForwardCmd.accesskey "f">
+<!ENTITY goForwardCmd.commandkey "]">
+<!ENTITY goHomeCmd.label "Home">
+<!ENTITY goHomeCmd.accesskey "h">
+<!ENTITY goHomeCmd.commandkey "h">
+
+
+<!ENTITY bookmarksMenu.label "Bookmarks">
+<!ENTITY bookmarksMenu.accesskey "b">
+<!ENTITY addCurPageCmd.label "Add Current Page">
+<!ENTITY addCurPageCmd.accesskey "a">
+<!ENTITY addCurPageCmd.commandkey "d">
+<!ENTITY manBookmarksCmd.label "Manage Bookmarks...">
+<!ENTITY manBookmarksCmd.accesskey "m">
+<!ENTITY manBookmarksCmd.commandkey "b">
+
+<!ENTITY helpMenuCmd.label "Help">
+<!ENTITY helpContentsCmd.label "Help Contents">
+<!ENTITY howTutorialCmd.label "How to Tutorial">
+<!ENTITY helpChannelCmd.label "Help Channel">
+<!ENTITY softwareUpdatesCmd.label "Software Updates">
+<!ENTITY technicalSupportCmd.label "Technical Support">
+<!ENTITY releaseNotesCmd.label "Release Notes">
+<!ENTITY aboutCommunicatorCmd.label "About Communicator Prototype">
+
+<!-- LOCALIZATION NOTE BEGIN : DO not localize the entities below; debug --> 
+<!ENTITY debugMenu.label "Debug">
+<!ENTITY debugQA.label "QA Help">
+<!ENTITY debugQABug.label "QA Help">
+<!ENTITY debugQASmoke.label "Smoke Tests">
+<!ENTITY debugQAKnowBug.label "Known Bugs">
+<!ENTITY debugVerCmd.label "Verification">
+<!ENTITY ver1Cmd.label "Mozilla">
+<!ENTITY ver2Cmd.label "Yahoo">
+<!ENTITY ver3Cmd.label "Netscape">
+<!ENTITY ver4Cmd.label "Excite">
+<!ENTITY ver5Cmd.label "Microsoft">
+<!ENTITY ver6Cmd.label "city.net">
+<!ENTITY ver7Cmd.label "Mirabilis">
+<!ENTITY ver8Cmd.label "Pathfinder">
+<!ENTITY ver9Cmd.label "Warner Bros.">
+<!ENTITY ver10Cmd.label "CNN">
+<!ENTITY ver11Cmd.label "USA Today">
+<!ENTITY ver12Cmd.label "Disney">
+<!ENTITY ver13Cmd.label "Hotwired">
+<!ENTITY ver14Cmd.label "Hotbot">
+<!ENTITY ver15Cmd.label "Frames">
+<!ENTITY ver16Cmd.label "Tables">
+<!ENTITY ver17Cmd.label "Applets">
+<!ENTITY ver18Cmd.label "JavaScript">
+<!ENTITY ver19Cmd.label "GIF Images">
+<!ENTITY ver20Cmd.label "JPEG Images">
+<!ENTITY ver21Cmd.label "PNG Images">
+<!ENTITY ver22Cmd.label "Transparency">
+<!ENTITY ver23Cmd.label "Animation">
+<!ENTITY ver24Cmd.label "Larger page">
+<!ENTITY ver25Cmd.label "Smaller page">
+<!-- LOCALIZATION NOTE END : DO not localize the entities above; debug --> 
+
+<!-- LOCALIZATION NOTE BEGIN : DO not localize the entities below; debug --> 
+<!ENTITY viewDemoMenu.label "Viewer Demos">
+<!ENTITY demo0Cmd.label "#0 Basic Styles">
+<!ENTITY demo1Cmd.label "#1 CSS Styles">
+<!ENTITY demo2Cmd.label "#2 Images">
+<!ENTITY demo3Cmd.label "#3 Basic Tables">
+<!ENTITY demo4Cmd.label "#4 Simple Tables">
+<!ENTITY demo5Cmd.label "#5 More Styles">
+<!ENTITY demo6Cmd.label "#6 Deeply Nested Tables">
+<!ENTITY demo7Cmd.label "#7 Scaled Anim Image">
+<!ENTITY demo8Cmd.label "#8 Form">
+<!ENTITY demo9Cmd.label "#9 Frames">
+<!ENTITY demo10Cmd.label "#10 Anim Images">
+<!ENTITY demo11Cmd.label "#11 Fixed Positioning">
+<!ENTITY demo12Cmd.label "#12 More Fixed Pos">
+<!ENTITY demo13Cmd.label "#13 DHTML">
+<!ENTITY demo14Cmd.label "#14 XML Sorting">
+<!ENTITY demo15Cmd.label "#15 XML IRS">
+<!ENTITY demo16Cmd.label "#16 Gfx Widgets">
+<!-- LOCALIZATION NOTE END : DO not localize the entities above; debug --> 
+
+<!-- LOCALIZATION NOTE BEGIN : DO not localize the entities below; debug --> 
+<!ENTITY xptkMenu.label "XPToolkit">
+<!ENTITY xptk1Cmd.label "Tri-state checkbox">
+<!ENTITY xptk2Cmd.label "Toolbar">
+<!ENTITY xptk3Cmd.label "Tree">
+<!ENTITY xptk4Cmd.label "Dialog">
+<!ENTITY xptk5Cmd.label "Dialog w/ animation">
+<!ENTITY xptk6Cmd.label "Dialog chrome">
+<!ENTITY xptk7Cmd.label "Tab">
+<!ENTITY xptk8Cmd.label "Beep">
+<!ENTITY xptk9Cmd.label "Sound">
+<!ENTITY xptk10Cmd.label "XP Menus">
+<!ENTITY xptk11Cmd.label "Color Picker">
+<!-- LOCALIZATION NOTE END : DO not localize the entities above; debug --> 
+
+<!-- LOCALIZATION NOTE BEGIN : DO not localize the entities below; debug --> 
+<!ENTITY domviewer.label "DOM Viewer">
+<!ENTITY browserbuster.label "chofmann's browser buster">
+<!-- LOCALIZATION NOTE END : DO not localize the entities above; debug --> 
+
+<!-- LOCALIZATION NOTE BEGIN : DO not localize the entities below; test case --> 
+<!ENTITY strresCmd.label "StringBundle Test">
+<!ENTITY languages.label "Languages">
+<!ENTITY en-US.label "English (en-US)">
+<!ENTITY da-DK-file.label "Danish (da-DK; file)">
+<!ENTITY da-DK-http.label "Danish (da-DK; http)">
+<!-- LOCALIZATION NOTE END   : DO not localize the entities above; test case --> 
+
+<!-- LOCALIZATION NOTE BEGIN : DO not localize the entities below; QA --> 
+<!ENTITY QA.label "QA">
+<!ENTITY PrecheckinTests.label "Precheckin Tests">
+<!ENTITY QABugCmd.label "Bug Writing">
+<!ENTITY QATempCmd.label "Bug Template">
+<!ENTITY QASmokeCmd.label "Smoke Tests">
+<!ENTITY QAKnownBugCmd.label "Known Bugs">
+<!ENTITY BloatDumpNewCmd.label "Bloat: Dump New Stats">
+<!ENTITY BloatDumpAllCmd.label "Bloat: Dump All Stats">
+<!ENTITY BloatClearCmd.label "Bloat: Clear Stats">
+<!ENTITY BloatLeaksCmd.label "Bloat: Dump Memory Leaks">
+<!ENTITY URIDispatchingCmd.label "URI Dispatching">
+<!ENTITY URIDispatchingEnableCmd.label "Enable Dispatching">
+<!ENTITY URIDispatchingDisableCmd.label "Disable Dispatching">
+<!-- LOCALIZATION NOTE END : DO not localize the entities above; QA --> 
+
+
+<!-- Toolbar items --> 
+<!ENTITY backButton.label "Back">
+<!ENTITY forwardButton.label "Forward">
+<!ENTITY reloadButton.label "Reload">
+<!ENTITY stopButton.label "Stop">
+<!ENTITY searchButton.label "Search">
+<!ENTITY printButton.label "Print">
+
+<!-- Toolbar items --> 
+<!ENTITY  bookmarksButton.label "Bookmarks">
+<!ENTITY  homeButton.label "Home">
+<!-- LOCALIZATION NOTE (bugzillaButton.label) : DONT_TRANSLATE -->
+<!ENTITY  bugzillaButton.label "Bugzilla">
+<!-- LOCALIZATION NOTE (tinderboxButton.label) : DONT_TRANSLATE -->
+<!ENTITY  tinderboxButton.label "Tinderbox">
+
+<!-- Statusbar -->
+<!ENTITY  statusText.label "Document: Done">
+<!ENTITY  buildId.label "Build ID: 1999122808">
+
+<!-- Context Menu -->                 
+<!ENTITY openLinkCmd.label            "Open link in new window">
+<!ENTITY openLinkCmd.accesskey        "o">
+<!ENTITY editLinkCmd.label            "Edit link in composer">
+<!ENTITY editLinkCmd.accesskey        "e">
+<!ENTITY openFrameCmd.label           "Open frame in new window">
+<!ENTITY openFrameCmd.accesskey       "o">
+<!ENTITY viewPageSourceCmd.label      "View page source">
+<!ENTITY viewPageSourceCmd.accesskey  "v">
+<!ENTITY viewFrameSourceCmd.label     "View frame source">
+<!ENTITY viewFrameSourceCmd.accesskey "v">
+<!ENTITY viewPageInfoCmd.label        "View page info">
+<!ENTITY viewPageInfoCmd.accesskey    "i">
+<!ENTITY viewFrameInfoCmd.label       "View frame info">
+<!ENTITY viewFrameInfoCmd.accesskey   "i">
+<!ENTITY viewImageCmd.label           "View image">
+<!ENTITY viewImageCmd.accesskey       "w">
+<!ENTITY bookmarkPageCmd.label        "Bookmark this page">
+<!ENTITY bookmarkPageCmd.accesskey    "b">
+<!ENTITY savePageCmd.label            "Save page as...">
+<!ENTITY savePageCmd.accesskey        "s">
+<!ENTITY saveFrameCmd.label           "Save frame as...">
+<!ENTITY saveFrameCmd.accesskey       "s">
+<!ENTITY saveLinkCmd.label            "Save link as...">
+<!ENTITY saveLinkCmd.accesskey        "s">
+<!ENTITY saveImageCmd.label           "Save image as...">
+<!ENTITY saveImageCmd.accesskey       "a">
+<!ENTITY saveBGImageCmd.label         "Save background image as...">
+<!ENTITY saveBGImageCmd.accesskey     "a">
+<!ENTITY copyCmd.label                "Copy">
+<!ENTITY copyCmd.accesskey            "c">
+<!ENTITY selectAllCmd.label           "Select all">
+<!ENTITY selectAllCmd.accesskey       "l">
+<!ENTITY copyLinkCmd.label            "Copy link location">
+<!ENTITY copyLinkCmd.accesskey        "l">
+<!ENTITY copyImageCmd.label           "Copy image location">
+<!ENTITY copyImageCmd.accesskey       "m">

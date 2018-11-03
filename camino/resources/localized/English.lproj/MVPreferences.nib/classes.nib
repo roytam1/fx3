@@ -1,0 +1,18 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {showPreferences = id; }; 
+            CLASS = MVPreferencesController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                mLoadingImageView = NSImageView; 
+                mLoadingTextFeld = NSTextField; 
+                mLoadingView = NSView; 
+                mWindow = NSWindow; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

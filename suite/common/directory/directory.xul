@@ -1,0 +1,80 @@
+<?xml version="1.0"?> <!-- -*- Mode: SGML -*- -->
+<!--
+
+  The contents of this file are subject to the Netscape Public
+  License Version 1.1 (the "License"); you may not use this file
+  except in compliance with the License. You may obtain a copy of
+  the License at http://www.mozilla.org/NPL/
+ 
+  Software distributed under the License is distributed on an "AS
+  IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+  implied. See the License for the specific language governing
+  rights and limitations under the License.
+ 
+  The Original Code is mozilla.org code.
+ 
+  The Initial Developer of the Original Code is Netscape
+  Communications Corporation.  Portions created by Netscape are
+  Copyright (C) 1998 Netscape Communications Corporation. All
+  Rights Reserved.
+ 
+  Contributor(s): 
+
+-->
+
+<?xml-stylesheet href="chrome://directory/skin/" type="text/css"?>
+
+<!DOCTYPE window SYSTEM "chrome://directory/locale/directory.dtd">
+
+<window 
+  title="&directoryWindowTitle.label;"
+  xmlns:html="http://www.w3.org/TR/REC-html40"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  align="vertical">
+
+  <html:script src="directory.js" />
+
+  <html:div style="width:100px;height:100px;" flex="1">
+    <tree id="tree" datasources="rdf:null" style="height:100%;">
+      <template>
+        <treechildren>
+          <!-- We force the 'container="true"' onto the treeitem, even
+               though this _should_ be a value that is computed by the
+               template engine. We need to hack it this way because,
+               if we don't, the tree control will assume that the item
+               shouldn't have a twisty next to it -->
+          <treeitem uri="..." type="rdf:urn:http-index-format:File-Type"
+                    loading="rdf:urn:http-index-format:Loading"
+                    container="true">
+            <treerow>
+              <treecell class="filename" indent="true"
+                        value="rdf:urn:http-index-format:Filename"/>
+              <treecell value="rdf:urn:http-index-format:Content-Length" />
+              <treecell value="rdf:urn:http-index-format:Last-Modified" />
+            </treerow>
+          </treeitem>
+        </treechildren>
+      </template>
+
+      <treecol id="FilenameColumn" rdf:resource="urn:http-index-format:Filename" sortActive="true" sortDirection="ascending" />
+      <treecol id="ContentLengthColumn" rdf:resource="urn:http-index-format:Content-Length"/>
+      <treecol id="LastModColumn" rdf:resource="urn:http-index-format:Last-Modified"/>
+
+      <treehead>
+        <treerow>
+          <treecell value="&directoryWindow.filename.label;" onclick="return doSort('FilenameColumn');" observes="FilenameColumn" sortActive="true" sortDirection="ascending" />
+          <treecell value="&directoryWindow.contentlength.label;" onclick="return doSort('ContentLengthColumn');" observes="ContentLengthColumn" />
+          <treecell value="&directoryWindow.lastmodified.label;" onclick="return doSort('LastModColumn');" observes="LastModColumn" />
+        </treerow>
+      </treehead>
+
+      <!-- Create the treechildren here so we can attach event handlers
+           at this level (rather than at the tree level -->
+      <treechildren
+          onclick="OnClick(event);"
+          ondblclick="OnDblClick(event);" />
+
+    </tree>
+  </html:div>
+</window>

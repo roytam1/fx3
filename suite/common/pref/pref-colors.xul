@@ -1,0 +1,121 @@
+<?xml version="1.0"?> 
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   Software distributed under the License is distributed on an "AS
+   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-colors.dtd" >
+<window xmlns:html="http://www.w3.org/TR/REC-html40"
+		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        class="dialog"
+        onload="StartUp('Colors')"  title="&window.title;" align="vertical">
+
+<html:script language="JavaScript" src="chrome://pref/content/PrefsWindow.js"/>
+
+  	<box class="header" align="horizontal">  
+	      <titledbutton class="left-header-text" value="&lHeader;"/>
+   		  <spring class="header-spring" flex="1"/>
+		  <titledbutton class="right-header-text" value="&rHeader;"/>
+	</box>
+
+
+  <box align="horizontal">
+		<html:fieldset flex="1">
+					<html:legend align="left"> 
+			<html:div>
+				&color;
+			</html:div> 
+			</html:legend> 
+			<html:div>
+			<menu>
+				<titledbutton value="&text;" class="popup" align="right"/>
+				<html:div id="pref:#000000:color:browser.foreground_color" style="width:30px; background-color:white"/>
+				<menupopup>
+					<colorpicker palettename="standard" onclick="setColorWell(this.parentNode.parentNode,null,false);"/>
+				</menupopup>
+			</menu>
+
+			</html:div>
+			<html:div>
+			<menu>
+				<titledbutton value="&background;" class="popup" align="right"/>
+				<html:div id="pref:#000000:color:browser.background_color" style="width:30px; background-color:white"/>
+				<menupopup>
+					<colorpicker palettename="standard" onclick="setColorWell(this.parentNode.parentNode,null,false);"/>
+				</menupopup>
+			</menu>
+
+			</html:div>
+			<html:div>
+				<html:input  type="checkbox" id="pref:0:bool:browser.wfe.use_windows_colors"
+				val="checked" />
+			<html:label for="pref:0:bool:browser.wfe.use_windows_colors" accesskey="w" tabindex="0">
+				&useWinColorsCheck.label;
+			</html:label>
+			</html:div> 
+	    	</html:fieldset>
+			<html:fieldset flex="1">
+					<html:legend align="left">
+			<html:div>&links;</html:div> 
+					</html:legend>
+			<html:div>
+			<menu>
+				<titledbutton value="&unvisit;" class="popup" align="right"/>
+				<html:div id="pref:#000000:color:browser.anchor_color" style="width:30px; background-color:white"/>
+				<menupopup>
+					<colorpicker palettename="standard" onclick="setColorWell(this.parentNode.parentNode,null,false);"/>
+				</menupopup>
+			</menu>
+				</html:div>
+			<html:div>
+			<menu>
+				<titledbutton value="&visit;" class="popup" align="right"/>
+				<html:div id="pref:#000000:color:browser.visited_color" style="width:30px; background-color:white"/>
+				<menupopup>
+					<colorpicker palettename="standard" onclick="setColorWell(this.parentNode.parentNode,null,false);"/>
+				</menupopup>
+			</menu>
+			</html:div>
+			<html:div><html:input  type="checkbox" id="pref:0:bool:browser.underline_anchors" val="checked" />		
+				<html:label for="pref:0:bool:browser.underline_anchors" accesskey="u" tabindex="0">				
+				&underLinksCheck.label;
+				</html:label>
+			
+			</html:div>		
+		</html:fieldset>
+  </box>
+
+			<html:fieldset>
+					<html:legend align="left">
+			<html:div></html:div> 
+					</html:legend>
+			<html:div>
+				&someProvColors;
+			</html:div>
+			<html:div>
+				<html:input type="checkbox" id="pref:0:bool:browser.use_document_colors" />
+				<html:label for="pref:0:bool:browser.use_document_colors" accesskey="a" tabindex="0">
+				&alwaysOverCheck.label;
+			</html:label>
+			</html:div>		
+		</html:fieldset>
+</window>

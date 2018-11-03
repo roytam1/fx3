@@ -1,0 +1,153 @@
+<?xml version="1.0"?> 
+<!--
+   The contents of this file are subject to the Netscape Public
+   License Version 1.1 (the "License"); you may not use this file
+   except in compliance with the License. You may obtain a copy of
+   the License at http://www.mozilla.org/NPL/
+    
+   Software distributed under the License is distributed on an "AS
+   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+   implied. See the License for the specific language governing
+   rights and limitations under the License.
+    
+   The Original Code is Mozilla Communicator client code, released
+   March 31, 1998.
+   
+   The Initial Developer of the Original Code is Netscape
+   Communications Corporation. Portions created by Netscape are
+   Copyright (C) 1998-1999 Netscape Communications Corporation. All
+   Rights Reserved.
+   
+   Contributor(s): 
+  -->
+
+<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+
+<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-themes.dtd" >
+<window xmlns:html="http://www.w3.org/TR/REC-html40"
+		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        class="dialog"
+        align="vertical">
+
+<box class="header" align="horizontal">
+  <titledbutton class="left-header-text" value="&lHeader;"/>
+  <spring class="header-spring" flex="1"/>
+  <titledbutton class="right-header-text" value="&rHeader;"/>
+</box>
+
+<tabcontrol flex="1" align="vertical">
+  <tabbox>
+    <tab selected="true">Theme View</tab>
+    <tab>Package View</tab>
+  </tabbox>
+  <tabpanel align="vertical" flex="1">
+    <box flex="1" align="vertical">
+	  <html:fieldset>
+	    <html:legend align="left">
+		  <html:div>Themes</html:div> 
+		</html:legend>
+		<html:div style="height:100px">
+		<tree style="height:100%;width:100%;">
+			<treecol/>
+			<treechildren>
+			  <treeitem>
+				<treerow>
+				  <treecell value="Classic 4.x"/>
+				</treerow>
+			  </treeitem>
+			  <treeitem>
+				<treerow>
+				  <treecell value="Purple and Blue"/>
+				</treerow>
+			  </treeitem>
+			  <treeitem>
+				<treerow>
+				  <treecell value="That 70's Chrome"/>
+				</treerow>
+			  </treeitem>
+			</treechildren>
+		  </tree>
+		</html:div>
+	</html:fieldset>
+	  <spring style="width: 2px"/>
+	  <html:fieldset>
+	    <html:legend align="left">
+		  <html:div>Selected Theme: Purple and Blue</html:div> 
+		</html:legend>
+		<html:div>Author: Mozilla.org</html:div>
+		<html:div>Version: 1.0</html:div>
+		<html:div>Site: <html:a href="http://www.mozilla.org" target="_blank">http://www.mozilla.org</html:a></html:div>
+		<html:div>Preview Image:<html:br/>The thumbnail image would go here.</html:div>
+		<html:div>
+		    <titledbutton class="push dialog" value="Apply Theme"/>
+		    <titledbutton class="push dialog" value="Delete Theme"/>
+			<titledbutton class="push dialog" value="View Details"/>
+		</html:div>
+	  </html:fieldset>
+	</box>
+
+	<box flex="1" align="vertical">
+	  <html:fieldset>
+	    <html:legend align="left">
+		  <html:div>Packages</html:div> 
+		</html:legend>
+		<html:div style="height:100px">
+		<tree style="height:100%;width:100%;">
+			<treecol/>
+			<treechildren>
+			  <treeitem>
+				<treerow>
+				  <treecell value="Global"/>
+				</treerow>
+			  </treeitem>
+			  <treeitem>
+				<treerow>
+				  <treecell value="Navigator"/>
+				</treerow>
+			  </treeitem>
+			  <treeitem>
+				<treerow>
+				  <treecell value="Messenger"/>
+				</treerow>
+			  </treeitem>
+			</treechildren>
+		  </tree>
+		</html:div>
+	</html:fieldset>
+	  <spring style="width: 2px"/>
+	  <html:fieldset>
+	    <html:legend align="left">
+		  <html:div>Selected Package: Messenger</html:div> 
+		</html:legend>
+		<html:div>Author: Mozilla.org</html:div>
+		<html:div>Version: 1.0</html:div>
+		<html:div>Site: <html:a href="http://www.mozilla.org">http://www.mozilla.org</html:a></html:div>
+		<html:div style="height:100px">
+		    <tree style="height:80px;width:100%">
+			  <treecol/>
+			  <treechildren>
+			  <treeitem selected="true">
+				<treerow>
+				  <treecell value="That 70's Chrome"/>
+				</treerow>
+			  </treeitem>
+			  <treeitem>
+				<treerow>
+				  <treecell value="Star Trek"/>
+				</treerow>
+			  </treeitem>
+			  <treeitem>
+				<treerow>
+				  <treecell value="Candy Land"/>
+				</treerow>
+			  </treeitem>
+			  </treechildren>
+		    </tree>
+		</html:div>
+	  </html:fieldset>
+	</box>
+
+  </tabpanel>
+</tabcontrol>
+
+</window>

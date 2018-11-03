@@ -1,0 +1,359 @@
+<?xml version="1.0"?>
+
+<!-- ***** BEGIN LICENSE BLOCK *****
+   - Version: MPL 1.1/GPL 2.0/LGPL 2.1
+   -
+   - The contents of this file are subject to the Mozilla Public License Version
+   - 1.1 (the "License"); you may not use this file except in compliance with
+   - the License. You may obtain a copy of the License at
+   - http://www.mozilla.org/MPL/
+   -
+   - Software distributed under the License is distributed on an "AS IS" basis,
+   - WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+   - for the specific language governing rights and limitations under the
+   - License.
+   -
+   - The Original Code is Mozilla XForms support.
+   -
+   - The Initial Developer of the Original Code is
+   - Novell, Inc.
+   - Portions created by the Initial Developer are Copyright (C) 2005
+   - the Initial Developer. All Rights Reserved.
+   -
+   - Contributor(s):
+   -  Allan Beaufour <abeaufour@novell.com>
+   -  Olli Pettay <Olli.Pettay@helsinki.fi>
+   -
+   - Alternatively, the contents of this file may be used under the terms of
+   - either the GNU General Public License Version 2 or later (the "GPL"), or
+   - the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+   - in which case the provisions of the GPL or the LGPL are applicable instead
+   - of those above. If you wish to allow use of your version of this file only
+   - under the terms of either the GPL or the LGPL, and not to allow others to
+   - use your version of this file under the terms of the MPL, indicate your
+   - decision by deleting the provisions above and replace them with the notice
+   - and other provisions required by the GPL or the LGPL. If you do not delete
+   - the provisions above, a recipient may use your version of this file under
+   - the terms of any one of the MPL, the GPL or the LGPL.
+   -
+   - ***** END LICENSE BLOCK ***** -->
+
+<!--
+  This file implements the "abstract" UI classes for XForms controls. They
+  all have "pure virtual" functions that they expect to be implemented by
+  concrete application and returned in the getElementControl() call. An example
+  is the controls for XHTML in xforms-xhtml.xml.
+-->
+
+
+<!DOCTYPE bindings [
+<!ENTITY % xformsDTD SYSTEM "chrome://xforms/locale/xforms.dtd">
+  %xformsDTD;
+]>
+
+<bindings id="xformsBindings"
+          xmlns="http://www.mozilla.org/xbl"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:xbl="http://www.mozilla.org/xbl"
+          xmlns:xforms="http://www.w3.org/2002/xforms"
+          xmlns:lazy="http://www.mozilla.org/projects/xforms/2005/lazy">
+
+
+  <!-- LAZY INSTANCE MODEL -->
+  <binding id="xforms-lazy-instance">
+    <content><xforms:instance lazy:lazy="true"/><children/></content>
+  </binding>
+
+
+  <!-- BASE -->
+  <binding id="xformswidget-base">
+    <content><children/></content>
+
+    <implementation implements="nsIXFormsUIWidget">
+
+    <!-- nsIXFormsUIWidget interface -->
+      <method name="refresh">
+        <body>
+          return true;
+        </body>
+      </method>
+
+      <method name="disable">
+        <parameter name="aDisable"/>
+        <body>
+          return true;
+        </body>
+      </method>
+
+      <method name="focus">
+        <body>
+          return false;
+        </body>
+      </method>
+
+    <!-- interface -->
+      <property name="XFORMS_NS" readonly="true">
+        <getter>
+          return "http://www.w3.org/2002/xforms";
+        </getter>
+      </property>
+
+      <property name="accessors" readonly="true">
+        <getter>
+          <![CDATA[
+          if (!this._accessors && this.delegate)
+            this._accessors = this.delegate.getXFormsAccessors();
+          return this._accessors;
+          ]]>
+        </getter>
+      </property>
+
+      <property name="stringValue" readonly="true">
+        <getter>
+          var value = this.accessors.getValue();
+          return value != null ? value : "";
+        </getter>
+      </property>
+
+      <!-- Dispatch UI Event to the control itself -->
+      <method name="dispatchDOMUIEvent">
+        <parameter name="aType"/>
+        <body>
+          var ev = document.createEvent("UIEvents");
+          ev.initUIEvent(aType, true, true, window, 1);
+          this.dispatchEvent(ev);
+          return true;
+        </body>
+      </method>
+
+      <!--
+          Dispatch an _XForms notification event_ to a node.
+          See http://www.w3.org/TR/xforms/slice4.html#evt-notify
+      -->
+      <method name="dispatchXFormsNotificationEvent">
+        <parameter name="aEventName"/>
+        <parameter name="aTarget"/>
+        <body>
+          var ev = document.createEvent("Events");
+          ev.initEvent(aEventName, true, false);
+          aTarget.dispatchEvent(ev);
+          return true;
+        </body>
+      </method>
+
+      <!--
+        Return object to operate with underliying controls. Each xforms widget
+        defines interface what should implement the object.
+      -->
+      <property name="control" readonly="true">
+        <getter>
+          if (!this._control) 
+            this._control = this.getControlElement();
+          return this._control;
+        </getter>
+      </property>
+
+      <!--
+        Each base binding for xforms widget assumes successors bindings will
+        override the method.
+      -->
+      <method name="getControlElement">
+        <body>
+          throw Error("getControlElement() method isn't implemented.");
+        </body>
+      </method>
+
+    <!-- private -->
+      <constructor>
+        this.delegate.widgetAttached();
+      </constructor>
+
+      <destructor>
+        this._delegate = null;
+        this._accessors = null;
+      </destructor>
+
+      <property name="delegate" readonly="true">
+        <getter>
+          if (!this._delegate) {
+            this._delegate =
+              this.QueryInterface(Components.interfaces.nsIXFormsDelegate);
+          }
+          return this._delegate;
+        </getter>
+      </property>
+
+      <field name="_delegate">null</field>
+      <field name="_accessors">null</field>
+      <field name="_control">null</field>
+
+    </implementation>
+  </binding>
+
+
+  <!-- OUTPUT: <DEFAULT>
+    The output widget assumes successors bindings implement getElementControl()
+    method what returns the object:
+    {
+      set value(); // set "string" value
+    }
+  -->
+  <binding id="xformswidget-output-base"
+           extends="chrome://xforms/content/xforms.xml#xformswidget-base">
+    <implementation implements="nsIXFormsUIWidget">
+      <method name="refresh">
+        <body>
+          this.control.value = this.stringValue;
+          return true;
+        </body>
+      </method>
+    </implementation>
+  </binding>
+
+
+  <!-- LABEL: <DEFAULT>
+    The label widget assumes successors bindings implement getElementControl()
+    method what returns the object:
+    {
+      set value(); // set "string" value
+    }
+  -->
+  <binding id="xformswidget-label-base"
+           extends="chrome://xforms/content/xforms.xml#xformswidget-base">
+
+    <implementation implements="nsIXFormsUIWidget">
+      <method name="refresh">
+        <body>
+          this.control.value = this.accessors.getValue();
+          return true;
+        </body>
+      </method>
+
+    </implementation>
+  </binding>
+
+
+  <!-- TRIGGER: <DEFAULT>
+    The trigger widget assumes successors bindings implement getElementControl()
+    method what returns the object:
+    {
+      set disabled(); // set disabled state
+      focus(); // set focus
+    }
+  -->
+  <binding id="xformswidget-trigger-base"
+           extends="chrome://xforms/content/xforms.xml#xformswidget-base">
+
+    <implementation implements="nsIXFormsUIWidget">
+      <method name="disable">
+        <parameter name="aDisable"/>
+        <body>
+          this.control.disabled = aDisable;
+        </body>
+      </method>
+
+      <method name="focus">
+        <body>
+          this.control.focus();
+          return true;
+        </body>
+      </method>
+
+    </implementation>
+  </binding>
+
+
+  <!-- TRIGGER: MINIMAL
+    We don't need in any special base binding for trigger[appearance="minimal"]
+    widget. All successors bindings should be extended from base binding for
+    default trigger widget.
+  -->
+
+
+  <!-- CASE: <DEFAULT> -->
+  <binding id="xformswidget-case">
+    <content>
+      <html:div anonid="container" class="-moz-xforms-case-container">
+        <children/>
+      </html:div>
+    </content>
+
+    <implementation implements="nsIXFormsCaseUIElement">
+      <constructor>
+        this.QueryInterface(Components.interfaces.nsIXFormsCaseElement).
+          widgetAttached();
+      </constructor>
+
+      <field name="_container">null</field>
+      <property name="container" readonly="true">
+        <getter>
+          if (!this._container) {
+            this._container = document.
+              getAnonymousElementByAttribute(this, "anonid", "container");
+          }
+          return this._container;
+        </getter>
+      </property>
+
+      <method name="caseSelected">
+        <parameter name="aEnable"/>
+        <body>
+          if (aEnable) {
+            this.container.style.display = "inherit";
+          } else {
+            this.container.style.display = "none"
+          }
+
+          return true;
+        </body>
+      </method>
+
+    </implementation>
+  </binding>
+
+
+  <!-- UPLOAD: <DEFAULT>
+    The upload widget assumes successors bindings implement getElementControl()
+    method what returns the object:
+    {
+      set value(); // set "string" value
+      set readonly(); // set readonly state
+      focus(); // set focus
+    }
+  -->
+  <binding id="xformswidget-upload-base" extends="#xformswidget-base">
+
+    <implementation implements="nsIXFormsUIWidget, nsIXFormsUploadUIElement">
+      <method name="refresh">
+        <body>
+          this.control.readonly = this.accessors.isReadonly();
+        </body>
+      </method>
+
+      <method name="focus">
+        <body>
+          this.control.focus();
+          return true;
+        </body>
+      </method>
+
+      <property name="uploadElement" readonly="true">
+        <getter>
+          if (!this._uploadElement) {
+            this._uploadElement =
+              this.QueryInterface(Components.interfaces.nsIXFormsUploadElement);
+          }
+          return this._uploadElement;
+        </getter>
+      </property>
+      <field name="_uploadElement">null</field>
+
+      <method name="setFieldText">
+        <parameter name="aString"/>
+        <body>
+          this.control.value = aString;
+        </body>
+      </method>
+    </implementation>
+  </binding>
+</bindings>

@@ -1,0 +1,8 @@
+#
+# This is a list of local files which get copied to the mozilla:dist directory
+#
+
+pw_public.h
+nsITransferListener.h
+nsProgressManager.h
+progress.h

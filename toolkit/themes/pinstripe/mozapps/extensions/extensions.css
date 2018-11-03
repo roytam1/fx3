@@ -1,0 +1,161 @@
+#extensionManager {
+  padding: 0;
+}
+
+richlistbox {
+  -moz-appearance: none !important;
+  margin: 0;
+  padding: 0;
+}
+
+#extensionsView[state="themes"] {
+	margin: 8px 8px 3px 8px;
+        border: 1px solid #bebebe;
+}
+
+#extensionsView[state="extensions"] {
+        margin-bottom: 1px;
+        border-bottom: 1px solid #bebebe;
+}
+
+/* Extension Manager Command Bar */
+#commandBar {
+  padding: 5px 8px 6px 8px;
+  min-width: 1px;
+}
+
+#commandBar button {
+  -moz-appearance: button-bevel;
+  min-width: 1px;
+  padding: 3px 6px;
+  margin: 0;
+}
+
+.commandBarSeparator {
+	width: 6px;
+}
+
+#getMore {
+  text-align: right;
+}
+
+/* Extension List Items */
+extension[selected="true"] {
+  background-color: Highlight;
+}
+
+extension {
+  padding: 10px;
+  min-height: 25px;
+  border-bottom: 1px dashed #C0C0C0;
+  margin: 0;
+}
+
+extension[odd] {
+  background-color: #F3F3F3;
+}
+
+.extension-icon {
+  list-style-image: url("chrome://mozapps/skin/extensions/extensionItem.png");
+}
+
+extension[disabled="true"] {
+  color: GrayText;
+  background-image: none;
+}
+
+extension[disabled="true"][compatible="false"] .extension-item-description,
+extension[blocklisted="true"] .extension-item-description,
+extension[satisfiesDependencies="false"] .extension-item-description,
+extension[incompatibleUpdate="true"] .extension-item-description {
+  color: #C77173;
+}
+
+extension[disabled="true"][selected="true"] {
+  background-image: url("chrome://mozapps/skin/shared/itemSelected.png");
+}
+
+extension[disabled="true"] .extension-icon, extension[opType="needs-disable"] .extension-icon {
+  opacity: 0.5;
+}
+
+extension[opType="needs-uninstall"] .extension-icon {
+  opacity: 0.2;
+}
+
+.extension-item-name {
+  font-weight: bold;
+}
+
+.extension-item-description, .extension-item-creator {
+  color: #505050;
+}
+.extension-icon {
+  margin-right: 10px; 
+}
+
+.previewText {
+  font-size: larger;
+  font-weight: bold;
+  color: #999;
+  text-align: center;
+}
+
+extension[itemType="theme"] {
+  padding: 7px 5px 7px 6px;
+}
+
+extension[itemType="theme"] .extension-icon {
+  margin-right: 3px;
+}
+
+.themePreviewArea {
+  margin: 8px 8px 3px 0px !important;
+  padding: 5px 5px 0px 5px;
+  border: 3px solid transparent;
+  -moz-border-top-colors: #9b9b9b #c8c8c8 #e1e1e1 ;
+  -moz-border-right-colors: #c4c4c4 #e1e1e1 #e4e4e4;
+  -moz-border-bottom-colors: #d6d6d6 #e2e2e2 #e4e4e4;
+  -moz-border-left-colors: #c4c4c4 #e1e1e1 #e4e4e4;
+  background: url("chrome://global/skin/10pct_transparent_grey.png") repeat !important;
+  -moz-border-radius: 3px;
+}
+
+extension[availableUpdateURL="none"] .extension-badge,
+extension .extension-details-link {
+  display: none;
+}
+
+extension[blocklisted="true"][blocklistDetailsURL][availableUpdateURL="none"] .extension-details-link {
+  display: -moz-box;
+}
+
+extension[loading="true"] .extension-badge {
+  display: -moz-box;
+  width: 16px;
+  height: 16px;
+  margin-bottom: -3px;
+  -moz-margin-end: -2px;
+  list-style-image: url("chrome://global/skin/throbber/Throbber-small.gif") !important;
+}
+
+.extension-badge {
+  display: -moz-box;
+  width: 16px;
+  height: 16px;
+  margin-bottom: -3px;
+  -moz-margin-end: -2px;
+  list-style-image: url("chrome://mozapps/skin/update/update.png");
+  -moz-image-region: rect(0px 48px 16px 32px);
+}
+
+.extension-install-button-box {
+  margin: 0px;
+}
+
+.throbber {
+  width: 16px;
+  height: 16px;
+  list-style-image: url("chrome://global/skin/throbber/Throbber-small.gif") !important;
+}
+

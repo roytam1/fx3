@@ -1,0 +1,28 @@
+<!-- extracted from content/pref-navigator.xul -->
+
+<!--LOCALIZATION NOTE : FILE Navigator prefs screen -->
+<!--LOCALIZATION NOTE (title.label): DONT_TRANSLATE -->
+<!ENTITY  title.label "Navigator">
+<!ENTITY  lHeader "Navigator">
+<!ENTITY  rHeader "Specify the home page location">
+<!ENTITY  navRadio "Navigator starts with">
+<!ENTITY  blankRadio "Blank page">
+<!ENTITY  header2.label "Home page">
+<!ENTITY  lastPageRadio "Last page visited">
+<!ENTITY  homepageRadio "Home page">
+<!ENTITY  clickRadio "Clicking the Home button will take you to this page.">
+<!ENTITY  location "Location:">
+<!ENTITY  useCurrent "Use Current Page">
+<!ENTITY  browseFile "Select File...">
+<!ENTITY  header3.label "History">
+<!ENTITY  historyPages "List of the pages you have previously visited.">
+<!--LOCALIZATION NOTE (histDay): DONT_TRANSLATE -->
+<!ENTITY  histDay "9">
+<!ENTITY  daysRadio "days">
+<!ENTITY  homepageRadio "Homepage">
+<!ENTITY  pagesHis "Pages in history expire after:">
+<!ENTITY  clearRadio "Clear the list of sites on the location bar: ">
+<!ENTITY  clearHis "clear history">
+<!ENTITY  header4.label "Location Bar History">
+<!ENTITY  clearBar "Clear the list of sites on the location bar:">
+<!ENTITY  clearLoc "Clear">

@@ -1,0 +1,1099 @@
+<?xml version="1.0"?>
+
+<!-- ***** BEGIN LICENSE BLOCK *****
+   - Version: MPL 1.1/GPL 2.0/LGPL 2.1
+   -
+   - The contents of this file are subject to the Mozilla Public License Version
+   - 1.1 (the "License"); you may not use this file except in compliance with
+   - the License. You may obtain a copy of the License at
+   - http://www.mozilla.org/MPL/
+   -
+   - Software distributed under the License is distributed on an "AS IS" basis,
+   - WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+   - for the specific language governing rights and limitations under the
+   - License.
+   -
+   - The Original Code is Mozilla XForms support.
+   -
+   - The Initial Developer of the Original Code is
+   - IBM Corporation.
+   - Portions created by the Initial Developer are Copyright (C) 2005
+   - the Initial Developer. All Rights Reserved.
+   -
+   - Contributor(s):
+   -  Doron Rosenberg <doronr@us.ibm.com>
+   -
+   - Alternatively, the contents of this file may be used under the terms of
+   - either the GNU General Public License Version 2 or later (the "GPL"), or
+   - the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+   - in which case the provisions of the GPL or the LGPL are applicable instead
+   - of those above. If you wish to allow use of your version of this file only
+   - under the terms of either the GPL or the LGPL, and not to allow others to
+   - use your version of this file under the terms of the MPL, indicate your
+   - decision by deleting the provisions above and replace them with the notice
+   - and other provisions required by the GPL or the LGPL. If you do not delete
+   - the provisions above, a recipient may use your version of this file under
+   - the terms of any one of the MPL, the GPL or the LGPL.
+   -
+   - ***** END LICENSE BLOCK ***** -->
+
+<!--
+  XBL select parses the childnodes of the xforms:select and then constructs
+  the anonymous content programmatically.
+
+  The main _buildSelect() method assumes that each select implementation
+  has three methods: _addSelectItem (for xf:item), _handleChoices (for xf:choice,
+  which can be nested) and _addItemSetItem for itemsets.
+
+  _controlArray is used to store each generated selectable item in the UI
+  (html:select for regular select and checkboxes for appearance="full" selects.
+
+  For a regular select (default appearance), the anonymous content generates
+  an html:select and child html:option and html:optgroup (for choices).
+
+  For an appearance="full" select, the anonymous content generates:
+
+    <html:table>
+      <html:tr>
+        <html:td valign="bottom">
+          // label goes here
+        </html:td>
+        <html:td anonid="checkbox-group"
+          <html:div>
+            <html:input type="checkbox"/>
+            <html:span>Label</html:span>
+          </html:div>
+        </html:td>
+      </html:tr>
+    </html:table>
+-->
+
+<bindings id="xformsBindings"
+          xmlns="http://www.mozilla.org/xbl"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          xmlns:xbl="http://www.mozilla.org/xbl"
+          xmlns:xforms="http://www.w3.org/2002/xforms">
+
+ <!-- SELECT: <DEFAULT> -->
+  <binding id="xformswidget-select"
+           extends="chrome://xforms/content/xforms.xml#xformswidget-base">
+    <content>
+      <html:label>
+        <html:span>
+           <children includes="label"/>
+        </html:span>
+        <html:select xbl:inherits="style, accesskey"
+                     class="xf-value"
+                     onchange="this.parentNode.parentNode.selectionChanged();"
+                     onfocus="this.parentNode.parentNode.dispatchDOMUIEvent('DOMFocusIn');"
+                     onblur="this.parentNode.parentNode.handleBlur(); this.parentNode.parentNode.dispatchDOMUIEvent('DOMFocusOut');"
+                     multiple="true"
+                     size="5"
+                     anonid="select"/>
+        <children/>
+      </html:label>
+    </content>
+
+    <implementation implements="nsIXFormsUIWidget">
+      <constructor>
+        <![CDATA[
+        ]]>
+      </constructor>
+
+      <field name="_uiElement">null</field>
+      <property name="uiElement" readonly="true">
+        <getter>
+          if (!this._uiElement) {
+            this._uiElement =
+              document.getAnonymousElementByAttribute(this, "anonid", "select");
+          }
+
+          return this._uiElement;
+        </getter>
+      </property>
+
+      <property name="selectedIndex">
+        <setter>
+          this.uiElement.selectedIndex = val;
+        </setter>
+      </property>
+
+      <field name="_accessorValueCache">null</field>
+
+      <!-- Make sure we don't refresh while we are refreshing (race condition).
+           This happens when we are inside a repeat for example. We use the
+           _refreshing field to store if we are refreshing or not. -->
+      <field name="_refreshing">false</field>
+      <method name="refresh">
+        <body>
+        <![CDATA[
+          if (this._refreshing)
+            return;
+
+          if (this.accessors.isReadonly()) {
+            this.uiElement.setAttribute("readonly", "readonly");
+          } else {
+            this.uiElement.removeAttribute("readonly");
+          }
+
+          this._refreshing = true;
+
+          // if this node contains a non TEXT node, then we have to throw
+          // the 'just string values' logic out the window
+          var boundNode = this.accessors.getBoundNode();
+          var containsNonText = false;
+          if (boundNode && boundNode.hasChildNodes()) {
+            var child = boundNode.firstChild;
+            while (child) {
+              var type = child.nodeType;
+              if (type != Node.TEXT_NODE && type != Node.CDATA_SECTION_NODE) {
+                containsNonText = true;
+                this._accessorValueCache = null;
+                break;
+              }
+              child = child.nextSibling;
+            }
+          }
+
+          // We detect if the instance data we bind to has changed.  If it has,
+          // changed, we simply update the selection.  If it hasn't, that means
+          // we rebuild the select UI.  We also rebuild if the delegate cache is
+          // null (first load).
+          if (this._accessorValueCache == null ||
+              this._accessorValueCache == this.accessors.getValue() || 
+              containsNonText) {
+            // if we reached here and the instance data only contains text
+            // nodes, then we need to rebuild the control since we know it
+            // wasn't due to a simple instance data changing scenario.  But if
+            // the bound node contains non TEXT nodes, then it is too expensive
+            // to figure out if this was because a child node changed somewhere
+            // along the way.  We'd basically have to cache the whole bound node
+            // subtree to compare against.  To avoid this we'll just rebuild the
+            // control from scratch.
+
+            // XXX at a future time we need to figure out which will be more
+            //     efficient give the most probable use cases.
+            this._buildSelect(containsNonText);
+          } else if (!containsNonText) {
+            // update selection
+            this._updateSelection();
+
+            // store the delegate value
+            this._accessorValueCache = this.accessors.getValue();
+          }
+
+          this._refreshing = false;
+
+          return true;
+         ]]>
+        </body>
+      </method>
+
+      <field name="_controlArraySize">0</field>
+      <field name="_controlArray">new Array()</field>
+      <field name="_selectedElementSize">0</field>
+      <field name="_selectedElementArray">new Array()</field>
+      <field name="_defaultHash">null</field>
+
+      <method name="_buildSelect">
+        <parameter name="aContainsNonText"/>
+        <body>
+        <![CDATA[
+          // select builds its own UI by parsing it's children.
+
+          // if delegate.value has something, then only text node(s) should
+          // exist under the bound node
+
+          // holds an array of DOMElements that exist under bound node,
+          this._selectedElementSize = 0;
+          this._selectedElementArray = new Array();
+
+          if (!aContainsNonText) {
+            // replace new line (\n), tabs (\t) and carriage returns (\r) with
+            // "".
+            var value = "";
+            var accessValue = this.accessors.getValue();
+
+            if (accessValue)
+              value = accessValue.replace(/\n|\t|\r/g, " ");
+
+            // get an array of values selected in the bound node
+            var selectedArray = value.split(" ");
+
+            // create a hash from the default values so we can store how often
+            // we encountered them.  This allows us to figure out later if any
+            // were not hit, which requires us to send an event.
+            this._defaultHash = new Object();
+            for (var run = 0; run < selectedArray.length; run++) {
+              this._defaultHash[selectedArray[run]] = {hits: 0}
+            }
+          } else {
+            var boundNode = this.accessors.getBoundNode();
+            var child = boundNode ? boundNode.firstChild : null;
+            this._defaultHash = null;
+            while (child) {
+              var type = child.nodeType;
+              if (type == Node.TEXT_NODE || 
+                  type == Node.CDATA_SECTION_NODE) {
+                // if child is a text node completely filled with
+                // whitespace let's ignore it and get the next node
+                var string = child.nodeValue;
+                var nonWhitespace = false;
+                if (string) {
+                  // this regexp tests whether only whitespace is contained
+                  // between the beginning and ending of the string.
+                  nonWhitespace = !(/^\s*$/.test(string));
+                }
+                if (nonWhitespace) {
+                  // replace new line (\n), tabs (\t) and carriage returns (\r)
+                  // with " ".
+                  var value = string.replace(/\n|\t|\r/g, " ");
+
+                  // get an array of values selected in the bound node
+                  var selectedArray = value.split(" ");
+
+                  // create a hash from the default values so we can store how
+                  // often we encountered them.  This allows us to figure out
+                  // later if any were not hit, which requires us to send an
+                  // event.
+                  if (!this._defaultHash) {
+                    this._defaultHash = new Object();
+                  }
+                  for (var run = 0; run < selectedArray.length; run++) {
+                    this._defaultHash[selectedArray[run]] = {hits: 0}
+                  }
+                }
+              } else {
+                // if it's not a text node, we'll assume that we are looking at
+                // a node worth comparing.  As such, look for an
+                // item with a copy element that might match this node.
+                this._selectedElementArray[this._selectedElementSize] = 
+                  {element: child, hits: 0}
+                this._selectedElementSize++;
+              }
+
+              if (child == boundNode.lastChild) {
+                break;
+              }
+              child = child.nextSibling;
+            }
+          }
+
+          // clear the UI children
+          for (var i = this.uiElement.childNodes.length; i > 0; i--) {
+             this.uiElement.removeChild(this.uiElement.childNodes[i-1]);
+          }
+
+          // create children
+          var child, option;
+          var childNodes = this.childNodes;
+
+          // these hold an array of generated HTML controls
+          this._controlArraySize = 0;
+          this._controlArray = new Array();
+
+          for (var i = 0; i < childNodes.length; i++) {
+            child = childNodes[i];
+
+            // we only care about element nodes in the XForms namespace.
+            if (child.nodeType == child.ELEMENT_NODE &&
+                child.namespaceURI == this.XFORMS_NS) {
+              if (child.localName == "item") {
+                // cache the item's label/value
+                var itemElement =
+                  child.QueryInterface(Components.interfaces.nsIXFormsItemElement);
+                var value = itemElement.value;
+                var label = itemElement.labelText;
+
+                this._addSelectItem(label, value, child);
+
+                // check if we should pre-select this option
+                this.preselectItem(value);
+              } else if (child.localName == "choices") {
+                var optGroup = this._handleChoices(child);
+                this.uiElement.appendChild(optGroup);
+              } else if (child.localName == "itemset") {
+                var uiElement =
+                  child.QueryInterface(Components.interfaces.nsIXFormsItemSetUIElement);
+                var containers = uiElement.anonymousItemSetContent.childNodes;
+
+                // go through each item in the itemset and add it to the
+                // html:select.  Select any of the items that contain a value
+                // that also appears under the bound node.
+                for (var y = 0; y < containers.length; y++) {
+                  if (containers[y].nodeType == containers[y].ELEMENT_NODE) {
+                    this._addItemSetItem(containers[y]);
+                  }
+                }
+              }
+            }
+          }
+
+          // check if any default values were not found
+          for (var index in this._defaultHash) {
+            if (this._defaultHash[index].hits == 0) {
+              // XXX: some of default values not found, we need to throw an
+              // xforms-out-of-range event, but only if the select is 'closed'.
+              // If the select is open, the missing elements should be added
+              // and selected per 8.1.10 in the spec.
+            }
+          }
+
+          // check if any default elements were not found
+          for (var j = 0; j < this._selectedElementSize; j++) {
+            if (this._selectedElementArray[j].hits == 0) {
+              // XXX: some of default values not found, we need to throw an
+              // xforms-out-of-range event, but only if the select is 'closed'.
+              // If the select is open, the missing elements should be added
+              // and selected per 8.1.10 in the spec.
+            }
+          }
+
+          return true;
+         ]]>
+        </body>
+      </method>
+
+      <method name="_buildSelectItem">
+        <parameter name="aLabel"/>
+        <parameter name="aValue"/>
+        <parameter name="aControl"/>
+        <parameter name="aUseLabelValue"/>
+        <body>
+        <![CDATA[
+          // creates a select item element (html:option) and returns it
+
+          option = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                            "option");
+
+          option.setAttribute("value", aValue);
+          option.setAttribute("optionid", this._controlArraySize);
+
+          // itemsets needs to use aLabel and not the label element contents
+          if (aUseLabelValue) {
+            option.textContent = aLabel;
+          } else {
+            var label = aControl.getElementsByTagName("label")[0];
+
+            // We either have a bound node and get it's content, or we
+            // clone the contents of the label element
+            if (label.accessors.hasBoundNode()) {
+              option.textContent = label.accessors.getValue();
+            } else {
+              var childLength = label.childNodes.length;
+
+              // text content only?
+              if (childLength == 1 && label.firstChild.nodeType == Node.TEXT_NODE) {
+                option.textContent = label.textContent;
+              } else {
+                // clone all children.  We don't simply clone the xforms:label
+                // because xhtml:select will get confused by it and break
+                // find-as-you-type.
+                for (var i = 0; i < childLength; i++) {
+                  option.appendChild(label.childNodes[i].cloneNode(true));
+                }
+              }
+            }
+          }
+
+          return option;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_addSelectItem">
+        <parameter name="aLabel"/>
+        <parameter name="aValue"/>
+        <parameter name="aControl"/>
+        <body>
+        <![CDATA[
+          // adds a new select item into the select
+
+          var option = this._buildSelectItem(aLabel, aValue, aControl, false);
+
+          var newOption = this.uiElement.appendChild(option);
+          option = newOption;
+
+          // add to the control array
+          this._controlArray[this._controlArraySize] =
+            {control: aControl, option: option, type: "item", wasSelected: false}
+          this._controlArraySize++;
+
+          return option;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_setItemSelection">
+        <parameter name="aControl"/>
+        <parameter name="aValue"/>
+        <body>
+        <![CDATA[
+          aControl.option.selected = aValue;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_handleChoices">
+        <parameter name="aChoicesElement"/>
+        <body>
+        <![CDATA[
+          // creates the items for a choice and it's children
+
+          var child, label = "", option;
+
+          // create the html:optgroup
+          var optGroup = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                                  "optgroup");
+
+          for (var i = 0; i < aChoicesElement.childNodes.length; i++) {
+            child = aChoicesElement.childNodes[i];
+
+            // we only care about element nodes
+            if (child.nodeType == child.ELEMENT_NODE) {
+              if (child.localName == "label") {
+                optGroup.appendChild(child.cloneNode(true));
+              } else if (child.localName == "item") {
+                var itemElm = child.QueryInterface(Components.interfaces.nsIXFormsItemElement);
+                var itemValue = itemElm.value;
+                var itemLabel = itemElm.labelText;
+
+                var option = this._buildSelectItem(itemLabel, itemValue, child, false);
+                optGroup.appendChild(option);
+
+                // add to the control array
+                this._controlArray[this._controlArraySize] =
+                  {control: child, option: option, type: "item", wasSelected: false}
+                this._controlArraySize++;
+
+                // check if we should pre-select this option
+                this.preselectItem(itemValue);
+              } else if (child.localName == "choices") {
+                optGroup.appendChild(this._handleChoices(child));
+              }
+            }
+          }
+
+          return optGroup;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_addItemSetItem">
+        <parameter name="aItemElement"/>
+        <body>
+        <![CDATA[
+          var itemElm = aItemElement.QueryInterface(Components.interfaces.nsIXFormsItemElement);
+          var copyItem = itemElm.isCopyItem;
+          var itemValue = copyItem ? "" : itemElm.value;
+          var itemLabel = itemElm.labelText;
+
+          var option = this._buildSelectItem(itemLabel, itemValue, aItemElement,
+                                             true);
+
+          // if this item contains a copy element AND if the bound node contains
+          // non-text elements, then see if any of these non-text elements match
+          // this copyItem's node.
+          if (copyItem && this._selectedElementSize > 0) {
+            var item = aItemElement.QueryInterface(Components.interfaces.nsIXFormsSelectChild); 
+            for (var j = 0; j < this._selectedElementSize; j++ ) {
+              var selectedItem =
+                item.selectItemByNode(this._selectedElementArray[j].element);
+              if (selectedItem) {
+                this._selectedElementArray[j].hits++;
+                option.selected = true;
+                // XXX It is possible that two identical elements are under the
+                // bound node.  I guess we shouldn't mark one and not the other
+                // if there is an item in the select that matches it.  So we'll
+                // go through the whole list.  But this is quite an edge case
+                // and will cause more inefficiency just to prevent an errant
+                // xforms-out-of-range.
+              }
+            }
+          }
+
+          // add to the control array
+          this._controlArray[this._controlArraySize] =
+            {control: aItemElement, option: option, type: "item", wasSelected: option.selected}
+          this._controlArraySize++;
+
+          this.uiElement.appendChild(option);
+
+          if (!copyItem) {
+            // if this item contains a value element, then make sure to select
+            // this item if its value exists under the bound node.
+            this.preselectItem(itemValue);
+          }
+
+          return itemValue;
+        ]]>
+        </body>
+      </method>
+
+      <method name="selectionChanged">
+        <parameter name="aEvent"/>
+        <body>
+        <![CDATA[
+          // if incremental, change instance data and send the value-changed event
+          if (this.incremental) {
+            this._handleSelection();
+          } else {
+            // per the spec, if not incremental, we still need to send the
+            // deselect/select events. which _getSelectedValues() does for us
+            this._getSelectedValues();
+          }
+        ]]>
+        </body>
+      </method>
+
+      <method name="_handleSelection">
+        <body>
+        <![CDATA[
+          var boundNode = this.accessors.getBoundNode();
+          if (!boundNode) {
+            return;
+          }
+
+          // if a copy item is selected or deselected, then we need to replace
+          // ALL of the current content with the newly selected content.  Which
+          // means calling setContent.  setValue only messes with the first
+          // textnode under the bound node.
+          var copySelectedOrDeselected = new Boolean();
+          copySelectedOrDeselected.value = false;
+          var contentEnvelope = this._getSelectedValues(copySelectedOrDeselected);
+          if (contentEnvelope) {
+            if (boundNode.nodeType == Node.ELEMENT_NODE) {
+              // we shouldn't call setContent if we haven't selected any
+              // copyItems.  We can't just test for a single text node under
+              // the bound node because this could still have been the result
+              // of a copyItem being selected.  And if a copyItem is selected,
+              // then we need to do the whole rebuild, recalculate, revalidate,
+              // refresh process according to the spec...whether we really need
+              // to or not.
+              if (copySelectedOrDeselected.value == false) {
+                // well, no copyItems are selected, so need to find the value
+                // to set.  Will be in the first child.
+                var firstChild = contentEnvelope.firstChild;
+                var value = null;
+                if (firstChild) {
+                  value = firstChild.nodeValue;
+                }
+                this.accessors.setValue(value);
+              } else {
+                this.accessors.setContent(contentEnvelope, true);
+              }
+            } else {
+              // if some copyItems were selected by the user prior to the call
+              // to _getSelectedValues, then we would not have set up
+              // _accessorValueCache.  Since the node we are bound to can't
+              // be set by copyItems (its not an ELEMENT_NODE), any copyItems
+              // in this select would have been deselected during
+              // _getSelectedValues.  Thus, anything in the contentEnvelope at
+              // this point should just be strings and so we can set
+              // delegate.value directly and use _accessorValueCache after all.
+
+              this.accessors.setValue(contentEnvelope.nodeValue);
+              this._accessorValueCache = contentEnvelope.nodeValue;
+            }
+          }
+        ]]>
+        </body>
+      </method>
+
+      <method name="_getSelectedValues">
+        <parameter name="aIsACopyItemSelectedOrDeselected"/>
+        <body>
+        <![CDATA[
+          var selectedValues = "";
+          var newSelectedControls = new Array();
+
+          // select if found, unselect if not
+          var options = this._controlArray;
+
+          if (aIsACopyItemSelectedOrDeselected) {
+            aIsACopyItemSelectedOrDeselected.value = false;
+          }
+
+          var boundNode = this.accessors.getBoundNode();
+          if (!boundNode) {
+            return;
+          }
+
+          // we are cloning boundNode to create a node that we will return.
+          // By the end of this function, assuming all went well,
+          // contentEnvelope will contain the values and copyNodes that are
+          // represented by the selected items in this xf:select.  Cloning
+          // the boundNode to use as the envelope so that the caller could
+          // just pass the results straight into accessors.setContent().
+          var contentEnvelope = null;
+          contentEnvelope = boundNode.cloneNode(false);
+          if (!contentEnvelope) {
+            return;
+          }
+          var boundType = boundNode.nodeType;
+          var copyNode;
+
+          // keep in mind, to maintain compatibility with XSmiles and Novell, we
+          // ultimately need to end up with all 'value' elements contained in a
+          // text node and this text node needs to be the first child of the
+          // bound node.
+          for (var i = 0; i < options.length; i++) {
+            var isSelected =
+              options[i].option ? options[i].option.selected : options[i].checkbox.checked;
+
+            if (isSelected) {
+              // space delimited list
+              if (selectedValues.length > 0) {
+                selectedValues += " ";
+              }
+
+              var item = options[i].control.QueryInterface(Components.interfaces.nsIXFormsItemElement);
+              if (item.isCopyItem) {
+                if (boundType && (boundType != Node.ELEMENT_NODE)) {
+                  // if we are trying to do a copy without being bound to an
+                  // element node, then we need to throw a binding exception
+                  // per spec.
+                  bindingException = document.createEvent("Events");
+                  bindingException.initEvent("xforms-binding-exception", true, false);
+                  this.dispatchEvent(bindingException);
+
+                  // we should probably un-select the option so that the list
+                  // of selected data is accurate.  This WON'T cause a
+                  // xforms-select/deselect to fire.  Since the user just
+                  // selected this item and we are automatically deselecting
+                  // it from underneath the user, we'll treat it like nothing
+                  // happened.
+                  if (options[i].option) {
+                    options[i].option.selected = false;
+                  } else {
+                    options[i].checkbox.checked = false;
+                  }
+                } else {
+                  copyNode = item.copyNode;
+                  if (copyNode) {
+                    var clone = copyNode.cloneNode(true);
+                    contentEnvelope.appendChild(clone);
+                  }
+
+                  // if it wasn't selected before add to the list of newly
+                  // selected items
+                  if (!options[i].wasSelected) {
+                    newSelectedControls.push(options[i].control);
+                    if (aIsACopyItemSelectedOrDeselected && 
+                        aIsACopyItemSelectedOrDeselected.value != true) {
+                      aIsACopyItemSelectedOrDeselected.value = true;
+                    }
+                  }
+    
+                  options[i].wasSelected = true;
+                }
+              } else {
+                // not a copyItem, so grab the item's value and append it to our
+                // space seperated list.
+                selectedValues +=
+                  options[i].control.QueryInterface(Components.interfaces.nsIXFormsSelectChild).value;
+
+                // if it wasn't selected before add to the list of newly
+                // selected items
+                if (!options[i].wasSelected) {
+                  newSelectedControls.push(options[i].control);
+                }
+  
+                options[i].wasSelected = true;
+              }
+            } else {
+              // it was selected before, but now unselected
+              if (options[i].wasSelected) {
+                this.dispatchSelectEvent(options[i].control, "xforms-deselect");
+
+                // if a copyItem was deselected, we need to make sure to do a
+                // rebuild.  By setting aIsACopyItemSelectedOrDeselected, this
+                // should tell _handleSelection to use setContent with
+                // aForceUpdate = true
+                var item = options[i].control.QueryInterface(Components.interfaces.nsIXFormsItemElement);
+                if (item.isCopyItem) {
+                  if (aIsACopyItemSelectedOrDeselected && 
+                      aIsACopyItemSelectedOrDeselected.value != true) {
+                    aIsACopyItemSelectedOrDeselected.value = true;
+                  }
+                }
+              }
+
+              options[i].wasSelected = false;
+            }
+          }
+
+          // write out the text nodes before we handle copy
+          if (boundType == Node.ELEMENT_NODE) {
+            if (selectedValues.length > 0) {
+              var textNode = document.createTextNode(selectedValues);
+              if (copyNode) {
+                // making sure all selected 'values' are in the first text node
+                // under the bound node.
+                var firstChild = contentEnvelope.firstChild;
+                contentEnvelope.insertBefore(textNode, firstChild);
+              } else { 
+                contentEnvelope.appendChild(textNode);
+              }
+            }
+          } else {
+            contentEnvelope.nodeValue = selectedValues;
+          }
+
+          selectedValues = "";
+
+          // we send xforms-select after all deselect events are thrown
+          for (var i = 0; i < newSelectedControls.length; i++) {
+            this.dispatchSelectEvent(newSelectedControls[i], "xforms-select");
+          }
+
+          return contentEnvelope;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_updateSelection">
+        <body>
+        <![CDATA[
+          // this function only looks through the text values that are stored
+          // under the bound node and selects the xf:items that have
+          // corresponding values to that list.  As such, copyItems will
+          // be ignored.
+
+          // get an array of values selected in the bound node
+          var selectedArray = new Array();
+          if (this.accessors.getValue())
+            selectedArray = this.accessors.getValue().split(" ");
+
+          // store the values in a hash for quick access
+          this._defaultHash = new Object();
+          for (var run = 0; run < selectedArray.length; run++) {
+            this._defaultHash[selectedArray[run]] = {}
+          }
+
+          // select if found, unselect if not
+          var options = this._controlArray;
+
+          for (var i = 0; i < options.length; i++) {
+            var item = options[i].control.QueryInterface(Components.interfaces.nsIXFormsSelectChild);
+            if (item.isCopyItem) {
+              break;
+            }
+            var value = item.value;
+            var selectionValue = (this._defaultHash[value] != null);
+
+            // either a checkbox or an option
+            if (options[i].option) {
+              if (options[i].option.selected != selectionValue)
+                options[i].option.selected = selectionValue;
+            } else {
+              if (options[i].checkbox.checked != selectionValue)
+                options[i].checkbox.checked = selectionValue;
+            }
+          }
+        ]]>
+        </body>
+      </method>
+
+      <property name="incremental">
+        <getter>
+        <![CDATA[
+          // default is true
+          var incremental = true;
+
+          if (this.hasAttribute("incremental")) {
+            if (this.getAttribute("incremental") == "false")
+              incremental = false;
+          }
+
+          return incremental;
+        ]]>
+        </getter>
+      </property>
+
+      <method name="focus">
+        <body>
+        <![CDATA[
+          this.uiElement.focus();
+          return true;
+        ]]>
+        </body>
+      </method>
+
+      <method name="handleBlur">
+        <body>
+        <![CDATA[
+          // update instance data if we are not incremental
+          if (!this.incremental) {
+            this._handleSelection();
+          }
+        ]]>
+        </body>
+      </method>
+
+      <method name="preselectItem">
+        <parameter name="aValue"/>
+        <body>
+        <![CDATA[
+          // check if we should pre-select this option
+          if (this._defaultHash && this._defaultHash[aValue] != null) {
+            var control = this._controlArray[this._controlArraySize - 1]
+            this._setItemSelection(control, true);
+
+            // tell the control it was selected
+            control.wasSelected = true;
+
+            this._defaultHash[aValue].hits++;
+          }
+        ]]>
+        </body>
+      </method>
+
+      <method name="dispatchSelectEvent">
+        <parameter name="aElement"/>
+        <parameter name="aName"/>
+        <body>
+          var ev = document.createEvent("Events");
+          ev.initEvent(aName, true, false);
+
+          var elm = aElement;
+
+          // per http://www.w3.org/TR/2005/PER-xforms-20051006/index-all.html#evt-select
+          // we send the event to the itemset if it is a parent.
+          if (elm.parentNode.localName == "itemset")
+            elm = elm.parentNode;
+
+          elm.dispatchEvent(ev);
+          return true;
+        </body>
+      </method>
+    </implementation>
+  </binding>
+
+  <!-- SELECT: <FULL> -->
+  <!-- XXX: need to send DOMFocusIn/DOMFocusOut events -->
+  <binding id="xformswidget-select-full"
+           extends="chrome://xforms/content/select.xml#xformswidget-select">
+    <content>
+      <html:table xbl:inherits="style">
+        <html:tr>
+          <html:td valign="bottom">
+            <children includes="label"/>
+          </html:td>
+          <html:td anonid="checkbox-group"
+                   class="xf-value"
+                   onchange="this.parentNode.parentNode.parentNode.selectionChanged();">
+          </html:td>
+        </html:tr>
+      </html:table>
+
+      <html:span style="display:none">
+        <children/>
+      </html:span>
+    </content>
+
+   <implementation implements="nsIXFormsUIWidget">
+
+      <field name="_uiElement">null</field>
+      <property name="uiElement" readonly="true">
+        <getter>
+        <![CDATA[
+          if (!this._uiElement) {
+            this._uiElement =
+              document.getAnonymousElementByAttribute(this, "anonid",
+                                                      "checkbox-group");
+          }
+
+          return this._uiElement;
+        ]]>
+        </getter>
+      </property>
+
+      <method name="_buildSelectItem">
+        <parameter name="aLabel"/>
+        <parameter name="aValue"/>
+        <parameter name="aControl"/>
+        <parameter name="aUseLabelValue"/>
+        <body>
+        <![CDATA[
+          var div = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                             "div");
+
+          var labelSpan = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                                   "span");
+
+          if (aUseLabelValue) {
+            labelSpan.textContent = aLabel;
+          } else {
+            var label = aControl.getElementsByTagName("label")[0];
+
+            // We either have a bound node and get it's content, or we
+            // clone the contents of the label element
+            if (label.accessors.hasBoundNode()) {
+              labelSpan.textContent = label.accessors.getValue();
+            } else {
+              var childLength = label.childNodes.length;
+
+              // text content only?
+              if (childLength == 1 && label.firstChild.nodeType == Node.TEXT_NODE) {
+                labelSpan.textContent = label.textContent;
+              } else {
+                // clone all children.  We don't simply clone the xforms:label
+                // because xhtml:select will get confused by it and break
+                // find-as-you-type.
+                for (var i = 0; i < childLength; i++) {
+                  labelSpan.appendChild(label.childNodes[i].cloneNode(true));
+                }
+              }
+            }
+          }
+
+          var input = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                               "input");
+          input.setAttribute("type", "checkbox");
+          input.setAttribute("value", aValue);
+          input.setAttribute("optionid", this._controlArraySize);
+
+          div.appendChild(input);
+          div.appendChild(labelSpan);
+
+          return div;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_addSelectItem">
+        <parameter name="aLabel"/>
+        <parameter name="aValue"/>
+        <parameter name="aControl"/>
+        <body>
+        <![CDATA[
+          var item = this._buildSelectItem(aLabel, aValue, aControl, false);
+          var newElement = this.uiElement.appendChild(item);
+          item = newElement;
+
+          // add to the control array
+          this._controlArray[this._controlArraySize] =
+            {control: aControl, checkbox: item.firstChild, type: "item", wasSelected: false}
+          this._controlArraySize++;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_setItemSelection">
+        <parameter name="aControl"/>
+        <parameter name="aValue"/>
+        <body>
+        <![CDATA[
+          aControl.checkbox.checked = aValue;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_handleChoices">
+        <parameter name="aChoicesElement"/>
+        <body>
+        <![CDATA[
+          var child;
+
+          var mainDiv = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                                 "div");
+
+          var label = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                                "div");
+          label.className = "select-choice-label"
+          mainDiv.appendChild(label);
+
+          var contentDiv = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                                    "div");
+          contentDiv.className = "select-choice-content";
+
+          for (var i = 0; i < aChoicesElement.childNodes.length; i++) {
+            child = aChoicesElement.childNodes[i];
+
+            // we only care about element nodes
+            if (child.nodeType == child.ELEMENT_NODE) {
+              if (child.localName == "label") {
+                label.appendChild(child.cloneNode(true));
+              } else if (child.localName == "item") {
+                var itemElm =
+                  child.QueryInterface(Components.interfaces.nsIXFormsItemElement)
+                var itemValue = itemElm.value;
+                var itemLabel = itemElm.labelText;
+
+                var item = this._buildSelectItem(itemLabel, itemValue, child, false);
+                contentDiv.appendChild(item);
+
+                // add to the control array
+                this._controlArray[this._controlArraySize] =
+                  {control: child, checkbox: item.firstChild, type: "item", wasSelected: false}
+                this._controlArraySize++;
+
+                // check if we should pre-select this option
+                this.preselectItem(itemValue);
+              } else if (child.localName == "choices") {
+                contentDiv.appendChild(this._handleChoices(child));
+              }
+            }
+          }
+
+          mainDiv.appendChild(contentDiv);
+          return mainDiv;
+        ]]>
+        </body>
+      </method>
+
+      <method name="_addItemSetItem">
+        <parameter name="aItemElement"/>
+        <body>
+        <![CDATA[
+          var itemElm = aItemElement.QueryInterface(Components.interfaces.nsIXFormsItemElement);
+          var copyItem = itemElm.isCopyItem;
+          var itemValue = itemElm.value;
+          var itemLabel = copyItem ? "" : itemElm.labelText;
+          
+          var item = this._buildSelectItem(itemLabel, itemValue, aItemElement,
+                                           true);
+
+          // add to the control array
+          this._controlArray[this._controlArraySize] =
+            {control: aItemElement, checkbox: item.firstChild, type: "item", wasSelected: false}
+          this._controlArraySize++;
+
+          this.uiElement.appendChild(item);
+
+          // if this item contains a copy element AND if the bound node contains
+          // non-text elements, then see if any of these non-text elements match
+          // this copyItem's node.
+          if (copyItem && this._selectedElementSize > 0) {
+            var item = aItemElement.QueryInterface(Components.interfaces.nsIXFormsSelectChild); 
+            for (var j = 0; j < this._selectedElementSize; j++ ) {
+              var selectedItem =
+                item.selectItemByNode(this._selectedElementArray[j].element);
+              if (selectedItem) {
+                this._selectedElementArray[j].hits++;
+                item.firstChild.checked = true;
+
+                this._controlArray[this._controlArraySize - 1].wasSelected = true;
+                // XXX It is possible that two identical elements are under the
+                // bound node.  I guess we shouldn't mark one and not the other
+                // if there is an item in the select that matches it.  So we'll
+                // go through the whole list.  But this is quite an edge case
+                // and will cause more inefficiency just to prevent an errant
+                // xforms-out-of-range.
+              }
+            }
+          } else if (!copyItem) {
+            // if this item contains a value element, then make sure to select
+            // this item if its value exists under the bound node.
+            this.preselectItem(itemValue);
+          }
+
+          return itemValue;
+        ]]>
+        </body>
+      </method>
+
+    </implementation>
+  </binding>
+</bindings>

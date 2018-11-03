@@ -1,0 +1,445 @@
+<?xml version="1.0"?> <!-- -*- Mode: HTML -*- -->
+
+<!-- The contents of this file are subject to the Netscape Public
+License Version 1.1 (the "License"); you may not use this file
+except in compliance with the License. You may obtain a copy of
+the License at http://www.mozilla.org/NPL/
+
+Software distributed under the License is distributed on an "AS
+IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+implied. See the License for the specific language governing
+rights and limitations under the License.
+
+The Original Code is Mozilla Communicator client code, released
+March 31, 1998.
+
+The Initial Developer of the Original Code is Netscape
+Communications Corporation. Portions created by Netscape are
+Copyright (C) 1998-1999 Netscape Communications Corporation. All
+Rights Reserved.
+
+Contributor(s): ______________________________________. -->
+
+
+<?xml-stylesheet href="chrome://navigator/skin/" type="text/css"?> 
+<?xml-stylesheet href="chrome://bookmarks/skin/" type="text/css"?> 
+<?xul-overlay href="chrome://navigator/content/navigatorOverlay.xul"?>
+<?xul-overlay href="chrome://global/content/tasksOverlay.xul"?>
+<?xul-overlay href="chrome://sidebar/content/sidebarOverlay.xul"?>
+
+<!DOCTYPE window SYSTEM "chrome://navigator/locale/navigator.dtd" >
+
+<window id="main-window" xmlns:html="http://www.w3.org/TR/REC-html40"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  onload="Startup()"
+  onunload="Shutdown()"
+  title="&mainWindow.title;" 
+  titlemodifier="&mainWindow.titlemodifier;" 
+  titlemenuseparator="&mainWindow.titlemodifiermenuseparator;"
+  viewsourcetitlepreface="&viewsourcetitle.preface;"
+  windowtype="navigator:browser"
+  align="vertical"
+  width="640" height="480"
+  x="10" y="10"
+  persist="width height x y"
+  ondraggesture="return GeneralDrag(event);"> 
+
+<html:script language="javascript" src="chrome://global/content/strres.js" />
+<html:script language="javascript" src="navigator.js" />
+<html:script language="javascript" src="nsContextMenu.js" />
+<html:script language="javascript" src="tooltip.js" />
+
+<commands id="commands">
+	<commandset id="globalEditMenuItems"/>
+</commands>
+
+<!-- broadcasters are appended from the overlay -->
+<broadcasterset id="broadcasterset">
+  <broadcaster id="canReload" oncommand="BrowserReallyReload(0);"/>
+  <broadcaster id="canStop"/>
+  <broadcaster id="canPrint"/>
+  <broadcaster id="Browser:LoadingProgress"/>
+  <broadcaster id="Browser:Status"/>
+  <broadcaster id="Browser:Throbber" busy="false"/>
+  <broadcaster id="args" value=""/> 
+</broadcasterset>
+
+<!-- Interim hack to transition from nsIXULWindowCallbacks/ShowWindowWithArgs -->
+<broadcaster id="dialog.start" ready="false"/>
+<observes element="dialog.start" attribute="ready" onbroadcast="onLoadWithArgs()"/>
+  
+<!-- keys are appended from the overlay -->
+<keyset id="keyset"/>
+  
+
+<!-- This needs to go into a xul fragment, but since those don't work now, this stays here !-->
+<popupset>
+  <popup id="aTooltip" 
+    oncreate="return FillInTooltip(document.tooltipElement);">
+    style="border: thin solid black;"> 
+   <titledbutton id="replaceMe" align="left" crop="right" class="borderless"
+     value="" />
+ </popup>
+</popupset>
+
+<!-- Context menu -->
+<html:script language="javascript">
+    // Global variable that holds the nsContextMenu instance.
+    var contextMenu = null;
+</html:script>
+<popupset>
+    <!-- This is the context menu for the content-area of the navigator
+         window.  It contains each and every possible menu choice.  The
+         appropriate items are hidden/shown upon display, based on what
+         the user has clicked-on.
+    -->
+    <popup id="context"
+        oncreate="contextMenu = new nsContextMenu( this );"
+        ondestroy="contextMenu.onDestroy(); contextMenu = null;">
+
+        <!-- Open ==================================== -->
+        <menuitem id="context-openlink"
+                  value="&openLinkCmd.label;"
+                  accesskey=""
+                  oncommand="contextMenu.openLink();"/>
+        <menuitem id="context-editlink"
+                  value="&editLinkCmd.label;"
+                  accesskey=""
+                  oncommand="contextMenu.editLink();"/>
+        <menuitem id="context-openframe"
+                  value="&openFrameCmd.label;"
+                  accesskey=""
+                  oncommand="contextMenu.openFrame();"/>
+        <menuseparator id="context-sep-open"/>
+        <!-- Navigation ============================== -->
+        <menuitem id="context-back"
+                  value="&goBackCmd.label;"
+                  accesskey="&goBackCmd.accesskey;"
+                  oncommand="BrowserBack()"/>
+        <menuitem id="context-forward"
+                  value="&goForwardCmd.label;"
+                  accesskey="&goForwardCmd.accesskey;"
+                  oncommand="BrowserForward()"/>
+        <menuitem id="context-reload"
+                  value="&reloadCmd.label;"
+                  accesskey=""
+                  oncommand="BrowserReallyReload(0);"/>
+        <menuitem id="context-stop"
+                  value="&stopCmd.label;"
+                  accesskey=""
+                  oncommand="BrowserStop();"/>
+        <menuseparator/>
+        <!-- View ==================================== -->
+        <menuitem id="context-viewsource"
+                  value="&viewPageSourceCmd.label;"
+                  accesskey=""
+                  oncommand="BrowserViewSource();"/>
+        <menuitem id="context-viewframesource"
+                  value="&viewFrameSourceCmd.label;"
+                  accesskey=""
+                  oncommand="contextMenu.viewFrameSource();"/>
+        <menuitem id="context-viewinfo"
+                  value="&viewPageInfoCmd.label;"
+                  accesskey=""
+                  oncommand="contextMenu.viewInfo();"/>
+        <menuitem id="context-viewframeinfo"
+                  value="&viewFrameInfoCmd.label;"
+                  accesskey=""
+                  oncommand="contextMenu.viewFrameInfo();"/>
+        <menuitem id="context-viewimage"
+                  value="&viewImageCmd.label;"
+                  accesskey=""
+                  oncommand="contextMenu.viewImage();"/>
+        <menuseparator/>
+        <!-- Misc ==================================== -->
+		<menuitem id="context-bookmarkpage"
+                  value="&bookmarkPageCmd.label;"
+                  accesskey="&bookmarkPageCmd.accesskey;"
+                  oncommand="BrowserAddBookmark( window.content.location.href,
+                                                 window.content.document.title )"/>
+        <menuitem id="context-sendpage"
+                  value="&sendPageCmd.label;"
+                  accesskey="&sendPageCmd.accesskey;"
+                  oncommand="BrowserSendPage();"/>
+        <menuseparator/>
+        <!-- Save ==================================== -->
+        <menuitem id="context-savepage"
+                  value="&savePageCmd.label;"
+                  accesskey="&savePageCmd.accesskey;"
+                  oncommand="contextMenu.savePage();"/>
+        <menuitem id="context-saveframe"
+                  value="&saveFrameCmd.label;"
+                  accesskey="&saveFrameCmd.accesskey;"
+                  oncommand="contextMenu.saveFrame();"/>
+        <menuitem id="context-savelink"
+                  value="&saveLinkCmd.label;"
+                  accesskey="&saveLinkCmd.accesskey;"
+                  oncommand="contextMenu.saveLink();"/>
+        <menuitem id="context-saveimage"
+                  value="&saveImageCmd.label;"
+                  accesskey="&saveImageCmd.accesskey;"
+                  oncommand="contextMenu.saveImage();"/>
+        <menuitem id="context-savebgimage"
+                  value="&saveBGImageCmd.label;"
+                  accesskey="&saveBGImageCmd.accesskey;"
+                  oncommand="contextMenu.saveBGImage();"/>
+        <menuseparator/>
+        <!-- Clipboard =============================== -->
+        <menuitem id="context-selectall"
+                  value="&selectAllCmd.label;"
+                  accesskey="&selectAllCmd.accesskey;"
+                  oncommand="BrowserSelectAll();"/>
+        <menuitem id="context-copy"
+                  value="&copyCmd.label;"
+                  accesskey="&copyCmd.accesskey;"
+                  oncommand="BrowserCopy();"/>
+        <menuitem id="context-copylink"
+                  value="&copyLinkCmd.label;"
+                  accesskey="&copyLinkCmd.accesskey;"
+                  oncommand="contextMenu.copyLink();"/>
+        <menuitem id="context-copyimage"
+                  value="&copyImageCmd.label;"
+                  accesskey="&copyImageCmd.accesskey;"
+                  oncommand="contextMenu.copyImage();"/>
+    </popup>
+</popupset>
+
+<html:script language="javascript">
+  var gBookmarkPopup = null;
+</html:script>
+
+<!-- Menu -->
+<menubar id="main-menubar"/>
+<!-- Toolbox -->
+<toolbox id="main-toolbox">
+  
+  <toolbar id="PersonalToolbar" chromeclass="toolbar" persist="collapsed" dragdroparea="innermostBox"
+    ondraggesture="return BeginDragPersonalToolbar(event);"
+    ondragdrop="return DropPersonalToolbar(event);"
+    ondragover="return DragOverPersonalToolbar(event);">
+
+    <!-- button area of personal toolbar -->
+    <box align="horizontal" flex="1" style="min-width: 1px">
+
+      // I added the container=true on this button as a temp hack until
+      // we can get this button into rdf. We can't allow drags on this
+      // container so we have to be able to identify it (bug 19588).
+      //     - pinkerton
+      <menu id="PersonalMenu" datasources="rdf:bookmarks rdf:files rdf:localsearch rdf:internetsearch" ref="NC:BookmarksRoot">
+        <titledbutton class="bookmarkFolder" align="right" container="true"
+          value="&bookmarksButton.label;" crop="right"/>
+        <template>
+          <!-- Recursive rules for nested folders -->
+          <rule iscontainer="true">
+            <menupopup>
+              <menu uri="rdf:*" crop="right" flex="1" align="left"
+                value="rdf:http://home.netscape.com/NC-rdf#Name" >
+                <menupopup />
+              </menu>
+            </menupopup>
+          </rule>
+          <rule rdf:type="http://home.netscape.com/NC-rdf#BookmarkSeparator">
+            <menupopup>
+              <menuseparator/>
+            </menupopup>
+          </rule>
+          <rule>
+            <menupopup>
+              <menuitem align="left" uri="..." 
+                value="rdf:http://home.netscape.com/NC-rdf#Name"
+                oncommand="OpenBookmarkURL(event.target, document.getElementById('PersonalMenu').database)"/>
+            </menupopup>
+          </rule>
+        </template>
+        <spring class="personaltoolbarspacer" flex="1"/>
+      </menu>
+
+      <box align="horizontal"
+        flex="1"
+        style="min-width: 1px; overflow: hidden"
+        datasources="rdf:bookmarks"
+        ref="NC:PersonalToolbarFolder" id="innermostBox">
+
+		    <!-- This template builds content from the bookmarks datasource -->
+		    <template>
+		      <!-- Rules for content hanging _directly_ off the toolbar -->
+		      <rule parent="box" iscontainer="true">
+		        <menu uri="...">
+		          <titledbutton value="rdf:http://home.netscape.com/NC-rdf#Name"
+		                        align="right" class="bookmarkFolder"/>
+		          <menupopup/>
+		        </menu>
+				<spring uri="rdf:*" class="personaltoolbarspacer" flex="1"/>
+		      </rule>
+		      <rule parent="box">
+		        <titledbutton class="bookmarkbutton" uri="rdf:*" align="left" 
+		          value="rdf:http://home.netscape.com/NC-rdf#Name" crop="right"
+		          oncommand="OpenBookmarkURL(event.target, document.getElementById('innermostBox').database)"/>
+		        <spring uri="rdf:*" class="personaltoolbarspacer" flex="1"/>
+		      </rule>
+
+		      <!-- Recursive rules for nested folders -->
+		      <rule iscontainer="true">
+		        <menupopup>
+		          <menu uri="rdf:*" crop="right" flex="1" align="left"
+		            value="rdf:http://home.netscape.com/NC-rdf#Name" >
+		            <menupopup />
+		          </menu>
+		        </menupopup>
+		      </rule>
+		      <rule rdf:type="http://home.netscape.com/NC-rdf#BookmarkSeparator">
+		        <menupopup>
+		          <menuseparator/>
+		        </menupopup>
+		      </rule>
+		      <rule>
+		        <menupopup>
+		          <menuitem align="left" uri="..." 
+		            value="rdf:http://home.netscape.com/NC-rdf#Name"
+		            oncommand="OpenBookmarkURL(event.target, document.getElementById('innermostBox').database)"/>
+		        </menupopup>
+		      </rule>
+		    </template>
+		     
+		    <titledbutton id="home-button" align="left"
+		      value="&homeButton.label;"
+			  class="bookmarkbutton"  
+		      onclick="BrowserHome(); event.preventBubble();"/>
+		    <spring class="personaltoolbarspacer" flex="1"/>
+	    
+	    </box>
+	    <spring flex="9999999"/>
+    </box>
+	
+	<!-- throbber area of personal toolbar -->
+	<box id="personaltoolbar-endcap" align="vertical" width="68px"/>
+  </toolbar>
+
+  <toolbar id="nav-bar" class="main-bar" chromeclass="toolbar" persist="collapsed">
+	<box align="horizontal" flex="100%" style="overflow: hidden">
+      <titledbutton id="back-button" class="button32" crop="right" align="top" observes="canGoBack" />  
+
+      <titledbutton id="forward-button" class="button32" crop="right" align="top" observes="canGoForward" />
+    
+      <!-- Right now only regular reload is supported.  When the
+      functionality is available, look for 'Shift' key pressed state
+      and pass on appropriate reload type. (The shift functionality
+      is available.  There's a shiftDown field in the event object.)
+      -->
+      <titledbutton id="reload-button" class="button32" crop="right" align="top" observes="canReload"/>
+   
+      <titledbutton id="stop-button" class="button32" crop="right" align="top" onclick="BrowserStop()">
+        <observes element="canStop" attribute="disabled"
+                  onbroadcast="BrowserCanStop()"/>
+      </titledbutton>
+
+          <!-- changed : the url field is now grouped with search -->
+          <box align="vertical" flex="100%">
+            <spring style="height: 4px;"/>
+            <!-- used for vertically positioning the url field contraption w/i the nav toolbar   -->
+              
+            <box id="url-bar-box" align="horizontal" style="width: 100%;"> 
+  
+             <!-- this is the little page proxy icon --> 
+             <!-- display should be turned off right now until functionality is implemented --> 
+              <titledbutton id="page-proxy-button" ondraggesture="DragProxyIcon(event);"/> 
+  
+               <!-- this is the urlbar --> 
+             <html:input id="urlbar" type="text" chromeclass="location" 
+                onkeyup="if (event.which == 13) { BrowserLoadURL(); }" 
+                flex = "100%" /> 
+  
+                <!-- this is the urlbar session history popup --> 
+                <!-- display should be turned off right now until functionality is implemented --> 
+                <titledbutton id="sessionhist-popup"/> 
+  
+                <!-- this is the search/go button --> 
+                <titledbutton id="search-button" value="&searchButton.label;"
+                  onclick="OpenSearch('internet',false, document.getElementById('urlbar').value);" 
+                /> 
+  
+             <!-- this is for other functionality --> 
+             <titledbutton id="action-popup" align="right"/> 
+  
+             <!-- end url bar box -->
+            </box>
+            
+            <!-- used for vertically positioning the url field contraption w/i the nav toolbar   -->
+          </box>
+				
+      <!-- FIX ME - remove this
+      <box align="vertical" flex="9999999">
+        <spring flex="1"/>
+        <html:input id="urlbar" type="text" chromeclass="location"
+                    onkeyup="if (event.which == 13) { BrowserLoadURL(); }"/>   
+        <spring flex="1"/>
+      </box>
+
+      <titledbutton id="search-button" crop="right" flex="1" align="top"
+                    value="&searchButton.label;"
+                    onclick="OpenSearch('internet', false, document.getElementById('urlbar').value);"/>
+
+      <titledbutton id="print-button" crop="right" flex="1" align="top" 
+                    value="&printButton.label;" onclick="BrowserPrint()">
+        <observes element="canPrint" attribute="disabled"/>
+      </titledbutton>
+      -->
+    </box>
+
+	<!-- throbber area of navigation toolbar -->
+	<box id="toolbar_throbber_box" align="vertical">
+		<titledbutton id="Throbber" onclick="window.content.location.href='&throbber.url;'">
+			<observes element="Browser:Throbber" attribute="busy"/>
+		</titledbutton>
+	</box>
+  </toolbar>
+
+</toolbox>
+
+<!-- sidebar/toolbar/content/status -->
+<box align="horizontal" flex="100%">
+  <!-- toolbar/content/status -->
+ 
+  <box id="sidebar-box" chromeclass="extrachrome"/>
+  <splitter id="sidebar-splitter" chromeclass="extrachrome" />
+  
+  <box id="appcontent" align="vertical" flex="100%"
+    ondragover="return DragOverContentArea(event);"
+    ondragdrop="return DropOnContentArea(event);">
+
+    <!-- type attribute is used by frame construction to locate iframes
+         intended to hold (html) content -->
+    <!-- id's use is a mystery -->
+    <box context="context" flex="100%">
+    <browser type="content-primary" id="content" src="about:blank" flex="100%"/>
+    </box>
+      <box id="status-bar" chromeclass="status">
+        <box id="state-box" align="horizontal" flex="100%" style="min-width: 1px">
+          <box align="vertical" style="width:100px">
+          <spring flex="100%"/>
+          <progressmeter id="statusbar-icon" mode="normal"
+            align="horizontal" value="0" onclick="dumpProgress()">
+              <observes element="Browser:LoadingProgress" attribute="mode"/>
+              <observes element="Browser:Throbber" attribute="busy" 
+                onbroadcast="onProgress()"/>
+          </progressmeter>
+          <spring flex="100%"/>
+        </box>
+		<spring style="width: 1em"/>
+        <titledbutton id="statusText" class="status-bar" align="left" flex="100%" 
+          value="&statusText.label;"  style="min-width: 1px">
+          <observes element="Browser:Status" attribute="value"
+            onbroadcast="onStatus()"/>         
+        </titledbutton>
+    
+        <titledbutton class="status-bar" align="left" value="&buildId.label;"/>
+        <titledbutton id="lock-button" class="borderless" align="left"/>    
+      
+      </box>
+    </box><!-- status -->
+  </box><!-- toolbar/content/status -->
+</box><!-- sidebar and tools/content/status -->
+<toolbar id="taskbar" chromeclass="extrachrome" />
+
+</window>
