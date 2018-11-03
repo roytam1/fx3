@@ -134,7 +134,6 @@ utf16_to_isolatin1(const PRUnichar **input, PRUint32 *inputLeft, char **output, 
 #include <langinfo.h> // nl_langinfo
 #include <iconv.h>    // iconv_open, iconv, iconv_close
 #include <errno.h>
-#include "plstr.h"
 
 #if defined(HAVE_ICONV_WITH_CONST_INPUT)
 #define ICONV_INPUT(x) (x)
@@ -932,40 +931,14 @@ NS_CopyUnicodeToNative(const nsAString  &input, nsACString &output)
     return NS_OK;
 }
 
-// moved from widget/src/windows/nsToolkit.cpp
-NS_COM PRInt32 
-NS_ConvertAtoW(const char *aStrInA, int aBufferSize, PRUnichar *aStrOutW)
+void
+NS_StartupNativeCharsetUtils()
 {
-    return MultiByteToWideChar(CP_ACP, 0, aStrInA, -1, aStrOutW, aBufferSize);
 }
 
-NS_COM PRInt32 
-NS_ConvertWtoA(const PRUnichar *aStrInW, int aBufferSizeOut,
-               char *aStrOutA, const char *aDefault)
+void
+NS_ShutdownNativeCharsetUtils()
 {
-    if ((!aStrInW) || (!aStrOutA) || (aBufferSizeOut <= 0))
-        return 0;
-
-    int numCharsConverted = WideCharToMultiByte(CP_ACP, 0, aStrInW, -1, 
-                                                aStrOutA, aBufferSizeOut,
-                                                aDefault, NULL);
-
-    if (!numCharsConverted) {
-        if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-            // Overflow, add missing null termination but return 0
-            aStrOutA[aBufferSizeOut-1] = '\0';
-        }
-        else {
-            // Other error, clear string and return 0
-            aStrOutA[0] = '\0';
-        }
-    }
-    else if (numCharsConverted < aBufferSizeOut) {
-        // Add 2nd null (really necessary?)
-        aStrOutA[numCharsConverted] = '\0';
-    }
-
-    return numCharsConverted;
 }
 
 //-----------------------------------------------------------------------------

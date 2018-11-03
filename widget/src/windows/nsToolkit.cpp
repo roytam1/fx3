@@ -46,7 +46,6 @@
 #include "nsIEventQueueService.h"
 #include "nsIEventQueue.h"
 #include "nsComponentManagerUtils.h"
-#include "nsNativeCharsetUtils.h"
 #include <objbase.h>
 #include <initguid.h>
 
@@ -182,6 +181,37 @@ LRESULT CALLBACK DetectWindowMove(int code, WPARAM wParam, LPARAM lParam)
 #define MAX_MENU_NAME   128
 #define MAX_FILTER_NAME 256
 
+int ConvertAtoW(LPCSTR aStrInA, int aBufferSize, LPWSTR aStrOutW)
+{
+  return MultiByteToWideChar(CP_ACP, 0, aStrInA, -1, aStrOutW, aBufferSize) ;
+}
+
+int ConvertWtoA(LPCWSTR aStrInW, int aBufferSizeOut, LPSTR aStrOutA)
+{
+  if ((!aStrInW) || (!aStrOutA) || (aBufferSizeOut <= 0))
+    return 0;
+
+  int numCharsConverted = WideCharToMultiByte(CP_ACP, 0, aStrInW, -1, 
+      aStrOutA, aBufferSizeOut, "?", NULL);
+
+  if (!numCharsConverted) {
+    if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+      // Overflow, add missing null termination but return 0
+      aStrOutA[aBufferSizeOut-1] = '\0';
+    }
+    else {
+      // Other error, clear string and return 0
+      aStrOutA[0] = '\0';
+    }
+  }
+  else if (numCharsConverted < aBufferSizeOut) {
+    // Add 2nd null (really necessary?)
+    aStrOutA[numCharsConverted] = '\0';
+  }
+
+  return numCharsConverted;
+}
+
 BOOL CallOpenSaveFileNameA(LPOPENFILENAMEW aFileNameW, BOOL aOpen)
 {
   BOOL rtn;
@@ -222,14 +252,13 @@ BOOL CallOpenSaveFileNameA(LPOPENFILENAMEW aFileNameW, BOOL aOpen)
     ofnA.lpstrFilter = filterA; 
   }
   if (aFileNameW->lpstrCustomFilter)  {
-    NS_ConvertWtoA(aFileNameW->lpstrCustomFilter, MAX_FILTER_NAME,
-                   customFilterA, "?");
+    ConvertWtoA(aFileNameW->lpstrCustomFilter, MAX_FILTER_NAME, customFilterA);
     ofnA.lpstrCustomFilter = customFilterA; 
     ofnA.nMaxCustFilter = MAX_FILTER_NAME;  
   }
   ofnA.nFilterIndex = aFileNameW->nFilterIndex; // Index of pair of filter strings. Should be ok.
   if (aFileNameW->lpstrFile)  {
-    NS_ConvertWtoA(aFileNameW->lpstrFile, FILE_BUFFER_SIZE, fileA, "?");
+    ConvertWtoA(aFileNameW->lpstrFile, FILE_BUFFER_SIZE, fileA);
     ofnA.lpstrFile = fileA;
     ofnA.nMaxFile = FILE_BUFFER_SIZE;
     if (strlen(fileA))  {
@@ -240,28 +269,27 @@ BOOL CallOpenSaveFileNameA(LPOPENFILENAMEW aFileNameW, BOOL aOpen)
     }
   }
   if (aFileNameW->lpstrFileTitle) {
-    NS_ConvertWtoA(aFileNameW->lpstrFileTitle, MAX_PATH, fileTitleA, "?");
+    ConvertWtoA(aFileNameW->lpstrFileTitle, MAX_PATH, fileTitleA);
     ofnA.lpstrFileTitle = fileTitleA;
     ofnA.nMaxFileTitle = MAX_PATH;  
   }
   if (aFileNameW->lpstrInitialDir)  {
-    NS_ConvertWtoA(aFileNameW->lpstrInitialDir, MAX_PATH, initDirA, "?");
+    ConvertWtoA(aFileNameW->lpstrInitialDir, MAX_PATH, initDirA);
     ofnA.lpstrInitialDir = initDirA; 
   }
   if (aFileNameW->lpstrTitle) {
-    NS_ConvertWtoA(aFileNameW->lpstrTitle, MAX_PATH, titleA, "?");
+    ConvertWtoA(aFileNameW->lpstrTitle, MAX_PATH, titleA);
     ofnA.lpstrTitle = titleA; 
   }
   ofnA.Flags = aFileNameW->Flags; 
   if (aFileNameW->lpstrDefExt)  {
-    NS_ConvertWtoA(aFileNameW->lpstrDefExt, MAX_PATH, defExtA, "?");
+    ConvertWtoA(aFileNameW->lpstrDefExt, MAX_PATH, defExtA);
     ofnA.lpstrDefExt = defExtA; 
   }
-  // Warning:  No WtoA() is done to application-defined data 
-  ofnA.lCustData = aFileNameW->lCustData; 
+  ofnA.lCustData = aFileNameW->lCustData; // Warning:  No WtoA() is done to application-defined data 
   ofnA.lpfnHook = aFileNameW->lpfnHook;   
   if (aFileNameW->lpTemplateName) {
-    NS_ConvertWtoA(aFileNameW->lpTemplateName, MAX_PATH, tempNameA, "?");
+    ConvertWtoA(aFileNameW->lpTemplateName, MAX_PATH, tempNameA);
     ofnA.lpTemplateName = tempNameA; 
   }
   
@@ -291,7 +319,7 @@ BOOL CallOpenSaveFileNameA(LPOPENFILENAMEW aFileNameW, BOOL aOpen)
       aFileNameW->lpstrFile[lenW+1] = '\0';
     }
     else  { 
-      NS_ConvertAtoW(ofnA.lpstrFile, aFileNameW->nMaxFile, aFileNameW->lpstrFile);
+      ConvertAtoW(ofnA.lpstrFile, aFileNameW->nMaxFile, aFileNameW->lpstrFile);
     }
   }
 
@@ -317,7 +345,7 @@ int WINAPI nsGetClassName(HWND aWnd, LPWSTR aClassName, int aMaxCount)
   if (!GetClassNameA(aWnd, classNameA, MAX_CLASS_NAME))
     return 0;
 
-  aMaxCount = NS_ConvertAtoW(classNameA, MAX_CLASS_NAME, aClassName);
+  aMaxCount = ConvertAtoW(classNameA, MAX_CLASS_NAME, aClassName);
 
   return aMaxCount;
 }
@@ -340,9 +368,9 @@ HWND WINAPI nsCreateWindowEx(DWORD aExStyle,
 
   // Convert class name and Window name from Unicode to ANSI
   if (aClassNameW)
-      NS_ConvertWtoA(aClassNameW, MAX_CLASS_NAME, classNameA, "?");
+      ConvertWtoA(aClassNameW, MAX_CLASS_NAME, classNameA);
   if (aWindowNameW)
-      NS_ConvertWtoA(aWindowNameW, MAX_CLASS_NAME, windowNameA, "?");
+      ConvertWtoA(aWindowNameW, MAX_CLASS_NAME, windowNameA);
   
   // so far only NULL is passed
   if (aParam != NULL) {
@@ -365,7 +393,7 @@ LRESULT WINAPI nsSendMessage(HWND aWnd, UINT aMsg, WPARAM awParam, LPARAM alPara
   if (WM_SETTEXT == aMsg)  {
     char title[MAX_PATH];
     if (alParam) // Note: Window titles are truncated to 159 chars by Windows
-      NS_ConvertWtoA((LPCWSTR)alParam, MAX_PATH, title, "?");
+      ConvertWtoA((LPCWSTR)alParam, MAX_PATH, title);
     return SendMessageA(aWnd, aMsg, awParam, (LPARAM)&title);
   }
 
@@ -393,11 +421,11 @@ ATOM WINAPI nsRegisterClass(const WNDCLASSW *aClassW)
 
   wClass.lpszClassName = classNameA;
   if (aClassW->lpszClassName)
-    NS_ConvertWtoA(aClassW->lpszClassName, MAX_CLASS_NAME, classNameA, "?");
+    ConvertWtoA(aClassW->lpszClassName, MAX_CLASS_NAME, classNameA);
   
   wClass.lpszMenuName = menuNameA; 
   if (aClassW->lpszMenuName)
-    NS_ConvertWtoA(aClassW->lpszMenuName, MAX_MENU_NAME, menuNameA, "?");
+    ConvertWtoA(aClassW->lpszMenuName, MAX_MENU_NAME, menuNameA);
 
   return RegisterClassA(&wClass);
 }
@@ -407,7 +435,7 @@ BOOL WINAPI nsUnregisterClass(LPCWSTR aClassW, HINSTANCE aInst)
   char classA[MAX_PATH+1];
 
   if (aClassW)  {
-    NS_ConvertWtoA(aClassW, MAX_PATH, classA, "?");
+    ConvertWtoA(aClassW, MAX_PATH, classA);
     return UnregisterClassA((LPCSTR)classA, aInst);
   }
   return FALSE;
@@ -419,9 +447,9 @@ BOOL WINAPI nsSHGetPathFromIDList(LPCITEMIDLIST aIdList, LPWSTR aPathW)
   char pathA[MAX_PATH+1];
 
   if (aPathW)  {
-    NS_ConvertWtoA(aPathW, MAX_PATH, pathA, "?");
+    ConvertWtoA(aPathW, MAX_PATH, pathA);
     if (SHGetPathFromIDListA(aIdList, pathA)) {
-      NS_ConvertAtoW(pathA, MAX_PATH, aPathW);
+      ConvertAtoW(pathA, MAX_PATH, aPathW);
       return TRUE;
     }
   }
@@ -440,11 +468,11 @@ LPITEMIDLIST WINAPI nsSHBrowseForFolder(LPBROWSEINFOW aBiW)
   biA.hwndOwner = aBiW->hwndOwner;
   biA.pidlRoot = aBiW->pidlRoot;
   if (aBiW->pszDisplayName)  {
-    NS_ConvertWtoA(aBiW->pszDisplayName, MAX_PATH, displayNameA, "?");
+    ConvertWtoA(aBiW->pszDisplayName, MAX_PATH, displayNameA);
     biA.pszDisplayName = displayNameA; 
   }
   if (aBiW->lpszTitle)  {
-    NS_ConvertWtoA(aBiW->lpszTitle, MAX_PATH, titleA, "?");
+    ConvertWtoA(aBiW->lpszTitle, MAX_PATH, titleA);
     biA.lpszTitle = titleA; 
   }
   biA.ulFlags = aBiW->ulFlags;
@@ -454,7 +482,7 @@ LPITEMIDLIST WINAPI nsSHBrowseForFolder(LPBROWSEINFOW aBiW)
 
   itemIdList = SHBrowseForFolderA(&biA);
   if (biA.pszDisplayName)  {
-    NS_ConvertAtoW(biA.pszDisplayName, MAX_PATH, aBiW->pszDisplayName);
+    ConvertAtoW(biA.pszDisplayName, MAX_PATH, aBiW->pszDisplayName);
   }
   return itemIdList;
 }

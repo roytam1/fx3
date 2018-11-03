@@ -99,15 +99,14 @@ private:
     PRPackedBool mFollowSymlinks;   // should we follow symlinks when working on this file
     
     // this string will always be in native format!
-    nsString mWorkingPath;
+    nsCString mWorkingPath;
     
-    // this will be the resolved path of shortcuts, it will *NEVER* 
-    // be returned to the user
-    nsString mResolvedPath;
-
+    // this will be the resolved path of shortcuts, it will *NEVER* be returned to the user
+    nsCString mResolvedPath;
+    
     // this string, if not empty, is the *short* pathname that represents
     // mWorkingPath
-    nsString mShortWorkingPath;
+    nsCString mShortWorkingPath;
 
     PRFileInfo64 mFileInfo64;
 
@@ -118,16 +117,12 @@ private:
 
     void EnsureShortPath();
     
-    nsresult CopyMove(nsIFile *newParentDir, const nsAString &newName,
-                      PRBool followSymlinks, PRBool move);
-    nsresult CopySingleFile(nsIFile *source, nsIFile* dest,
-                            const nsAString &newName,
-                            PRBool followSymlinks, PRBool move);
+    nsresult CopyMove(nsIFile *newParentDir, const nsACString &newName, PRBool followSymlinks, PRBool move);
+    nsresult CopySingleFile(nsIFile *source, nsIFile* dest, const nsACString &newName, PRBool followSymlinks, PRBool move);
 
-    nsresult SetModDate(PRInt64 aLastModifiedTime, const PRUnichar *filePath);
+    nsresult SetModDate(PRInt64 aLastModifiedTime, const char *filePath);
     nsresult HasFileAttribute(DWORD fileAttrib, PRBool *_retval);
-    nsresult AppendInternal(const nsAFlatString &node,
-                            PRBool multipleComponents);
+    nsresult AppendNativeInternal(const nsAFlatCString &node, PRBool multipleComponents);
 };
 
 #endif
