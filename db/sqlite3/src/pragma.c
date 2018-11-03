@@ -485,7 +485,7 @@ void sqlite3Pragma(
         sqlite3VdbeAddOp(v, OP_Integer, i, 0);
         sqlite3VdbeOp3(v, OP_String8, 0, 0, pCol->zName, 0);
         sqlite3VdbeOp3(v, OP_String8, 0, 0,
-           pCol->zType ? pCol->zType : "numeric", 0);
+           pCol->zType ? pCol->zType : "", 0);
         sqlite3VdbeAddOp(v, OP_Integer, pCol->notNull, 0);
         sqlite3ExprCode(pParse, pCol->pDflt);
         sqlite3VdbeAddOp(v, OP_Integer, pCol->isPrimKey, 0);

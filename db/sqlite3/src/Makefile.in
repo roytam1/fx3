@@ -48,6 +48,12 @@ LIBRARY_NAME     = sqlite3_s
 MODULE_NAME      = sqlite3
 FORCE_STATIC_LIB = 1
 
+ifeq (,$(filter-out WINNT WINCE, $(OS_ARCH)))
+ifndef GNU_CC
+DEFFILE = $(win_srcdir)/sqlite.def
+endif
+endif
+
 EXPORTS = sqlite3.h sqlite3file.h
 
 CSRCS = \
@@ -70,6 +76,7 @@ CSRCS = \
 	main.c \
 	opcodes.c \
 	os.c \
+	os_beos.c \
 	os_unix.c \
 	os_win.c \
 	os_os2.c \

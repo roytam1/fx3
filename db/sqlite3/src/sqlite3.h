@@ -18,6 +18,8 @@
 #define _SQLITE3_H_
 #include <stdarg.h>     /* Needed for the definition of va_list */
 
+#define sqlite3_prepare_v2 sqlite3_prepare
+
 /*
 ** Make sure we can call this stuff from C++.
 */
@@ -31,7 +33,7 @@ extern "C" {
 #ifdef SQLITE_VERSION
 # undef SQLITE_VERSION
 #endif
-#define SQLITE_VERSION         "3.3.4"
+#define SQLITE_VERSION         "3.3.5"
 
 /*
 ** The format of the version string is "X.Y.Z<trailing string>", where
@@ -48,7 +50,7 @@ extern "C" {
 #ifdef SQLITE_VERSION_NUMBER
 # undef SQLITE_VERSION_NUMBER
 #endif
-#define SQLITE_VERSION_NUMBER 3003004
+#define SQLITE_VERSION_NUMBER 3003005
 
 /*
 ** The version string is also compiled into the library so that a program
@@ -78,7 +80,10 @@ typedef struct sqlite3 sqlite3;
 ** to do a typedef that for 64-bit integers that depends on what compiler
 ** is being used.
 */
-#if defined(_MSC_VER) || defined(__BORLANDC__)
+#ifdef SQLITE_INT64_TYPE
+  typedef SQLITE_INT64_TYPE sqlite_int64;
+  typedef unsigned SQLITE_INT64_TYPE sqlite_uint64;
+#elif defined(_MSC_VER) || defined(__BORLANDC__)
   typedef __int64 sqlite_int64;
   typedef unsigned __int64 sqlite_uint64;
 #else
@@ -1486,6 +1491,19 @@ int sqlite3_bind_parameter_indexes(
     int **pIndexes
 );
 void sqlite3_free_parameter_indexes(int *pIndexes);
+
+/*
+** Preload the databases into the pager cache, up to the maximum size of the
+** pager cache.
+**
+** For a database to be loaded successfully, the pager must be active. That is,
+** there must be an open statement on that database. See sqlite3pager_loadall
+**
+** There might be many databases attached to the given connection. We iterate
+** them all and try to load them. If none are loadable successfully, we return
+** an error. Otherwise, we return OK.
+*/
+int sqlite3Preload(sqlite3* db);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */

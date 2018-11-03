@@ -123,24 +123,180 @@ int sqlite3_os_type = 0;
   }
 #endif /* OS_WINCE */
 
+/*** UTF16<-->UTF8 functions minicking MultiByteToWideChar/WideCharToMultiByte ***/
+int utf8GetMaskIndex(unsigned char n) {
+  if((unsigned char)(n + 2) < 0xc2) return 1; // 00~10111111, fe, ff
+  if(n < 0xe0)                      return 2; // 110xxxxx
+  if(n < 0xf0)                      return 3; // 1110xxxx
+  if(n < 0xf8)                      return 4; // 11110xxx
+  if(n < 0xfc)                      return 5; // 111110xx
+                                    return 6; // 1111110x
+}
+
+int wc2Utf8Len(wchar_t ** n, int *len) {
+  wchar_t *ch = *n, ch2;
+  int qch;
+  if((0xD800 <= *ch && *ch <= 0xDBFF) && *len) {
+    ch2 = *(ch + 1);
+    if(0xDC00 <= ch2 && ch2 <= 0xDFFF) {
+	  qch = 0x10000 + (((*ch - 0xD800) & 0x3ff) << 10) + ((ch2 - 0xDC00) & 0x3ff);
+	  (*n)++;
+	  (*len)--;
+	}
+  }
+  else
+    qch = (int) *ch;
+
+  if (qch <= 0x7f)           return 1;
+  else if (qch <= 0x7ff)     return 2;
+  else if (qch <= 0xffff)    return 3;
+  else if (qch <= 0x1fffff)  return 4;
+  else if (qch <= 0x3ffffff) return 5;
+  else                       return 6;
+}
+
+int Utf8ToWideChar(unsigned int unused1, unsigned long unused2, char *sb, int ss, wchar_t * wb, int ws) {
+  static const unsigned char utf8mask[] = { 0, 0xff, 0x1f, 0x0f, 0x07, 0x03, 0x01 };
+  char *p = (char *)(sb);
+  char *e = (char *)(sb + ss);
+  wchar_t *w = wb;
+  int cnt = 0, t, qch;
+
+  if (ss < 1) {
+    ss = lstrlenA(sb);
+    e = (char *)(sb + ss);
+  }
+
+  if (wb && ws) {
+    for (; p < e; ++w) {
+	  t = utf8GetMaskIndex(*p);
+	  qch = (*p++ & utf8mask[t]);
+	  while(p < e && --t)
+	    qch <<= 6, qch |= (*p++) & 0x3f;
+	  if(qch < 0x10000) {
+	    if(cnt <= ws)
+		  *w = (wchar_t) qch;
+	    cnt++;
+	  } else {
+	    if (cnt + 2 <= ws) {
+		  *w++ = (wchar_t) (0xD800 + (((qch - 0x10000) >> 10) & 0x3ff)),
+		    *w = (wchar_t) (0xDC00 + (((qch - 0x10000)) & 0x3ff));
+		}
+	    cnt += 2;
+	  }
+	}
+    if(cnt < ws) {
+      *(wb+cnt) = 0;
+      return cnt;
+    } else {
+      *(wb+ws) = 0;
+      return ws;
+    }
+  } else {
+    for (t; p < e;) {
+	  t = utf8GetMaskIndex(*p);
+	  qch = (*p++ & utf8mask[t]);
+	  while (p < e && --t)
+	    qch <<= 6, qch |= (*p++) & 0x3f;
+	  if (qch < 0x10000)
+	    cnt++;
+	  else
+	    cnt += 2;
+	}
+    return cnt+1;
+  }
+}
+
+int WideCharToUtf8(unsigned int unused1, unsigned long unused2, wchar_t * wb, int ws, char *sb, int ss) {
+  wchar_t *p = (wchar_t *)(wb);
+  wchar_t *e = (wchar_t *)(wb + ws);
+  wchar_t *oldp;
+  char *s = sb;
+  int cnt = 0, qch, t;
+
+  if (ws < 1) {
+    ws = lstrlenW(wb);
+    e = (wchar_t *)(wb + ws);
+  }
+
+  if (sb && ss) {
+    for (t; p < e; ++p) {
+      oldp = p;
+      t = wc2Utf8Len(&p, &ws);
+
+      if (p != oldp) { /* unicode surrogates encountered */
+        qch = 0x10000 + (((*oldp - 0xD800) & 0x3ff) << 10) + ((*p - 0xDC00) & 0x3ff);
+      } else
+        qch = *p;
+
+      if (qch <= 0x7f)
+        *s++ = (char) (qch),
+        cnt++;
+      else if (qch <= 0x7ff)
+        *s++ = 0xc0 | (char) (qch >> 6),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 2;
+      else if (qch <= 0xffff)
+        *s++ = 0xe0 | (char) (qch >> 12),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 3;
+      else if (qch <= 0x1fffff)
+        *s++ = 0xf0 | (char) (qch >> 18),
+        *s++ = 0x80 | (char) ((qch >> 12) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 4;
+      else if (qch <= 0x3ffffff)
+        *s++ = 0xf8 | (char) (qch >> 24),
+        *s++ = 0x80 | (char) ((qch >> 18) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 12) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 5;
+      else
+        *s++ = 0xfc | (char) (qch >> 30),
+        *s++ = 0x80 | (char) ((qch >> 24) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 18) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 12) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 6;
+    }
+    if(cnt < ss) {
+      *(sb+cnt) = 0;
+      return cnt;
+    } else {
+      *(sb+ss) = 0;
+      return ss;
+    }
+  } else {
+    for (t; p < e; ++p) {
+      t = wc2Utf8Len(&p, &ws);
+      cnt += t;
+    }
+    return cnt+1;
+  }
+}
+/*** Ends ***/
+
 /*
 ** Convert a UTF-8 string to UTF-32.  Space to hold the returned string
 ** is obtained from sqliteMalloc.
 */
 static WCHAR *utf8ToUnicode(const char *zFilename){
-  int nByte;
+  int nChar;
+  int nCharcpy;
   WCHAR *zWideFilename;
 
-  if( !isNT() ){
-    return 0;
-  }
-  nByte = MultiByteToWideChar(CP_UTF8, 0, zFilename, -1, NULL, 0)*sizeof(WCHAR);
-  zWideFilename = sqliteMalloc( nByte*sizeof(zWideFilename[0]) );
+  nCharcpy = Utf8ToWideChar(CP_UTF8, 0, zFilename, -1, NULL, 0);
+  zWideFilename = sqliteMalloc( nCharcpy*sizeof(zWideFilename[0]) );
   if( zWideFilename==0 ){
     return 0;
   }
-  nByte = MultiByteToWideChar(CP_UTF8, 0, zFilename, -1, zWideFilename, nByte);
-  if( nByte==0 ){
+  nChar = Utf8ToWideChar(CP_UTF8, 0, zFilename, -1, zWideFilename, nCharcpy);
+
+  if( nChar==0 ){
     sqliteFree(zWideFilename);
     zWideFilename = 0;
   }
@@ -153,20 +309,98 @@ static WCHAR *utf8ToUnicode(const char *zFilename){
 */
 static char *unicodeToUtf8(const WCHAR *zWideFilename){
   int nByte;
+  int nBytecpy;
   char *zFilename;
 
-  nByte = WideCharToMultiByte(CP_UTF8, 0, zWideFilename, -1, 0, 0, 0, 0);
-  zFilename = sqliteMalloc( nByte );
+  nBytecpy = WideCharToUtf8(CP_UTF8, 0, zWideFilename, -1, 0, 0, 0, 0);
+  zFilename = sqliteMalloc( nBytecpy );
   if( zFilename==0 ){
     return 0;
   }
-  nByte = WideCharToMultiByte(CP_UTF8, 0, zWideFilename, -1, zFilename, nByte,
+  nByte = WideCharToUtf8(CP_UTF8, 0, zWideFilename, -1, zFilename, nBytecpy,
                               0, 0);
   if( nByte == 0 ){
     sqliteFree(zFilename);
     zFilename = 0;
   }
   return zFilename;
+}
+
+/*
+** Convert a multibyte character string to UTF-32, based on the current Ansi codepage (CP_ACP).
+** Space to hold the returned string is obtained from sqliteMalloc.
+*/
+static WCHAR *mbcsToUnicode(const char *zFilename){
+  int nByte;
+  WCHAR *zMbcsFilename;
+
+  nByte = MultiByteToWideChar(CP_ACP, 0, zFilename, -1, NULL, 0)*sizeof(WCHAR);
+  zMbcsFilename = sqliteMalloc( nByte*sizeof(zMbcsFilename[0]) );
+  if( zMbcsFilename==0 ){
+    return 0;
+  }
+  nByte = MultiByteToWideChar(CP_ACP, 0, zFilename, -1, zMbcsFilename, nByte);
+  if( nByte==0 ){
+    sqliteFree(zMbcsFilename);
+    zMbcsFilename = 0;
+  }
+  return zMbcsFilename;
+}
+
+/*
+** Convert UTF-32 to multibyte character string, based on the user's Ansi codepage (CP_ACP).
+** Space to hold the returned string is obtained from sqliteMalloc().
+*/
+static char *unicodeToMbcs(const WCHAR *zWideFilename){
+  int nByte;
+  char *zFilename;
+
+  nByte = WideCharToMultiByte(CP_ACP, 0, zWideFilename, -1, 0, 0, 0, 0);
+  zFilename = sqliteMalloc( nByte );
+  if( zFilename==0 ){
+    return 0;
+  }
+  nByte = WideCharToMultiByte(CP_ACP, 0, zWideFilename, -1, zFilename, nByte,
+                              0, 0);
+  if( nByte == 0 ){
+    sqliteFree(zFilename);
+    zFilename = 0;
+  }
+  return zFilename;
+}
+
+/*
+** Convert multibyte character string to UTF-8.  Space to hold the returned string is
+** obtained from sqliteMalloc().
+*/
+static char *mbcsToUtf8(const char *zFilename){
+  char *zFilenameUtf8;
+  WCHAR *zTmpWide;
+
+  zTmpWide = mbcsToUnicode(zFilename);
+  if( zTmpWide==0 ){
+    return 0;
+  }
+  zFilenameUtf8 = unicodeToUtf8(zTmpWide);
+  sqliteFree(zTmpWide);
+  return zFilenameUtf8;
+}
+
+/*
+** Convert UTF-8 to multibyte character string.  Space to hold the returned string is
+** obtained from sqliteMalloc().
+*/
+static char *utf8ToMbcs(const char *zFilename){
+  char *zFilenameMbcs;
+  WCHAR *zTmpWide;
+
+  zTmpWide = utf8ToUnicode(zFilename);
+  if( zTmpWide==0 ){
+    return 0;
+  }
+  zFilenameMbcs = unicodeToMbcs(zTmpWide);
+  sqliteFree(zTmpWide);
+  return zFilenameMbcs;
 }
 
 #if OS_WINCE
@@ -475,21 +709,30 @@ static BOOL winceLockFileEx(
 *****************************************************************************/
 #endif /* OS_WINCE */
 
+static void *convertUtf8Filename(const char *zFilename){
+  void *zConverted = 0;
+  if( isNT() ){
+    zConverted = utf8ToUnicode(zFilename);
+  }else{
+    zConverted = utf8ToMbcs(zFilename);
+  }
+  /* caller will handle out of memory */
+  return zConverted;
+}
+
 /*
 ** Delete the named file
 */
 int sqlite3WinDelete(const char *zFilename){
-  WCHAR *zWide = utf8ToUnicode(zFilename);
-  if( zWide ){
-    DeleteFileW(zWide);
-    sqliteFree(zWide);
-  }else{
-#if OS_WINCE
+  void *zConverted = convertUtf8Filename(zFilename);
+  if( zConverted==0 )
     return SQLITE_NOMEM;
-#else
-    DeleteFileA(zFilename);
-#endif
+  if( isNT() ){
+    DeleteFileW((WCHAR*)zConverted);
+  }else{
+    DeleteFileA((char*)zConverted);
   }
+  sqliteFree(zConverted);
   TRACE2("DELETE \"%s\"\n", zFilename);
   return SQLITE_OK;
 }
@@ -499,17 +742,15 @@ int sqlite3WinDelete(const char *zFilename){
 */
 int sqlite3WinFileExists(const char *zFilename){
   int exists = 0;
-  WCHAR *zWide = utf8ToUnicode(zFilename);
-  if( zWide ){
-    exists = GetFileAttributesW(zWide) != 0xffffffff;
-    sqliteFree(zWide);
-  }else{
-#if OS_WINCE
+  void *zConverted = convertUtf8Filename(zFilename);
+  if( zConverted==0 )
     return SQLITE_NOMEM;
-#else
-    exists = GetFileAttributesA(zFilename) != 0xffffffff;
-#endif
+  if( isNT() ){
+    exists = GetFileAttributesW((WCHAR*)zConverted) != 0xffffffff;
+  }else{
+    exists = GetFileAttributesA((char*)zConverted) != 0xffffffff;
   }
+  sqliteFree(zConverted);
   return exists;
 }
 
@@ -536,10 +777,13 @@ int sqlite3WinOpenReadWrite(
 ){
   winFile f;
   HANDLE h;
-  WCHAR *zWide = utf8ToUnicode(zFilename);
+  void *zConverted = convertUtf8Filename(zFilename);
+  if( zConverted==0 )
+    return SQLITE_NOMEM;
   assert( *pId==0 );
-  if( zWide ){
-    h = CreateFileW(zWide,
+
+  if( isNT() ){
+    h = CreateFileW((WCHAR*)zConverted,
        GENERIC_READ | GENERIC_WRITE,
        FILE_SHARE_READ | FILE_SHARE_WRITE,
        NULL,
@@ -548,7 +792,7 @@ int sqlite3WinOpenReadWrite(
        NULL
     );
     if( h==INVALID_HANDLE_VALUE ){
-      h = CreateFileW(zWide,
+      h = CreateFileW((WCHAR*)zConverted,
          GENERIC_READ,
          FILE_SHARE_READ,
          NULL,
@@ -557,7 +801,7 @@ int sqlite3WinOpenReadWrite(
          NULL
       );
       if( h==INVALID_HANDLE_VALUE ){
-        sqliteFree(zWide);
+        sqliteFree(zConverted);
         return SQLITE_CANTOPEN;
       }
       *pReadonly = 1;
@@ -567,16 +811,12 @@ int sqlite3WinOpenReadWrite(
 #if OS_WINCE
     if (!winceCreateLock(zFilename, &f)){
       CloseHandle(h);
-      sqliteFree(zWide);
+      sqliteFree(zConverted);
       return SQLITE_CANTOPEN;
     }
 #endif
-    sqliteFree(zWide);
   }else{
-#if OS_WINCE
-    return SQLITE_NOMEM;
-#else
-    h = CreateFileA(zFilename,
+    h = CreateFileA((char*)zConverted,
        GENERIC_READ | GENERIC_WRITE,
        FILE_SHARE_READ | FILE_SHARE_WRITE,
        NULL,
@@ -585,7 +825,7 @@ int sqlite3WinOpenReadWrite(
        NULL
     );
     if( h==INVALID_HANDLE_VALUE ){
-      h = CreateFileA(zFilename,
+      h = CreateFileA((char*)zConverted,
          GENERIC_READ,
          FILE_SHARE_READ,
          NULL,
@@ -594,14 +834,17 @@ int sqlite3WinOpenReadWrite(
          NULL
       );
       if( h==INVALID_HANDLE_VALUE ){
+        sqliteFree(zConverted);
         return SQLITE_CANTOPEN;
       }
       *pReadonly = 1;
     }else{
       *pReadonly = 0;
     }
-#endif /* OS_WINCE */
   }
+
+  sqliteFree(zConverted);
+
   f.h = h;
 #if OS_WINCE
   f.zDeleteOnClose = 0;
@@ -629,7 +872,9 @@ int sqlite3WinOpenExclusive(const char *zFilename, OsFile **pId, int delFlag){
   winFile f;
   HANDLE h;
   int fileflags;
-  WCHAR *zWide = utf8ToUnicode(zFilename);
+  void *zConverted = convertUtf8Filename(zFilename);
+  if( zConverted==0 )
+    return SQLITE_NOMEM;
   assert( *pId == 0 );
   fileflags = FILE_FLAG_RANDOM_ACCESS;
 #if !OS_WINCE
@@ -637,8 +882,8 @@ int sqlite3WinOpenExclusive(const char *zFilename, OsFile **pId, int delFlag){
     fileflags |= FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE;
   }
 #endif
-  if( zWide ){
-    h = CreateFileW(zWide,
+  if( isNT() ){
+    h = CreateFileW((WCHAR*)zConverted,
        GENERIC_READ | GENERIC_WRITE,
        0,
        NULL,
@@ -646,12 +891,8 @@ int sqlite3WinOpenExclusive(const char *zFilename, OsFile **pId, int delFlag){
        fileflags,
        NULL
     );
-    sqliteFree(zWide);
   }else{
-#if OS_WINCE
-    return SQLITE_NOMEM;
-#else
-    h = CreateFileA(zFilename,
+    h = CreateFileA((char*)zConverted,
        GENERIC_READ | GENERIC_WRITE,
        0,
        NULL,
@@ -659,8 +900,8 @@ int sqlite3WinOpenExclusive(const char *zFilename, OsFile **pId, int delFlag){
        fileflags,
        NULL
     );
-#endif /* OS_WINCE */
   }
+  sqliteFree(zConverted);
   if( h==INVALID_HANDLE_VALUE ){
     return SQLITE_CANTOPEN;
   }
@@ -683,23 +924,12 @@ int sqlite3WinOpenExclusive(const char *zFilename, OsFile **pId, int delFlag){
 int sqlite3WinOpenReadOnly(const char *zFilename, OsFile **pId){
   winFile f;
   HANDLE h;
-  WCHAR *zWide = utf8ToUnicode(zFilename);
-  assert( *pId==0 );
-  if( zWide ){
-    h = CreateFileW(zWide,
-       GENERIC_READ,
-       0,
-       NULL,
-       OPEN_EXISTING,
-       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS,
-       NULL
-    );
-    sqliteFree(zWide);
-  }else{
-#if OS_WINCE
+  void *zConverted = convertUtf8Filename(zFilename);
+  if( zConverted==0 )
     return SQLITE_NOMEM;
-#else
-    h = CreateFileA(zFilename,
+  assert( *pId==0 );
+  if( isNT() ){
+    h = CreateFileW((WCHAR*)zConverted,
        GENERIC_READ,
        0,
        NULL,
@@ -707,8 +937,17 @@ int sqlite3WinOpenReadOnly(const char *zFilename, OsFile **pId){
        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS,
        NULL
     );
-#endif
+  }else{
+    h = CreateFileA((char*)zConverted,
+       GENERIC_READ,
+       0,
+       NULL,
+       OPEN_EXISTING,
+       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS,
+       NULL
+    );
   }
+  sqliteFree(zConverted);
   if( h==INVALID_HANDLE_VALUE ){
     return SQLITE_CANTOPEN;
   }
@@ -774,9 +1013,21 @@ int sqlite3WinTempFileName(char *zBuf){
       strncpy(zTempPath, zMulti, SQLITE_TEMPNAME_SIZE-30);
       zTempPath[SQLITE_TEMPNAME_SIZE-30] = 0;
       sqliteFree(zMulti);
+    }else{
+      return SQLITE_NOMEM;
     }
   }else{
-    GetTempPathA(SQLITE_TEMPNAME_SIZE-30, zTempPath);
+    char *zUtf8;
+    char zMbcsPath[SQLITE_TEMPNAME_SIZE];
+    GetTempPathA(SQLITE_TEMPNAME_SIZE-30, zMbcsPath);
+    zUtf8 = mbcsToUtf8(zMbcsPath);
+    if( zUtf8 ){
+      strncpy(zTempPath, zUtf8, SQLITE_TEMPNAME_SIZE-30);
+      zTempPath[SQLITE_TEMPNAME_SIZE-30] = 0;
+      sqliteFree(zUtf8);
+    }else{
+      return SQLITE_NOMEM;
+    }
   }
   for(i=strlen(zTempPath); i>0 && zTempPath[i-1]=='\\'; i--){}
   zTempPath[i] = 0;
@@ -982,20 +1233,19 @@ static int unlockReadLock(winFile *pFile){
 */
 int sqlite3WinIsDirWritable(char *zDirname){
   int fileAttr;
-  WCHAR *zWide;
+  void *zConverted;
   if( zDirname==0 ) return 0;
   if( !isNT() && strlen(zDirname)>MAX_PATH ) return 0;
-  zWide = utf8ToUnicode(zDirname);
-  if( zWide ){
-    fileAttr = GetFileAttributesW(zWide);
-    sqliteFree(zWide);
+
+  zConverted = convertUtf8Filename(zDirname);
+  if( zConverted==0 )
+    return SQLITE_NOMEM;
+  if( isNT() ){
+    fileAttr = GetFileAttributesW((WCHAR*)zConverted);
   }else{
-#if OS_WINCE
-    return 0;
-#else
-    fileAttr = GetFileAttributesA(zDirname);
-#endif
+    fileAttr = GetFileAttributesA((char*)zConverted);
   }
+  sqliteFree(zConverted);
   if( fileAttr == 0xffffffff ) return 0;
   if( (fileAttr & FILE_ATTRIBUTE_DIRECTORY) != FILE_ATTRIBUTE_DIRECTORY ){
     return 0;
@@ -1218,24 +1468,33 @@ char *sqlite3WinFullPathname(const char *zRelative){
   /* WinCE has no concept of a relative pathname, or so I am told. */
   zFull = sqliteStrDup(zRelative);
 #else
-  char *zNotUsed;
-  WCHAR *zWide;
   int nByte;
-  zWide = utf8ToUnicode(zRelative);
-  if( zWide ){
+  void *zConverted;
+  zConverted = convertUtf8Filename(zRelative);
+  if( isNT() ){
     WCHAR *zTemp, *zNotUsedW;
-    nByte = GetFullPathNameW(zWide, 0, 0, &zNotUsedW) + 1;
+    nByte = GetFullPathNameW((WCHAR*)zConverted, 0, 0, &zNotUsedW) + 1;
     zTemp = sqliteMalloc( nByte*sizeof(zTemp[0]) );
-    if( zTemp==0 ) return 0;
-    GetFullPathNameW(zWide, nByte, zTemp, &zNotUsedW);
-    sqliteFree(zWide);
+    if( zTemp==0 ){
+      sqliteFree(zConverted);
+      return 0;
+    }
+    GetFullPathNameW((WCHAR*)zConverted, nByte, zTemp, &zNotUsedW);
+    sqliteFree(zConverted);
     zFull = unicodeToUtf8(zTemp);
     sqliteFree(zTemp);
   }else{
-    nByte = GetFullPathNameA(zRelative, 0, 0, &zNotUsed) + 1;
-    zFull = sqliteMalloc( nByte*sizeof(zFull[0]) );
-    if( zFull==0 ) return 0;
-    GetFullPathNameA(zRelative, nByte, zFull, &zNotUsed);
+    char *zTemp, *zNotUsed;
+    nByte = GetFullPathNameA((char*)zConverted, 0, 0, &zNotUsed) + 1;
+    zTemp = sqliteMalloc( nByte*sizeof(zTemp[0]) );
+    if( zTemp==0 ){
+      sqliteFree(zConverted);
+      return 0;
+    }
+    GetFullPathNameA((char*)zConverted, nByte, zTemp, &zNotUsed);
+    sqliteFree(zConverted);
+    zFull = mbcsToUtf8(zTemp);
+    sqliteFree(zTemp);
   }
 #endif
   return zFull;
@@ -1372,8 +1631,15 @@ void sqlite3WinEnterMutex(){
 #ifdef SQLITE_W32_THREADS
   static int isInit = 0;
   while( !isInit ){
-    static long lock = 0;
-    if( InterlockedIncrement(&lock)==1 ){
+
+    /* On NT 3.51 and 95g the return value of InterlockedIncrement may not */
+    /* be the same as the result - unless the result is zero.  */
+
+    /* Since we only care about the first lock here, start counting at -1 */
+    /* instead of zero and check for the first lock which is now zero. */
+
+    static long lock = -1;
+    if( InterlockedIncrement(&lock)==0 ){
       InitializeCriticalSection(&cs);
       isInit = 1;
     }else{

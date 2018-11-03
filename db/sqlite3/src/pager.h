@@ -105,10 +105,11 @@ const char *sqlite3pager_dirname(Pager*);
 const char *sqlite3pager_journalname(Pager*);
 int sqlite3pager_nosync(Pager*);
 int sqlite3pager_rename(Pager*, const char *zNewName);
-void sqlite3pager_set_codec(Pager*,void(*)(void*,void*,Pgno,int),void*);
+void sqlite3pager_set_codec(Pager*,void*(*)(void*,void*,Pgno,int),void*);
 int sqlite3pager_movepage(Pager*,void*,Pgno);
 int sqlite3pager_reset(Pager*);
 int sqlite3pager_release_memory(int);
+int sqlite3pager_loadall(Pager*);
 
 #if defined(SQLITE_DEBUG) || defined(SQLITE_TEST)
 int sqlite3pager_lockstate(Pager*);
