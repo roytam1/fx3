@@ -35,26 +35,6 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-
-/*
- * This Original Code has been modified by IBM Corporation.
- * Modifications made by IBM described herein are
- * Copyright (c) International Business Machines
- * Corporation, 2000
- *
- * Modifications to Mozilla code or documentation
- * identified per MPL Section 3.3
- *
- * Date             Modified by     Description of modification
- * 03/23/2000       IBM Corp.       Changed write() to DosWrite(). EMX i/o
- *                                  calls cannot be intermixed with DosXXX
- *                                  calls since EMX remaps file/socket
- *                                  handles.
- * 04/27/2000       IBM Corp.       Changed open file to be more like NT and
- *                                  better handle PR_TRUNCATE | PR_CREATE_FILE
- *                                  and also fixed _PR_MD_SET_FD_INHERITABLE
- */
-
 /* OS2 IO module
  *
  * Assumes synchronous I/O.
@@ -65,14 +45,10 @@
 #include "prio.h"
 #include <ctype.h>
 #include <string.h>
-#ifdef XP_OS2_VACPP
-#include <direct.h>
-#else
 #include <limits.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <io.h>
-#endif
 
 struct _MDLock               _pr_ioq_lock;
 
@@ -199,6 +175,21 @@ _PR_MD_OPEN(const char *name, PRIntn osflags, int mode)
     PRInt32 flags = 0L;
     APIRET rc = 0;
     PRUword actionTaken;
+
+#ifdef MOZ_OS2_HIGH_MEMORY
+    /*
+     * All the pointer arguments (&file, &actionTaken and name) have to be in
+     * low memory for DosOpen to use them.
+     * The following moves name to low memory.
+     */ 
+    if ((ULONG)name >= 0x20000000)
+    {
+        size_t len = strlen(name) + 1;
+        char *copy = (char *)alloca(len);
+        memcpy(copy, name, len);
+        name = copy;
+    }
+#endif
 
     if (osflags & PR_SYNC) access |= OPEN_FLAGS_WRITE_THROUGH;
 

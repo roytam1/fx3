@@ -164,10 +164,6 @@ OBJS		= $(addprefix $(OBJDIR)/,$(CSRCS:.c=.$(OBJ_SUFFIX))) \
 		  $(addprefix $(OBJDIR)/,$(ASFILES:.$(ASM_SUFFIX)=.$(OBJ_SUFFIX)))
 endif
 
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-EXTRA_LIBS := $(patsubst -l%,$(DIST)/lib/%.$(LIB_SUFFIX),$(EXTRA_LIBS))
-endif
-
 ALL_TRASH		= $(TARGETS) $(OBJS) $(RES) $(filter-out . .., $(OBJDIR)) LOGS TAGS $(GARBAGE) \
 			  $(NOSUCHFILE) \
 			  so_locations
@@ -299,13 +295,15 @@ $(PROGRAM): $(OBJS)
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
 	$(CC) $(OBJS) -Fe$@ -link $(LDFLAGS) $(OS_LIBS) $(EXTRA_LIBS)
-else
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(CC) $(OBJS) -Fe$@ $(LDFLAGS) $(OS_LIBS) $(EXTRA_LIBS)
-else
+ifdef MT
+	@if test -f $@.manifest; then \
+		$(MT) -NOLOGO -MANIFEST $@.manifest -OUTPUTRESOURCE:$@\;1; \
+		rm -f $@.manifest; \
+	fi
+endif	# MSVC with manifest tool
+else	# WINNT && !GCC
 	$(CC) -o $@ $(CFLAGS) $(OBJS) $(LDFLAGS)
-endif
-endif
+endif	# WINNT && !GCC
 ifdef ENABLE_STRIP
 	$(STRIP) $@
 endif
@@ -313,11 +311,7 @@ endif
 $(LIBRARY): $(OBJS)
 	@$(MAKE_OBJDIR)
 	rm -f $@
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(AR) $(subst /,\\,$(OBJS)) $(AR_FLAGS)
-else
 	$(AR) $(AR_FLAGS) $(OBJS) $(AR_EXTRA_ARGS)
-endif
 	$(RANLIB) $@
 
 ifeq ($(OS_TARGET), OS2)
@@ -340,10 +334,13 @@ ifeq ($(OS_ARCH)$(OS_RELEASE), AIX4.1)
 else	# AIX 4.1
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
 	$(LINK_DLL) -MAP $(DLLBASE) $(DLL_LIBS) $(EXTRA_LIBS) $(OBJS) $(RES)
-else
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(LINK_DLL) $(DLLBASE) $(OBJS) $(OS_LIBS) $(EXTRA_LIBS) $(MAPFILE)
-else	# !os2 vacpp
+ifdef MT
+	@if test -f $@.manifest; then \
+		$(MT) -NOLOGO -MANIFEST $@.manifest -OUTPUTRESOURCE:$@\;2; \
+		rm -f $@.manifest; \
+	fi
+endif	# MSVC with manifest tool
+else	# WINNT && !GCC
 ifeq ($(OS_TARGET), OpenVMS)
 	@if test ! -f $(VMS_SYMVEC_FILE); then \
 	  if test -f $(VMS_SYMVEC_FILE_MODULE); then \
@@ -353,8 +350,7 @@ ifeq ($(OS_TARGET), OpenVMS)
 	fi
 endif	# OpenVMS
 	$(MKSHLIB) $(OBJS) $(RES) $(EXTRA_LIBS)
-endif   # OS2 vacpp
-endif	# WINNT
+endif	# WINNT && !GCC
 endif	# AIX 4.1
 ifdef ENABLE_STRIP
 	$(STRIP) $@
@@ -384,15 +380,10 @@ ifeq ($(OS_ARCH),OS2)
 	echo CODE    LOADONCALL MOVEABLE DISCARDABLE >> $@
 	echo DATA    PRELOAD MOVEABLE MULTIPLE NONSHARED >> $@
 	echo EXPORTS >> $@
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	grep -v ';+' $< | grep -v ';-' | \
-	sed -e 's; DATA ;;' -e 's,;;,,' -e 's,;.*,,' >> $@
-else
 	grep -v ';+' $< | grep -v ';-' | \
 	sed -e 's; DATA ;;' -e 's,;;,,' -e 's,;.*,,' -e 's,\([\t ]*\),\1_,' | \
 	awk 'BEGIN {ord=1;} { print($$0 " @" ord " RESIDENTNAME"); ord++;}'	>> $@
 	$(ADD_TO_DEF_FILE)
-endif
 endif
 
 #
@@ -410,22 +401,19 @@ endif
 
 ifdef NEED_ABSOLUTE_PATH
 PWD := $(shell pwd)
-abspath = $(if $(findstring :,$(1)),$(1),$(if $(filter /%,$(1)),$(1),$(PWD)/$(1)))
+# The quotes allow absolute paths to contain spaces.
+pr_abspath = "$(if $(findstring :,$(1)),$(1),$(if $(filter /%,$(1)),$(1),$(PWD)/$(1)))"
 endif
 
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.cpp
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
-	$(CCC) -Fo$@ -c $(CCCFLAGS) $(call abspath,$<)
-else
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(CCC) -Fo$@ -c $(CCCFLAGS) $(call abspath,$<)
+	$(CCC) -Fo$@ -c $(CCCFLAGS) $(call pr_abspath,$<)
 else
 ifdef NEED_ABSOLUTE_PATH
-	$(CCC) -o $@ -c $(CCCFLAGS) $(call abspath,$<)
+	$(CCC) -o $@ -c $(CCCFLAGS) $(call pr_abspath,$<)
 else
 	$(CCC) -o $@ -c $(CCCFLAGS) $<
-endif
 endif
 endif
 
@@ -435,16 +423,12 @@ WCCFLAGS3 = $(subst -D,-d,$(WCCFLAGS2))
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.c
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
-	$(CC) -Fo$@ -c $(CFLAGS) $(call abspath,$<)
-else
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(CC) -Fo$@ -c $(CFLAGS) $(call abspath,$<)
+	$(CC) -Fo$@ -c $(CFLAGS) $(call pr_abspath,$<)
 else
 ifdef NEED_ABSOLUTE_PATH
-	$(CC) -o $@ -c $(CFLAGS) $(call abspath,$<)
+	$(CC) -o $@ -c $(CFLAGS) $(call pr_abspath,$<)
 else
 	$(CC) -o $@ -c $(CFLAGS) $<
-endif
 endif
 endif
 
@@ -452,12 +436,6 @@ endif
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.s
 	@$(MAKE_OBJDIR)
 	$(AS) -o $@ $(ASFLAGS) -c $<
-
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-$(OBJDIR)/%.$(OBJ_SUFFIX): %.asm
-	@$(MAKE_OBJDIR)
-	$(AS) -Fdo:./$(OBJDIR) $(ASFLAGS) $<
-endif
 
 %.i: %.c
 	$(CC) -C -E $(CFLAGS) $< > $*.i

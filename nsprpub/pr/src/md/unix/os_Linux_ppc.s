@@ -21,7 +21,6 @@
 # the Initial Developer. All Rights Reserved.
 #
 # Contributor(s):
-#   Josh Aas <josh@mozilla.com>
 #
 # Alternatively, the contents of this file may be used under the terms of
 # either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -38,72 +37,71 @@
 # ***** END LICENSE BLOCK *****
 
 #
-# Based on os_Linux_x86.s
+# Based on the programming examples in The PowerPC Architecture:
+# A Specification for A New Family of RISC Processors, 2nd Ed.,
+# Book I, Section E.1, "Synchronization," pp. 249-256, May 1994.
 #
 
-#
-# PRInt32 __PR_Darwin_x86_AtomicIncrement(PRInt32 *val);
-#
-# Atomically increment the integer pointed to by 'val' and return
-# the result of the increment.
-#
-    .text
-    .globl __PR_Darwin_x86_AtomicIncrement
-    .align 4
-__PR_Darwin_x86_AtomicIncrement:
-    movl 4(%esp), %ecx
-    movl $1, %eax
-    lock
-    xaddl %eax, (%ecx)
-    incl %eax
-    ret
+        .section ".text"
 
 #
-# PRInt32 __PR_Darwin_x86_AtomicDecrement(PRInt32 *val);
+# PRInt32 _PR_ppc_AtomicIncrement(PRInt32 *val);
 #
-# Atomically decrement the integer pointed to by 'val' and return
-# the result of the decrement.
-#
-    .text
-    .globl __PR_Darwin_x86_AtomicDecrement
-    .align 4
-__PR_Darwin_x86_AtomicDecrement:
-    movl 4(%esp), %ecx
-    movl $-1, %eax
-    lock
-    xaddl %eax, (%ecx)
-    decl %eax
-    ret
+        .align  2
+        .globl  _PR_ppc_AtomicIncrement
+        .type _PR_ppc_AtomicIncrement,@function
+_PR_ppc_AtomicIncrement:
+.Lfd1:  lwarx   4,0,3
+        addi    0,4,1
+        stwcx.  0,0,3
+        bne-    .Lfd1
+        mr      3,0
+        blr
+.Lfe1:  .size _PR_ppc_AtomicIncrement,.Lfe1-_PR_ppc_AtomicIncrement
 
 #
-# PRInt32 __PR_Darwin_x86_AtomicSet(PRInt32 *val, PRInt32 newval);
+# PRInt32 _PR_ppc_AtomicDecrement(PRInt32 *val);
 #
-# Atomically set the integer pointed to by 'val' to the new
-# value 'newval' and return the old value.
-#
-    .text
-    .globl __PR_Darwin_x86_AtomicSet
-    .align 4
-__PR_Darwin_x86_AtomicSet:
-    movl 4(%esp), %ecx
-    movl 8(%esp), %eax
-    xchgl %eax, (%ecx)
-    ret
+        .align  2
+        .globl  _PR_ppc_AtomicDecrement
+        .type _PR_ppc_AtomicDecrement,@function
+_PR_ppc_AtomicDecrement:
+.Lfd2:  lwarx   4,0,3
+        addi    0,4,-1
+        stwcx.  0,0,3
+        bne-    .Lfd2
+        mr      3,0
+        blr
+.Lfe2:  .size _PR_ppc_AtomicDecrement,.Lfe2-_PR_ppc_AtomicDecrement
 
 #
-# PRInt32 __PR_Darwin_x86_AtomicAdd(PRInt32 *ptr, PRInt32 val);
+# PRInt32 _PR_ppc_AtomicSet(PRInt32 *val, PRInt32 newval);
 #
-# Atomically add 'val' to the integer pointed to by 'ptr'
-# and return the result of the addition.
+        .align  2
+        .globl  _PR_ppc_AtomicSet
+        .type _PR_ppc_AtomicSet,@function
+_PR_ppc_AtomicSet:
+.Lfd3:  lwarx   5,0,3
+        stwcx.  4,0,3
+        bne-    .Lfd3
+        mr      3,5
+        blr
+.Lfe3:  .size _PR_ppc_AtomicSet,.Lfe3-_PR_ppc_AtomicSet
+
 #
-    .text
-    .globl __PR_Darwin_x86_AtomicAdd
-    .align 4
-__PR_Darwin_x86_AtomicAdd:
-    movl 4(%esp), %ecx
-    movl 8(%esp), %eax
-    movl %eax, %edx
-    lock
-    xaddl %eax, (%ecx)
-    addl %edx, %eax
-    ret
+# PRInt32 _PR_ppc_AtomicAdd(PRInt32 *ptr, PRInt32 val);
+#
+        .align  2
+        .globl  _PR_ppc_AtomicAdd
+        .type _PR_ppc_AtomicAdd,@function
+_PR_ppc_AtomicAdd:
+.Lfd4:  lwarx   5,0,3
+        add     0,4,5
+        stwcx.  0,0,3
+        bne-    .Lfd4
+        mr      3,0
+        blr
+.Lfe4:  .size _PR_ppc_AtomicAdd,.Lfe4-_PR_ppc_AtomicAdd
+
+# Magic indicating no need for an executable stack
+.section .note.GNU-stack, "", @progbits ; .previous

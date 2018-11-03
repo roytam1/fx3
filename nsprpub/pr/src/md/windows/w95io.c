@@ -81,9 +81,13 @@ static const PRTime _pr_filetime_offset = 116444736000000000LL;
 static const PRTime _pr_filetime_offset = 116444736000000000i64;
 #endif
 
-#ifdef MOZ_UNICODE
+typedef BOOL (WINAPI *GetFileAttributesExFn)(LPCTSTR,
+                                             GET_FILEEX_INFO_LEVELS,
+                                             LPVOID); 
+static GetFileAttributesExFn getFileAttributesEx;
+static void InitGetFileInfo(void);
+
 static void InitUnicodeSupport(void);
-#endif
 
 static PRBool IsPrevCharSlash(const char *str, const char *current);
 
@@ -124,9 +128,11 @@ _PR_MD_INIT_IO()
 
     _PR_NT_InitSids();
 
-#ifdef MOZ_UNICODE
+    InitGetFileInfo();
+
     InitUnicodeSupport();
-#endif
+
+    _PR_MD_InitSockets();
 }
 
 PRStatus
@@ -330,7 +336,6 @@ _PR_MD_WRITE(PRFileDesc *fd, const void *buf, PRInt32 len)
     PROsfd f = fd->secret->md.osfd;
     PRInt32 bytes;
     int rv;
-    PRThread *me = _PR_MD_CURRENT_THREAD();
     
     rv = WriteFile((HANDLE)f,
             buf,
@@ -773,31 +778,52 @@ IsRootDirectory(char *fn, size_t buflen)
     return rv;
 }
 
-PRInt32
-_PR_MD_GETFILEINFO64(const char *fn, PRFileInfo64 *info)
+/*
+ * InitGetFileInfo --
+ *
+ * Called during IO init. Checks for the existence of the system function
+ * GetFileAttributeEx, which when available is used in GETFILEINFO calls. 
+ * If the routine exists, then the address of the routine is stored in the
+ * variable getFileAttributesEx, which will be used to call the routine.
+ */
+static void InitGetFileInfo(void)
+{
+    HMODULE module;
+    module = GetModuleHandle("Kernel32.dll");
+    if (!module) {
+        PR_LOG(_pr_io_lm, PR_LOG_DEBUG,
+                ("InitGetFileInfo: GetModuleHandle() failed: %d",
+                GetLastError()));
+        return;
+    }
+
+    getFileAttributesEx = (GetFileAttributesExFn)
+            GetProcAddress(module, "GetFileAttributesExA");
+}
+
+/*
+ * If GetFileAttributeEx doesn't exist, we call FindFirstFile as a
+ * fallback.
+ */
+static BOOL
+GetFileAttributesExFB(const char *fn, WIN32_FIND_DATA *findFileData)
 {
     HANDLE hFindFile;
-    WIN32_FIND_DATA findFileData;
-    char pathbuf[MAX_PATH + 1];
-    
-    if (NULL == fn || '\0' == *fn) {
-        PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
-        return -1;
-    }
 
     /*
      * FindFirstFile() expands wildcard characters.  So
      * we make sure the pathname contains no wildcard.
      */
     if (NULL != _mbspbrk(fn, "?*")) {
-        PR_SetError(PR_FILE_NOT_FOUND_ERROR, 0);
-        return -1;
+        SetLastError(ERROR_INVALID_NAME);
+        return FALSE;
     }
 
-    hFindFile = FindFirstFile(fn, &findFileData);
+    hFindFile = FindFirstFile(fn, findFileData);
     if (INVALID_HANDLE_VALUE == hFindFile) {
         DWORD len;
         char *filePart;
+        char pathbuf[MAX_PATH + 1];
 
         /*
          * FindFirstFile() does not work correctly on root directories.
@@ -812,43 +838,68 @@ _PR_MD_GETFILEINFO64(const char *fn, PRFileInfo64 *info)
          * a root directory or a pathname that ends in a slash.
          */
         if (NULL == _mbspbrk(fn, ".\\/")) {
-            _PR_MD_MAP_OPENDIR_ERROR(GetLastError());
-            return -1;
+            return FALSE;
         } 
         len = GetFullPathName(fn, sizeof(pathbuf), pathbuf,
                 &filePart);
         if (0 == len) {
-            _PR_MD_MAP_OPENDIR_ERROR(GetLastError());
-            return -1;
+            return FALSE;
         }
         if (len > sizeof(pathbuf)) {
-            PR_SetError(PR_NAME_TOO_LONG_ERROR, 0);
-            return -1;
+            SetLastError(ERROR_FILENAME_EXCED_RANGE);
+            return FALSE;
         }
         if (IsRootDirectory(pathbuf, sizeof(pathbuf))) {
-            info->type = PR_FILE_DIRECTORY;
-            info->size = 0;
+            findFileData->dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+            /* The file size doesn't have a meaning for directories. */
+            findFileData->nFileSizeHigh = 0;
+            findFileData->nFileSizeLow = 0;
             /*
-             * These timestamps don't make sense for root directories.
+             * For a directory, these timestamps all specify when the
+             * directory is created.  The creation time doesn't make
+             * sense for root directories, so we set it to (NSPR) time 0.
              */
-            info->modifyTime = 0;
-            info->creationTime = 0;
-            return 0;
+            memcpy(&findFileData->ftCreationTime, &_pr_filetime_offset, 8);
+            findFileData->ftLastAccessTime = findFileData->ftCreationTime;
+            findFileData->ftLastWriteTime = findFileData->ftCreationTime;
+            return TRUE;
         }
         if (!IsPrevCharSlash(pathbuf, pathbuf + len)) {
-            _PR_MD_MAP_OPENDIR_ERROR(GetLastError());
-            return -1;
+            return FALSE;
         } else {
             pathbuf[len - 1] = '\0';
-            hFindFile = FindFirstFile(pathbuf, &findFileData);
+            hFindFile = FindFirstFile(pathbuf, findFileData);
             if (INVALID_HANDLE_VALUE == hFindFile) {
-                _PR_MD_MAP_OPENDIR_ERROR(GetLastError());
-                return -1;
+                return FALSE;
             }
         }
     }
 
     FindClose(hFindFile);
+    return TRUE;
+}
+
+PRInt32
+_PR_MD_GETFILEINFO64(const char *fn, PRFileInfo64 *info)
+{
+    WIN32_FIND_DATA findFileData;
+    BOOL rv;
+    
+    if (NULL == fn || '\0' == *fn) {
+        PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
+        return -1;
+    }
+
+    /* GetFileAttributesEx is supported on Win 2K and up. */
+    if (getFileAttributesEx) {
+        rv = getFileAttributesEx(fn, GetFileExInfoStandard, &findFileData);
+    } else {
+        rv = GetFileAttributesExFB(fn, &findFileData);
+    }
+    if (!rv) {
+        _PR_MD_MAP_OPENDIR_ERROR(GetLastError());
+        return -1;
+    }
 
     if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
         info->type = PR_FILE_DIRECTORY;
@@ -1130,6 +1181,10 @@ static GetFullPathNameWFn getFullPathNameW = GetFullPathNameW;
 typedef UINT (WINAPI *GetDriveTypeWFn) (LPCWSTR);
 static GetDriveTypeWFn getDriveTypeW = GetDriveTypeW;
 
+#endif /* MOZ_UNICODE */
+
+PRBool _pr_useUnicode = PR_FALSE;
+
 static void InitUnicodeSupport(void)
 {
     /*
@@ -1137,7 +1192,27 @@ static void InitUnicodeSupport(void)
      * ERROR_CALL_NOT_IMPLEMENTED error.  We plan to emulate the
      * MSLU W functions on Win9x in the future.
      */
+
+    /* Find out if we are running on a Unicode enabled version of Windows */
+    OSVERSIONINFOA osvi = {0};
+
+    osvi.dwOSVersionInfoSize = sizeof(osvi);
+    if (GetVersionExA(&osvi)) {
+        _pr_useUnicode = (osvi.dwPlatformId >= VER_PLATFORM_WIN32_NT);
+    } else {
+        _pr_useUnicode = PR_FALSE;
+    }
+#ifdef DEBUG
+    /*
+     * In debug builds, allow explicit use of ANSI methods to simulate
+     * a Win9x environment for testing purposes.
+     */
+    if (getenv("WINAPI_USE_ANSI"))
+        _pr_useUnicode = PR_FALSE;
+#endif
 }
+
+#ifdef MOZ_UNICODE
 
 /* ================ UTF16 Interfaces ================================ */
 void FlipSlashesW(PRUnichar *cp, size_t len)

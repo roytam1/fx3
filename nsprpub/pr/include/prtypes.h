@@ -161,20 +161,42 @@
 #define PR_CALLBACK_DECL
 #define PR_STATIC_CALLBACK(__x) static __x
 
-#elif defined(XP_OS2_VACPP) 
+#elif defined(XP_OS2) && defined(__declspec)
 
-#define PR_EXPORT(__type) extern __type
-#define PR_EXPORT_DATA(__type) extern __type
-#define PR_IMPORT(__type) extern __type
-#define PR_IMPORT_DATA(__type) extern __type
+#define PR_EXPORT(__type) extern __declspec(dllexport) __type
+#define PR_EXPORT_DATA(__type) extern __declspec(dllexport) __type
+#define PR_IMPORT(__type) extern  __declspec(dllimport) __type
+#define PR_IMPORT_DATA(__type) extern __declspec(dllimport) __type
+
+#define PR_EXTERN(__type) extern __declspec(dllexport) __type
+#define PR_IMPLEMENT(__type) __declspec(dllexport) __type
+#define PR_EXTERN_DATA(__type) extern __declspec(dllexport) __type
+#define PR_IMPLEMENT_DATA(__type) __declspec(dllexport) __type
+
+#define PR_CALLBACK
+#define PR_CALLBACK_DECL
+#define PR_STATIC_CALLBACK(__x) static __x
+
+#elif defined(SYMBIAN)
+
+#define PR_EXPORT(__type) extern __declspec(dllexport) __type
+#define PR_EXPORT_DATA(__type) extern __declspec(dllexport) __type
+#ifdef __WINS__
+#define PR_IMPORT(__type) extern __declspec(dllexport) __type
+#define PR_IMPORT_DATA(__type) extern __declspec(dllexport) __type
+#else
+#define PR_IMPORT(__type) extern __declspec(dllimport) __type
+#define PR_IMPORT_DATA(__type) extern __declspec(dllimport) __type
+#endif
 
 #define PR_EXTERN(__type) extern __type
 #define PR_IMPLEMENT(__type) __type
 #define PR_EXTERN_DATA(__type) extern __type
 #define PR_IMPLEMENT_DATA(__type) __type
-#define PR_CALLBACK _Optlink
+
+#define PR_CALLBACK
 #define PR_CALLBACK_DECL
-#define PR_STATIC_CALLBACK(__x) static __x PR_CALLBACK
+#define PR_STATIC_CALLBACK(__x) static __x
 
 #else /* Unix */
 
@@ -254,6 +276,13 @@
 #define PR_MIN(x,y)     ((x)<(y)?(x):(y))
 #define PR_MAX(x,y)     ((x)>(y)?(x):(y))
 #define PR_ABS(x)       ((x)<0?-(x):(x))
+
+/***********************************************************************
+** MACROS:      PR_ARRAY_SIZE
+** DESCRIPTION:
+**  The number of elements in an array.
+***********************************************************************/
+#define PR_ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
 
 PR_BEGIN_EXTERN_C
 
@@ -365,7 +394,13 @@ typedef long PRInt32;
 **      the LL_ macros (see prlong.h).
 ************************************************************************/
 #ifdef HAVE_LONG_LONG
-#if PR_BYTES_PER_LONG == 8
+/* Keep this in sync with prlong.h. */
+/*
+ * On 64-bit Mac OS X, uint64 needs to be defined as unsigned long long to
+ * match uint64_t, otherwise our uint64 typedef conflicts with the uint64
+ * typedef in cssmconfig.h, which CoreServices.h includes indirectly.
+ */
+#if PR_BYTES_PER_LONG == 8 && !defined(__APPLE__)
 typedef long PRInt64;
 typedef unsigned long PRUint64;
 #elif defined(WIN16)
@@ -474,10 +509,6 @@ typedef PRUint8 PRPackedBool;
 */
 typedef enum { PR_FAILURE = -1, PR_SUCCESS = 0 } PRStatus;
 
-#ifdef MOZ_UNICODE
-/*
- * EXPERIMENTAL: This type may be removed in a future release.
- */
 #ifndef __PRUNICHAR__
 #define __PRUNICHAR__
 #if defined(WIN32) || defined(XP_MAC)
@@ -486,7 +517,6 @@ typedef wchar_t PRUnichar;
 typedef PRUint16 PRUnichar;
 #endif
 #endif
-#endif /* MOZ_UNICODE */
 
 /*
 ** WARNING: The undocumented data types PRWord and PRUword are

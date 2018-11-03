@@ -64,6 +64,7 @@ static PLArenaStats *arena_stats_list;
 
 static PRLock    *arenaLock;
 static PRCallOnceType once;
+static const PRCallOnceType pristineCallOnce;
 
 /*
 ** InitializeArenas() -- Initialize arena operations.
@@ -111,9 +112,23 @@ PR_IMPLEMENT(void) PL_InitArenaPool(
 #pragma unused (name)
 #endif
 
+    /*
+     * Look-up table of PR_BITMASK(PR_CeilingLog2(align)) values for
+     * align = 1 to 32.
+     */
+    static const PRUint8 pmasks[33] = {
+         0,                                               /*  not used */
+         0, 1, 3, 3, 7, 7, 7, 7,15,15,15,15,15,15,15,15,  /*  1 ... 16 */
+        31,31,31,31,31,31,31,31,31,31,31,31,31,31,31,31}; /* 17 ... 32 */
+
     if (align == 0)
         align = PL_ARENA_DEFAULT_ALIGN;
-    pool->mask = PR_BITMASK(PR_CeilingLog2(align));
+
+    if (align < sizeof(pmasks)/sizeof(pmasks[0]))
+        pool->mask = pmasks[align];
+    else
+        pool->mask = PR_BITMASK(PR_CeilingLog2(align));
+
     pool->first.next = NULL;
     pool->first.base = pool->first.avail = pool->first.limit =
         (PRUword)PL_ARENA_ALIGN(pool, &pool->first + 1);
@@ -245,6 +260,21 @@ PR_IMPLEMENT(void *) PL_ArenaGrow(
     return newp;
 }
 
+static void ClearArenaList(PLArena *a, PRInt32 pattern)
+{
+
+    for (; a; a = a->next) {
+        PR_ASSERT(a->base <= a->avail && a->avail <= a->limit);
+        a->avail = a->base;
+	PL_CLEAR_UNUSED_PATTERN(a, pattern);
+    }
+}
+
+PR_IMPLEMENT(void) PL_ClearArenaPool(PLArenaPool *pool, PRInt32 pattern)
+{
+    ClearArenaList(pool->first.next, pattern);
+}
+
 /*
  * Free tail arenas linked after head, which may not be the true list head.
  * Reset pool->current to point to head in case it pointed at a tail arena.
@@ -259,12 +289,7 @@ static void FreeArenaList(PLArenaPool *pool, PLArena *head, PRBool reallyFree)
         return;
 
 #ifdef DEBUG
-    do {
-        PR_ASSERT(a->base <= a->avail && a->avail <= a->limit);
-        a->avail = a->base;
-        PL_CLEAR_UNUSED(a);
-    } while ((a = a->next) != 0);
-    a = *ap;
+    ClearArenaList(a, PL_FREE_PATTERN);
 #endif
 
     if (reallyFree) {
@@ -357,6 +382,7 @@ PR_IMPLEMENT(void) PL_ArenaFinish(void)
         PR_DestroyLock(arenaLock);
         arenaLock = NULL;
     }
+    once = pristineCallOnce;
 }
 
 #ifdef PL_ARENAMETER

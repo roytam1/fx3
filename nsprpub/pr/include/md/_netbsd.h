@@ -1,36 +1,39 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* 
- * The contents of this file are subject to the Mozilla Public
- * License Version 1.1 (the "License"); you may not use this file
- * except in compliance with the License. You may obtain a copy of
- * the License at http://www.mozilla.org/MPL/
- * 
- * Software distributed under the License is distributed on an "AS
- * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing
- * rights and limitations under the License.
- * 
+/* ***** BEGIN LICENSE BLOCK *****
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
+ *
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
  * The Original Code is the Netscape Portable Runtime (NSPR).
- * 
- * The Initial Developer of the Original Code is Netscape
- * Communications Corporation.  Portions created by Netscape are 
- * Copyright (C) 1998-2000 Netscape Communications Corporation.  All
- * Rights Reserved.
- * 
+ *
+ * The Initial Developer of the Original Code is
+ * Netscape Communications Corporation.
+ * Portions created by the Initial Developer are Copyright (C) 1998-2000
+ * the Initial Developer. All Rights Reserved.
+ *
  * Contributor(s):
- * 
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License Version 2 or later (the
- * "GPL"), in which case the provisions of the GPL are applicable 
- * instead of those above.  If you wish to allow use of your 
- * version of this file only under the terms of the GPL and not to
- * allow others to use your version of this file under the MPL,
- * indicate your decision by deleting the provisions above and
- * replace them with the notice and other provisions required by
- * the GPL.  If you do not delete the provisions above, a recipient
- * may use your version of this file under either the MPL or the
- * GPL.
- */
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
+ *
+ * ***** END LICENSE BLOCK ***** */
 
 #ifndef nspr_netbsd_defs_h___
 #define nspr_netbsd_defs_h___
@@ -44,6 +47,8 @@
 #define _PR_SI_ARCHITECTURE "x86"
 #elif defined(__alpha__)
 #define _PR_SI_ARCHITECTURE "alpha"
+#elif defined(__amd64__)
+#define _PR_SI_ARCHITECTURE "amd64"
 #elif defined(__m68k__)
 #define _PR_SI_ARCHITECTURE "m68k"
 #elif defined(__powerpc__)
@@ -89,12 +94,6 @@
 #define _PR_INET6_PROBE
 #endif
 
-#if __NetBSD_Version__ >= 106370000
-/* NetBSD 1.6ZK */
-#define _PR_HAVE_GETPROTO_R
-#define _PR_HAVE_GETPROTO_R_INT
-#endif
-
 #define USE_SETJMP
 
 #ifndef _PR_PTHREADS
@@ -104,99 +103,39 @@
 
 #define CONTEXT(_th) ((_th)->md.context)
 
+#if defined(__i386__) || defined(__sparc__) || defined(__m68k__) || defined(__powerpc__)
+#define JB_SP_INDEX 2
+#elif defined(__mips__)
+#define JB_SP_INDEX 4
+#elif defined(__alpha__)
+#define JB_SP_INDEX 34
+#elif defined(__arm32__)
+/*
+ * On the arm32, the jmpbuf regs underwent a name change after NetBSD 1.3.
+ */
+#ifdef JMPBUF_REG_R13
+#define JB_SP_INDEX JMPBUF_REG_R13
+#else
+#define JB_SP_INDEX _JB_REG_R13
+#endif
+#else
+#error "Need to define SP index in jmp_buf here"
+#endif
+#define _MD_GET_SP(_th)    (_th)->md.context[JB_SP_INDEX]
+
+#define PR_NUM_GCREGS	_JBLEN
+
 /*
 ** Initialize a thread context to run "_main()" when started
 */
-#ifdef __i386__
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[2] = (unsigned char*) ((_sp) - 128);		\
-    CONTEXT(_thread)[0] = (int) _main;					\
-    *status = PR_TRUE;							\
+#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)  \
+{  \
+    *status = PR_TRUE;  \
+    if (sigsetjmp(CONTEXT(_thread), 1)) {  \
+        _main();  \
+    }  \
+    _MD_GET_SP(_thread) = (unsigned char*) ((_sp) - 64); \
 }
-#define	_MD_GET_SP(_thread)	CONTEXT(_thread)[2]
-#endif
-#ifdef __sparc_v9__
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[1] = (unsigned char*) ((_sp) - 176 - 0x7ff);	\
-    CONTEXT(_thread)[2] = (long) _main;					\
-    CONTEXT(_thread)[3] = (long) _main + 4;				\
-    *status = PR_TRUE;							\
-}
-#define	_MD_GET_SP(_thread)	(CONTEXT(_thread)[2]+0x7ff)
-#elif defined(__sparc__)
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[2] = (unsigned char*) ((_sp) - 128);		\
-    CONTEXT(_thread)[3] = (int) _main;					\
-    CONTEXT(_thread)[4] = (int) _main + 4;				\
-    *status = PR_TRUE;							\
-}
-#define	_MD_GET_SP(_thread)	CONTEXT(_thread)[2]
-#endif
-#ifdef __powerpc__
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[3] = (unsigned char*) ((_sp) - 128);		\
-    CONTEXT(_thread)[4] = (int) _main;					\
-    *status = PR_TRUE;							\
-}
-#define	_MD_GET_SP(_thread)	CONTEXT(_thread)[3]
-#endif
-#ifdef __m68k__
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[2] = (unsigned char*) ((_sp) - 128);		\
-    CONTEXT(_thread)[5] = (int) _main;					\
-    *status = PR_TRUE;							\
-}
-#define	_MD_GET_SP(_thread)	CONTEXT(_thread)[2]
-#endif
-#ifdef __mips__
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[32] = (unsigned char*) ((_sp) - 128);		\
-    CONTEXT(_thread)[2] = (int) _main;					\
-    CONTEXT(_thread)[28] = (int) _main;					\
-    *status = PR_TRUE;							\
-}
-#define	_MD_GET_SP(_thread)	CONTEXT(_thread)[32]
-#endif
-#if defined(__arm32__) || defined(__arm__) || defined(__armel__) \
-    || defined(__armeb__)
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[23] = (unsigned char*) ((_sp) - 128);		\
-    CONTEXT(_thread)[24] = (int) _main;					\
-    *status = PR_TRUE;							\
-}
-#define	_MD_GET_SP(_thread)	CONTEXT(_thread)[23]
-#endif
-#ifdef __alpha__
-#define _MD_INIT_CONTEXT(_thread, _sp, _main, status)			\
-{									\
-    sigsetjmp(CONTEXT(_thread), 1);					\
-    CONTEXT(_thread)[34] = (unsigned char*) ((_sp) - 128);		\
-    CONTEXT(_thread)[2] = (long) _main;					\
-    CONTEXT(_thread)[30] = (long) _main;				\
-    CONTEXT(_thread)[31] = (long) _main;				\
-    *status = PR_TRUE;							\
-}
-#define	_MD_GET_SP(_thread)	CONTEXT(_thread)[34]
-#endif
-#ifndef _MD_INIT_CONTEXT
-#error "Need to define _MD_INIT_CONTEXT for this platform"
-#endif
-
-#define PR_NUM_GCREGS	_JBLEN
 
 #define _MD_SWITCH_CONTEXT(_thread)  \
     if (!sigsetjmp(CONTEXT(_thread), 1)) {  \
@@ -299,6 +238,10 @@ struct _MDCPU {
 #define _MD_CLEAN_THREAD(_thread)
 
 #endif /* ! _PR_PTHREADS */
+
+extern void _MD_EarlyInit(void);
+extern PRIntervalTime _PR_UNIX_GetInterval(void);
+extern PRIntervalTime _PR_UNIX_TicksPerSecond(void);
 
 #define _MD_EARLY_INIT                  _MD_EarlyInit
 #define _MD_FINAL_INIT			_PR_UnixInit

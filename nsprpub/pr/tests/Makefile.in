@@ -125,6 +125,7 @@ CSRCS =             \
 	op_nofil.c		\
 	openfile.c		\
 	parent.c    	\
+	parsetm.c    	\
 	peek.c    		\
 	perf.c    		\
 	pipeping.c		\
@@ -236,12 +237,8 @@ endif # NS_USE_GCC
 endif
 
 ifeq ($(OS_ARCH),OS2)
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-  LDOPTS = -NOE -DEBUG -nologo -PMTYPE:VIO
-else
-  EXTRA_LIBS = $(OS_LIBS)
-  LDOPTS = -Zomf -Zlinker /PM:VIO -Zlinker /ST:0x64000
-endif
+EXTRA_LIBS = $(OS_LIBS)
+LDOPTS = -Zomf -Zlinker /PM:VIO -Zlinker /ST:0x64000
 endif
 
 ifneq ($(OS_ARCH), WINNT)
@@ -332,13 +329,9 @@ ifeq ($(OS_ARCH), SunOS)
         endif
     endif
 
-    ifneq ($(LOCAL_THREADS_ONLY),1)
-        ifdef USE_PTHREADS
-            EXTRA_LIBS = -lpthread -lthread
-        else
-            EXTRA_LIBS = -lthread
-        endif
-    endif # LOCAL_THREADS_ONLY
+    ifdef USE_PTHREADS
+        EXTRA_LIBS = -lpthread
+    endif
 endif # SunOS
 
 ifeq ($(OS_ARCH), NEC)
@@ -487,12 +480,14 @@ $(OBJDIR)/%$(PROG_SUFFIX): $(OBJDIR)/%.$(OBJ_SUFFIX)
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
 	link $(LDOPTS) $(EXTRA_LDOPTS) $< $(LIBPLC) $(LIBNSPR) $(EXTRA_LIBS) -out:$@
-else
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(LD) $(EXEFLAGS) $(LDOPTS) $< $(LIBPLC) $(LIBNSPR) $(OS_LIBS) $(EXTRA_LIBS)
+ifdef MT
+	@if test -f $@.manifest; then \
+		$(MT) -NOLOGO -MANIFEST $@.manifest -OUTPUTRESOURCE:$@\;1; \
+		rm -f $@.manifest; \
+	fi
+endif
 else
 	$(PURE) $(CC) $(XCFLAGS) $< $(LDOPTS) $(LIBPLC) $(LIBNSPR) $(EXTRA_LIBS) -o $@
-endif # OS/2
 endif # WINNT
 endif # AIX_PRE_4_2
 

@@ -48,11 +48,6 @@ include $(topsrcdir)/config/config.mk
 
 DIRS = io linking malloc md memory misc threads
 
-# For VAC++ 4 geticcdata rule in config/OS2.mk
-ifeq ($(MOZ_OS2_TOOLS),VACPP)
-CSRCS = prvrsion.c
-endif
-
 ifeq ($(USE_PTHREADS), 1)
 	DIRS += pthreads
 endif
@@ -95,19 +90,15 @@ LIBRT=-lposix4
 endif
 
 ifdef USE_PTHREADS
-OS_LIBS			= -lpthread -lthread ${LIBRT} -lsocket -lnsl -ldl -lc
+OS_LIBS			= -lpthread ${LIBRT} -lsocket -lnsl -ldl -lc
 else
-ifdef LOCAL_THREADS_ONLY
 OS_LIBS			= -lsocket -lnsl -ldl -lc
-else
-OS_LIBS			= -lthread ${LIBRT} -lsocket -lnsl -ldl -lc
-endif	# LOCAL_THREADS_ONLY
 endif	# USE_PTHREADS
-ifeq ($(OS_TEST),sun4u)
+ifeq ($(CPU_ARCH),sparc)
 ifndef USE_64
 DSO_LDOPTS	+= -Wl,-f,\$$ORIGIN/cpu/\$$ISALIST/lib$(ULTRASPARC_LIBRARY)$(LIBRARY_VERSION).so
 endif
-endif	# sun4u
+endif	# sparc
 endif	# 4.1.3_U1
 endif	# SunOS
 
@@ -119,6 +110,7 @@ OS_LIBS += -lc
 endif
 
 ifeq ($(OS_ARCH),AIX)
+DSO_LDOPTS	+= -binitfini::_PR_Fini
 OS_LIBS		= -lodm -lcfg
 ifeq ($(CLASSIC_NSPR),1)
 ifeq ($(OS_RELEASE),4.1)
@@ -186,6 +178,11 @@ OS_LIBS		+= -ldld -L/lib/pa1.1 -lm
 else
 OS_LIBS		+= -ldld -lm -lc
 endif
+ifneq ($(OS_TEST),ia64)
+ifndef USE_64
+DSO_LDOPTS	+= +I PR_HPUX10xInit
+endif
+endif
 endif
 
 ifeq ($(OS_ARCH),UNIXWARE)
@@ -236,6 +233,7 @@ OBJS = \
 	threads/$(OBJDIR)/prrwlock.$(OBJ_SUFFIX) \
 	threads/$(OBJDIR)/prtpd.$(OBJ_SUFFIX) \
     linking/$(OBJDIR)/prlink.$(OBJ_SUFFIX) \
+    malloc/$(OBJDIR)/prmalloc.$(OBJ_SUFFIX) \
     malloc/$(OBJDIR)/prmem.$(OBJ_SUFFIX) \
     md/$(OBJDIR)/prosdep.$(OBJ_SUFFIX) \
     memory/$(OBJDIR)/prshm.$(OBJ_SUFFIX) \
@@ -262,11 +260,6 @@ OBJS = \
     misc/$(OBJDIR)/prtpool.$(OBJ_SUFFIX) \
     misc/$(OBJDIR)/prtrace.$(OBJ_SUFFIX) \
     misc/$(OBJDIR)/prtime.$(OBJ_SUFFIX)
-
-# ilib now rejects empty objects
-ifneq ($(MOZ_OS2_TOOLS),VACPP)
-OBJS += malloc/$(OBJDIR)/prmalloc.$(OBJ_SUFFIX)
-endif
 
 ifdef USE_PTHREADS
 OBJS += \
@@ -316,13 +309,6 @@ OBJS += memory/$(OBJDIR)/prgcleak.$(OBJ_SUFFIX)
 endif
 
 ifeq ($(OS_ARCH), WINNT)
-ifndef USE_64
-ifdef NS_USE_GCC
-DLLBASE=-Wl,--image-base -Wl,0x30000000
-else
-DLLBASE=-BASE:0x30000000
-endif # GCC
-endif # !USE_64
 RES=$(OBJDIR)/nspr.res
 RESNAME=nspr.rc
 endif # WINNT
@@ -386,11 +372,7 @@ $(OBJDIR)/prvrsion.$(OBJ_SUFFIX): prvrsion.c $(TINC)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
 	$(CC) -Fo$@ -c $(CFLAGS) -I$(OBJDIR) $<
 else
-ifeq ($(MOZ_OS2_TOOLS), VACPP)
-	$(CC) -Fo$@ -c $(CFLAGS) -I$(OBJDIR) $<
-else
 	$(CC) -o $@ -c $(CFLAGS) -I$(OBJDIR) $<
-endif
 endif
 #
 # Version information generation (end)

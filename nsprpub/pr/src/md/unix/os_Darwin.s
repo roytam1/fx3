@@ -1,4 +1,5 @@
-# 
+# -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+#
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -16,7 +17,7 @@
 #
 # The Initial Developer of the Original Code is
 # Netscape Communications Corporation.
-# Portions created by the Initial Developer are Copyright (C) 1998-2000
+# Portions created by the Initial Developer are Copyright (C) 2008
 # the Initial Developer. All Rights Reserved.
 #
 # Contributor(s):
@@ -35,65 +36,10 @@
 #
 # ***** END LICENSE BLOCK *****
 
-#! gmake
-
-
-
-MOD_DEPTH	= ../../..
-topsrcdir	= @top_srcdir@
-srcdir		= @srcdir@
-VPATH		= @srcdir@
-
-include $(MOD_DEPTH)/config/autoconf.mk
-
-include $(topsrcdir)/config/config.mk
-
-W16STDIO = $(MOD_DEPTH)/pr/src/md/windows/$(OBJDIR)/w16stdio.$(OBJ_SUFFIX)
-
-CSRCS = poppad.c \
-       popfile.c \
-       popfont.c \
-       popfind.c \
-       popprnt0.c
-          
-
-INCLUDES = -I$(dist_includedir) 
-LIBPR = $(dist_libdir)/nspr$(MOD_MAJOR_VERSION).lib
-LIBPLDS = $(dist_libdir)/plds$(MOD_MAJOR_VERSION).lib
-TARGETS = $(OBJDIR)/poppad.exe
-OS_CFLAGS = $(OS_EXE_CFLAGS)
-
-include $(topsrcdir)/config/rules.mk
-
-
-ifeq ($(OS_TARGET),WIN16)    
-$(OBJDIR)/poppad.exe: $(OBJS)
-	@$(MAKE_OBJDIR)
-	echo system windows >w16link
-	echo name $@  >>w16link
-	echo option map >>w16link
-	echo option stack=16K >>w16link
-	echo debug $(DEBUGTYPE) all >>w16link
-	echo file >>w16link
-	echo $(OBJDIR)\\poppad.$(OBJ_SUFFIX), >>w16link
-	echo $(OBJDIR)\\popfile.$(OBJ_SUFFIX), >>w16link
-	echo $(OBJDIR)\\popfont.$(OBJ_SUFFIX), >>w16link
-	echo $(OBJDIR)\\popfind.$(OBJ_SUFFIX), >>w16link
-	echo $(OBJDIR)\\popprnt0.$(OBJ_SUFFIX), >>w16link
-	echo $(W16STDIO) >>w16link
-	echo library $(LIBPR)      >>w16link
-	echo library $(LIBPLDS)	   >>w16link
-	echo library clibl, commdlg >>w16link
-	echo library winsock.lib   >>w16link
-	wlink @w16link.
-	wrc -bt=windows poppad.rc $(OBJDIR)\\poppad.exe
-else    
-$(OBJDIR)/poppad.exe: $(OBJS)
-	link $(LDOPTS) $< $(LIBPLC) $(LIBPR) wsock32.lib -out:$@
-endif
-
-export:: $(TARGETS)
-
-
-clean::
-	rm -rf $(TARGETS)
+#ifdef __i386__
+#include "os_Darwin_x86.s"
+#elif defined(__x86_64__)
+#include "os_Darwin_x86_64.s"
+#elif defined(__ppc__)
+#include "os_Darwin_ppc.s"
+#endif

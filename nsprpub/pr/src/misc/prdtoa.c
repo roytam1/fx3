@@ -59,8 +59,9 @@ void _PR_CleanupDtoa(void)
     /* FIXME: deal with freelist and p5s. */
 }
 
-#if defined(__arm) || defined(__arm__) || defined(__arm26__) \
-    || defined(__arm32__)
+#if !defined(__ARM_EABI__) \
+    && (defined(__arm) || defined(__arm__) || defined(__arm26__) \
+    || defined(__arm32__))
 #define IEEE_ARM
 #elif defined(IS_LITTLE_ENDIAN)
 #define IEEE_8087
@@ -174,7 +175,12 @@ void _PR_CleanupDtoa(void)
  * #define MALLOC your_malloc, where your_malloc(n) acts like malloc(n)
  *	if memory is available and otherwise does something you deem
  *	appropriate.  If MALLOC is undefined, malloc will be invoked
- *	directly -- and assumed always to succeed.
+ *	directly -- and assumed always to succeed.  Similarly, if you
+ *	want something other than the system's free() to be called to
+ *	recycle memory acquired from MALLOC, #define FREE to be the
+ *	name of the alternate routine.  (FREE or free is only called in
+ *	pathological cases, e.g., in a dtoa call after a dtoa return in
+ *	mode 3 with thousands of digits requested.)
  * #define Omit_Private_Memory to omit logic (added Jan. 1998) for making
  *	memory allocations from a private pool of memory when possible.
  *	When used, the private pool is PRIVATE_MEM bytes long:  2304 bytes,
@@ -216,11 +222,6 @@ void _PR_CleanupDtoa(void)
  *	floating-point numbers and flushes underflows to zero rather
  *	than implementing gradual underflow, then you must also #define
  *	Sudden_Underflow.
- * #define YES_ALIAS to permit aliasing certain double values with
- *	arrays of ULongs.  This leads to slightly better code with
- *	some compilers and was always used prior to 19990916, but it
- *	is not strictly legal and can cause trouble with aggressively
- *	optimizing compilers (e.g., gcc 2.95.1 under -O2).
  * #define USE_LOCALE to use the current locale's decimal_point value.
  * #define SET_INEXACT if IEEE arithmetic is being used and extra
  *	computation should be done to set the inexact flag when the
@@ -357,24 +358,13 @@ Exactly one of IEEE_8087, IEEE_MC68k, IEEE_ARM, VAX, or IBM should be defined.
 
 typedef union { double d; ULong L[2]; } U;
 
-#ifdef YES_ALIAS
-#define dval(x) x
+#define dval(x) (x).d
 #ifdef IEEE_8087
-#define word0(x) ((ULong *)&x)[1]
-#define word1(x) ((ULong *)&x)[0]
+#define word0(x) (x).L[1]
+#define word1(x) (x).L[0]
 #else
-#define word0(x) ((ULong *)&x)[0]
-#define word1(x) ((ULong *)&x)[1]
-#endif
-#else
-#ifdef IEEE_8087
-#define word0(x) ((U*)&x)->L[1]
-#define word1(x) ((U*)&x)->L[0]
-#else
-#define word0(x) ((U*)&x)->L[0]
-#define word1(x) ((U*)&x)->L[1]
-#endif
-#define dval(x) ((U*)&x)->d
+#define word0(x) (x).L[0]
+#define word1(x) (x).L[1]
 #endif
 
 /* The following definition of Storeinc is appropriate for MIPS processors.
@@ -558,7 +548,7 @@ extern double rnd_prod(double, double), rnd_quot(double, double);
 #define FREE_DTOA_LOCK(n)	/*nothing*/
 #endif
 
-#define Kmax 15
+#define Kmax 7
 
  struct
 Bigint {
@@ -586,9 +576,10 @@ Balloc
 #endif
 
 	ACQUIRE_DTOA_LOCK(0);
-	if (rv = freelist[k]) {
+	/* The k > Kmax case does not need ACQUIRE_DTOA_LOCK(0), */
+	/* but this case seems very unlikely. */
+	if (k <= Kmax && (rv = freelist[k]))
 		freelist[k] = rv->next;
-		}
 	else {
 		x = 1 << k;
 #ifdef Omit_Private_Memory
@@ -596,7 +587,7 @@ Balloc
 #else
 		len = (sizeof(Bigint) + (x-1)*sizeof(ULong) + sizeof(double) - 1)
 			/sizeof(double);
-		if (pmem_next - private_mem + len <= PRIVATE_mem) {
+		if (k <= Kmax && pmem_next - private_mem + len <= PRIVATE_mem) {
 			rv = (Bigint*)pmem_next;
 			pmem_next += len;
 			}
@@ -620,10 +611,18 @@ Bfree
 #endif
 {
 	if (v) {
-		ACQUIRE_DTOA_LOCK(0);
-		v->next = freelist[v->k];
-		freelist[v->k] = v;
-		FREE_DTOA_LOCK(0);
+		if (v->k > Kmax)
+#ifdef FREE
+			FREE((void*)v);
+#else
+			free((void*)v);
+#endif
+		else {
+			ACQUIRE_DTOA_LOCK(0);
+			v->next = freelist[v->k];
+			freelist[v->k] = v;
+			FREE_DTOA_LOCK(0);
+			}
 		}
 	}
 
@@ -1183,14 +1182,15 @@ diff
  static double
 ulp
 #ifdef KR_headers
-	(x) double x;
+	(dx) double dx;
 #else
-	(double x)
+	(double dx)
 #endif
 {
 	register Long L;
-	double a;
+	U x, a;
 
+	dval(x) = dx;
 	L = (word0(x) & Exp_mask) - (P-1)*Exp_msk1;
 #ifndef Avoid_Underflow
 #ifndef Sudden_Underflow
@@ -1232,7 +1232,7 @@ b2d
 {
 	ULong *xa, *xa0, w, y, z;
 	int k;
-	double d;
+	U d;
 #ifdef VAX
 	ULong d0, d1;
 #else
@@ -1295,11 +1295,12 @@ b2d
  static Bigint *
 d2b
 #ifdef KR_headers
-	(d, e, bits) double d; int *e, *bits;
+	(dd, e, bits) double dd; int *e, *bits;
 #else
-	(double d, int *e, int *bits)
+	(double dd, int *e, int *bits)
 #endif
 {
+	U d;
 	Bigint *b;
 	int de, k;
 	ULong *x, y, z;
@@ -1308,6 +1309,10 @@ d2b
 #endif
 #ifdef VAX
 	ULong d0, d1;
+#endif
+
+	dval(d) = dd;
+#ifdef VAX
 	d0 = word0(d) >> 16 | word0(d) << 16;
 	d1 = word1(d) >> 16 | word1(d) << 16;
 #else
@@ -1438,7 +1443,7 @@ ratio
 	(Bigint *a, Bigint *b)
 #endif
 {
-	double da, db;
+	U da, db;
 	int k, ka, kb;
 
 	dval(da) = b2d(a, &ka);
@@ -1612,7 +1617,8 @@ PR_strtod
 	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, dsign,
 		 e, e1, esign, i, j, k, nd, nd0, nf, nz, nz0, sign;
 	CONST char *s, *s0, *s1;
-	double aadj, aadj1, adj, rv, rv0;
+	double aadj, aadj1, adj;
+	U aadj2, rv, rv0;
 	Long L;
 	ULong y, z;
 	Bigint *bb, *bb1, *bd, *bd0, *bs, *delta;
@@ -2375,7 +2381,9 @@ PR_strtod
 					aadj = z;
 					aadj1 = dsign ? aadj : -aadj;
 					}
-				word0(aadj1) += (2*P+1)*Exp_msk1 - y;
+				dval(aadj2) = aadj1;
+				word0(aadj2) += (2*P+1)*Exp_msk1 - y;
+				aadj1 = dval(aadj2);
 				}
 			adj = aadj1 * ulp(dval(rv));
 			dval(rv) += adj;
@@ -2710,10 +2718,10 @@ freedtoa(char *s)
  static char *
 dtoa
 #ifdef KR_headers
-	(d, mode, ndigits, decpt, sign, rve)
-	double d; int mode, ndigits, *decpt, *sign; char **rve;
+	(dd, mode, ndigits, decpt, sign, rve)
+	double dd; int mode, ndigits, *decpt, *sign; char **rve;
 #else
-	(double d, int mode, int ndigits, int *decpt, int *sign, char **rve)
+	(double dd, int mode, int ndigits, int *decpt, int *sign, char **rve)
 #endif
 {
  /*	Arguments ndigits, decpt, sign are similar to those
@@ -2759,7 +2767,8 @@ dtoa
 	ULong x;
 #endif
 	Bigint *b, *b1, *delta, *mlo, *mhi, *S;
-	double d2, ds, eps;
+	U d, d2, eps;
+	double ds;
 	char *s, *s0;
 #ifdef Honor_FLT_ROUNDS
 	int rounding;
@@ -2775,6 +2784,7 @@ dtoa
 		}
 #endif
 
+	dval(d) = dd;
 	if (word0(d) & Sign_bit) {
 		/* set sign for everything, including 0's and NaNs */
 		*sign = 1;
@@ -3067,7 +3077,7 @@ dtoa
 				goto no_digits;
 			goto one_digit;
 			}
-		for(i = 1;; i++, dval(d) *= 10.) {
+		for(i = 1; i <= k+1; i++, dval(d) *= 10.) {
 			L = (Long)(dval(d) / ds);
 			dval(d) -= L*ds;
 #ifdef Check_FLT_ROUNDS
@@ -3434,13 +3444,15 @@ PR_dtoa(PRFloat64 d, PRIntn mode, PRIntn ndigits,
 **   '+' or '-' after the 'e' in scientific notation
 */
 PR_IMPLEMENT(void)
-PR_cnvtf(char *buf,int bufsz, int prcsn,double fval)
+PR_cnvtf(char *buf, int bufsz, int prcsn, double dfval)
 {
     PRIntn decpt, sign, numdigits;
     char *num, *nump;
     char *bufp = buf;
     char *endnum;
+    U fval;
 
+    dval(fval) = dfval;
     /* If anything fails, we store an empty string in 'buf' */
     num = (char*)PR_MALLOC(bufsz);
     if (num == NULL) {

@@ -37,15 +37,7 @@
 
 #include "primpl.h"
 #include <process.h>  /* for _beginthread() */
-
-#ifdef XP_OS2_VACPP
-#include <time.h>     /* for _tzset() */
-#endif
-
-#ifdef XP_OS2_EMX
 #include <signal.h>
-#endif
-
 #include <float.h>
 
 /* --- globals ------------------------------------------------ */
@@ -75,10 +67,6 @@ _PR_MD_EARLY_INIT()
    if (DosLoadModule(NULL, 0, "DOSCALL1", &hmod) == 0)
        DosQueryProcAddr(hmod, 877, "DOSQUERYTHREADCONTEXT",
                         (PFN *)&QueryThreadContext);
-
-#ifdef XP_OS2_VACPP
-   _tzset();
-#endif
 }
 
 static void
@@ -223,18 +211,10 @@ _PR_MD_CREATE_THREAD(PRThread *thread,
     PARAMSTORE* params = PR_Malloc(sizeof(PARAMSTORE));
     params->start = start;
     params->thread = thread;
-#ifdef XP_OS2_VACPP /* No exception handler for VACPP */
-    thread->md.handle = thread->id = (TID) _beginthread(
-                    (void(* _Optlink)(void*))start,
-                    NULL, 
-                    thread->stack->stackSize,
-                    thread);
-#else
     thread->md.handle = thread->id = (TID) _beginthread(ExcpStartFunc,
                                                         NULL, 
                                                         thread->stack->stackSize,
                                                         params);
-#endif
     if(thread->md.handle == -1) {
         return PR_FAILURE;
     }
@@ -261,7 +241,7 @@ _PR_MD_YIELD(void)
 void
 _PR_MD_SET_PRIORITY(_MDThread *thread, PRThreadPriority newPri)
 {
-    int nativePri;
+    int nativePri = PRTYC_NOCHANGE;
     BOOL rv;
 
     if (newPri < PR_PRIORITY_FIRST) {
@@ -271,8 +251,6 @@ _PR_MD_SET_PRIORITY(_MDThread *thread, PRThreadPriority newPri)
     }
     switch (newPri) {
         case PR_PRIORITY_LOW:
-            nativePri = PRTYC_IDLETIME;
-            break;
         case PR_PRIORITY_NORMAL:
             nativePri = PRTYC_REGULAR;
             break;
@@ -285,7 +263,7 @@ _PR_MD_SET_PRIORITY(_MDThread *thread, PRThreadPriority newPri)
     rv = DosSetPriority(PRTYS_THREAD, nativePri, 0, thread->handle);
     PR_ASSERT(rv == NO_ERROR);
     if (rv != NO_ERROR) {
-	PR_LOG(_pr_thread_lm, PR_LOG_MIN,
+        PR_LOG(_pr_thread_lm, PR_LOG_MIN,
                 ("PR_SetThreadPriority: can't set thread priority\n"));
     }
     return;

@@ -1,39 +1,43 @@
 dnl -*- Mode: Autoconf; tab-width: 4; indent-tabs-mode: nil; -*-
 dnl 
-dnl The contents of this file are subject to the Mozilla Public
-dnl License Version 1.1 (the "License"); you may not use this file
-dnl except in compliance with the License. You may obtain a copy of
-dnl the License at http://www.mozilla.org/MPL/
-dnl 
-dnl Software distributed under the License is distributed on an "AS
-dnl IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-dnl implied. See the License for the specific language governing
-dnl rights and limitations under the License.
-dnl 
+dnl ***** BEGIN LICENSE BLOCK *****
+dnl Version: MPL 1.1/GPL 2.0/LGPL 2.1
+dnl
+dnl The contents of this file are subject to the Mozilla Public License Version
+dnl 1.1 (the "License"); you may not use this file except in compliance with
+dnl the License. You may obtain a copy of the License at
+dnl http://www.mozilla.org/MPL/
+dnl
+dnl Software distributed under the License is distributed on an "AS IS" basis,
+dnl WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+dnl for the specific language governing rights and limitations under the
+dnl License.
+dnl
 dnl The Original Code is the Netscape Portable Runtime (NSPR).
-dnl 
-dnl The Initial Developer of the Original Code is Netscape
-dnl Communications Corporation.  Portions created by Netscape are 
-dnl Copyright (C) 1998o-2000 Netscape Communications Corporation.  All
-dnl Rights Reserved.
-dnl 
+dnl
+dnl The Initial Developer of the Original Code is
+dnl Netscape Communications Corporation.
+dnl Portions created by the Initial Developer are Copyright (C) 1998
+dnl the Initial Developer. All Rights Reserved.
+dnl
 dnl Contributor(s):
-dnl     Christopher Seawood <cls@seawood.org>
-dnl     Howard Chu <hyc@symas.com>
-dnl     Mark Mentovai <mark@moxienet.com>
-dnl 
-dnl Alternatively, the contents of this file may be used under the
-dnl terms of the GNU General Public License Version 2 or later (the
-dnl "GPL"), in which case the provisions of the GPL are applicable 
-dnl instead of those above.  If you wish to allow use of your 
-dnl version of this file only under the terms of the GPL and not to
-dnl allow others to use your version of this file under the MPL,
-dnl indicate your decision by deleting the provisions above and
-dnl replace them with the notice and other provisions required by
-dnl the GPL.  If you do not delete the provisions above, a recipient
-dnl may use your version of this file under either the MPL or the
-dnl GPL.
-dnl 
+dnl   Christopher Seawood <cls@seawood.org>
+dnl   Howard Chu <hyc@symas.com>
+dnl   Mark Mentovai <mark@moxienet.com>
+dnl
+dnl Alternatively, the contents of this file may be used under the terms of
+dnl either the GNU General Public License Version 2 or later (the "GPL"), or
+dnl the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+dnl in which case the provisions of the GPL or the LGPL are applicable instead
+dnl of those above. If you wish to allow use of your version of this file only
+dnl under the terms of either the GPL or the LGPL, and not to allow others to
+dnl use your version of this file under the terms of the MPL, indicate your
+dnl decision by deleting the provisions above and replace them with the notice
+dnl and other provisions required by the GPL or the LGPL. If you do not delete
+dnl the provisions above, a recipient may use your version of this file under
+dnl the terms of any one of the MPL, the GPL or the LGPL.
+dnl
+dnl ***** END LICENSE BLOCK *****
 
 AC_PREREQ(2.12)
 AC_INIT(config/libc_r.h)
@@ -46,7 +50,7 @@ dnl = Defaults
 dnl ========================================================
 MOD_MAJOR_VERSION=4
 MOD_MINOR_VERSION=7
-MOD_PATCH_VERSION=0
+MOD_PATCH_VERSION=6
 NSPR_MODNAME=nspr20
 _HAVE_PTHREADS=
 USE_PTHREADS=
@@ -72,6 +76,8 @@ LIBPLC='-L$(dist_libdir) -lplc$(MOD_MAJOR_VERSION)'
 CYGWIN_WRAPPER=
 MACOS_SDK_DIR=
 NEXT_ROOT=
+MT=
+MOZ_OS2_HIGH_MEMORY=1
 
 dnl Link in libraries necessary to resolve all symbols for shared libs
 RESOLVE_LINK_SYMBOLS=
@@ -86,6 +92,7 @@ dnl ========================================================
 CFLAGS="${CFLAGS=}"
 CXXFLAGS="${CXXFLAGS=}"
 LDFLAGS="${LDFLAGS=}"
+DLLFLAGS="${DLLFLAGS=}"
 HOST_CFLAGS="${HOST_CFLAGS=}"
 HOST_LDFLAGS="${HOST_LDFLAGS=}"
 
@@ -129,6 +136,8 @@ dist_prefix='${MOD_DEPTH}/dist'
 dist_bindir='${dist_prefix}/bin'
 dist_includedir='${dist_prefix}/include/nspr'
 dist_libdir='${dist_prefix}/lib'
+dnl If the --includedir option was not specified, add '/nspr' to autoconf's
+dnl default value of includedir.
 if test "${includedir}" = '${prefix}/include'; then
     includedir='${prefix}/include/nspr'
 fi
@@ -229,6 +238,19 @@ AC_ARG_ENABLE(mdupdate,
 	    USE_MDUPDATE=1
       fi ])
 
+AC_ARG_ENABLE(cplus,
+    [  --enable-cplus          Enable some c++ api routines],
+    [ if test "$enableval" = "yes"; then
+	    USE_CPLUS=1
+      fi]) 
+
+AC_ARG_WITH(arm-kuser,
+    [  --with-arm-kuser        Use kuser helpers (Linux/ARM only)
+                          (Requires kernel 2.6.13 or later)],
+    [ if test "$withval" = "yes"; then
+	    AC_DEFINE(_PR_ARM_KUSER)
+      fi ])
+
 dnl ========================================================
 dnl = Mac OS X SDK support
 dnl ========================================================
@@ -239,7 +261,7 @@ AC_ARG_WITH(macos-sdk,
 AC_ARG_ENABLE(macos-target,
              [  --enable-macos-target=VER
                           Set the minimum MacOS version needed at runtime
-                          [10.1 for ppc, 10.4 for x86]],
+                          [10.2 for ppc, 10.4 for x86]],
              [_MACOSX_DEPLOYMENT_TARGET=$enableval])
 
 dnl ========================================================
@@ -429,9 +451,11 @@ if test "$target" != "$host"; then
     AC_CHECK_PROGS(CC, $CC "${target_alias}-gcc" "${target}-gcc", echo)
     unset ac_cv_prog_CC
     AC_PROG_CC
-    AC_CHECK_PROGS(CXX, $CXX "${target_alias}-g++" "${target}-g++", echo)
-    unset ac_cv_prog_CXX
-    AC_PROG_CXX
+    if test -n "$USE_CPLUS"; then
+        AC_CHECK_PROGS(CXX, $CXX "${target_alias}-g++" "${target}-g++", echo)
+        unset ac_cv_prog_CXX
+        AC_PROG_CXX
+    fi
 
     case "$build:$target" in
       powerpc-apple-darwin8*:i?86-apple-darwin*)
@@ -451,11 +475,13 @@ if test "$target" != "$host"; then
     AC_CHECK_PROGS(WINDRES, $WINDRES "${target_alias}-windres" "${target}-windres", echo)
 
 else
-    AC_PROG_CXX
-    if test "$CXX" = "cl" -a -z "$CC"; then
-        CC=$CXX
-    else        
-        AC_PROG_CC
+    AC_PROG_CC
+    if test -n "$USE_CPLUS"; then
+        if test "$CC" = "cl" -a -z "$CXX"; then
+            CXX=$CC
+        else        
+            AC_PROG_CXX
+        fi
     fi
     AC_PROG_CPP
     AC_PROG_RANLIB
@@ -774,6 +800,15 @@ fi
 OS_CONFIG="${OS_TARGET}${OS_RELEASE}"
 
 dnl ========================================================
+dnl Enable high-memory support on OS/2 by default.
+dnl ========================================================
+AC_ARG_ENABLE(os2-high-mem,
+    [  --disable-os2-high-mem  Disable high-memory support on OS/2],
+    [ if test "$enableval" = "no"; then
+        MOZ_OS2_HIGH_MEMORY=
+      else
+        MOZ_OS2_HIGH_MEMORY=1
+      fi ])
 
 dnl ========================================================
 dnl Override of system specific host options
@@ -964,26 +999,26 @@ case "$target" in
     CFLAGS="$CFLAGS -Wmost -fno-common"
     case "${target_cpu}" in
         i*86*)
-            AC_DEFINE(i386)
-            CPU_ARCH=i386
-            PR_MD_ASFILES=os_Darwin_x86.s
+            if test -n "$USE_64"; then
+                CPU_ARCH=x86_64
+                CC="$CC -arch x86_64"
+            else        
+                CPU_ARCH=i386
+            fi
             ;;
         *)
-            AC_DEFINE(ppc)
             CPU_ARCH=ppc
-            PR_MD_ASFILES=os_Darwin_ppc.s
             ;;
     esac
     DSO_CFLAGS=-fPIC
     DSO_LDOPTS='-dynamiclib -compatibility_version 1 -current_version 1 -all_load -install_name @executable_path/$@ -headerpad_max_install_names'
-    # Use the standard preprocessor (cpp)
-    CFLAGS="$CFLAGS -no-cpp-precomp"
     MKSHLIB='$(CC) $(DSO_LDOPTS) -o $@'
     STRIP="$STRIP -x -S"
     DLL_SUFFIX=dylib
     USE_PTHREADS=1
     MDCPUCFG_H=_darwin.cfg
     PR_MD_CSRCS=darwin.c
+    PR_MD_ASFILES=os_Darwin.s
 
     # Add Mac OS X support for loading CFM & CFBundle plugins
     if test -f /System/Library/Frameworks/Carbon.framework/Carbon; then
@@ -999,8 +1034,8 @@ case "$target" in
             dnl minimum.
             case "${target_cpu}" in
                 powerpc*)
-                    dnl Architecture minimum 10.1
-                    export MACOSX_DEPLOYMENT_TARGET=10.1
+                    dnl Architecture minimum 10.2
+                    export MACOSX_DEPLOYMENT_TARGET=10.2
                     ;;
                 i*86*)
                     dnl Architecture minimum 10.4
@@ -1041,17 +1076,32 @@ tools are selected during the Xcode/Developer Tools installation.])
                 dnl CPP needs to be set for AC_CHECK_HEADER.
                 CPP="$CPP -nostdinc ${SDK_C_INCLUDE}"
 
-                dnl ld support for -syslibroot is compiler-agnostic, but only
-                dnl available on Tiger.  Although it's possible to switch on
-                dnl the build host's OS release to use ld -syslibroot when
-                dnl available, ld -syslibroot cause warnings as long as
-                dnl NEXT_ROOT is set.  NEXT_ROOT should be set because both
-                dnl both the compiler and linker use it.
-                dnl
+                changequote(,)
+                HOST_DARWIN_MAJOR=`echo "$build_os" | sed -E -e 's/^darwin([0-9]+).*$/\1/'`
+                changequote([,])
+                if test "$HOST_DARWIN_MAJOR" -lt 9 ; then
+                    dnl The build host is running Tiger (10.4) or earlier.
+                    dnl ld support for -syslibroot is compiler-agnostic, but
+                    dnl only available on Tiger and later.  On Tiger and
+                    dnl earlier build hosts, just rely on NEXT_ROOT, because
+                    dnl it's not been shown to cause any problems.
+                    MACOS_SDK_LIBS="-L${MACOS_SDK_DIR}/usr/lib/gcc/darwin -L${MACOS_SDK_DIR}/usr/lib/gcc/darwin/${GCC_VERSION_FULL} -L${MACOS_SDK_DIR}/usr/lib ${SDK_C_FRAMEWORK}"
+                else
+                    dnl The build host is running Leopard (10.5) or later.
+                    dnl With NEXT_ROOT set, the linker will still not apply
+                    dnl it when resolving dependencies.  This causes problems
+                    dnl on Leopard, where an SDK depends on frameworks which
+                    dnl were present in earlier OS releases (and the associated
+                    dnl SDK) but not in Leopard.  -syslibroot does not have
+                    dnl this problem, but it results in harmless warnings when
+                    dnl NEXT_ROOT is set.  NEXT_ROOT needs to remain set even
+                    dnl on Leopard because the compiler uses it too.
+                    MACOS_SDK_LIBS="-Wl,-syslibroot,${MACOS_SDK_DIR}"
+                fi
+
                 dnl LDFLAGS is for the utilities built in config (now and
                 dnl nsinstall).  DSO_LDOPTS is used when linking shared
                 dnl libraries.
-                MACOS_SDK_LIBS="-L${MACOS_SDK_DIR}/usr/lib/gcc/darwin -L${MACOS_SDK_DIR}/usr/lib/gcc/darwin/${GCC_VERSION_FULL} -L${MACOS_SDK_DIR}/usr/lib ${SDK_C_FRAMEWORK}"
                 LDFLAGS="${MACOS_SDK_LIBS} $LDFLAGS"
                 DSO_LDOPTS="${MACOS_SDK_LIBS} $DSO_LDOPTS"
                 export NEXT_ROOT=$MACOS_SDK_DIR
@@ -1092,6 +1142,20 @@ tools are selected during the Xcode/Developer Tools installation.])
             fi
         fi
     fi
+
+    AC_MSG_CHECKING(for socklen_t)
+    AC_CACHE_VAL(ac_cv_socklen_t,
+        [AC_TRY_COMPILE([#include <stdio.h>
+                         #include <sys/socket.h>],
+                        [socklen_t foo = 0;],
+                        [ac_cv_socklen_t=true],
+                        [ac_cv_socklen_t=false])])
+    if test "$ac_cv_socklen_t" = true ; then
+        AC_DEFINE(HAVE_SOCKLEN_T)
+        AC_MSG_RESULT(yes)
+    else
+        AC_MSG_RESULT(no)
+    fi
     ;;
 
 *-dgux*)
@@ -1118,7 +1182,7 @@ tools are selected during the Xcode/Developer Tools installation.])
     AC_DEFINE(HAVE_BSD_FLOCK)
     AC_DEFINE(HAVE_SOCKLEN_T)
     CFLAGS="$CFLAGS $(DSO_CFLAGS) -ansi -Wall"
-    MOZ_OBJFORMAT=`test -x /usr/bin/objformat && /usr/bin/objformat || echo aout`
+    MOZ_OBJFORMAT=`test -x /usr/bin/objformat && /usr/bin/objformat || echo elf`
     if test "$MOZ_OBJFORMAT" = "elf"; then
         DLL_SUFFIX=so
     else
@@ -1196,10 +1260,10 @@ tools are selected during the Xcode/Developer Tools installation.])
         AC_DEFINE(HAVE_POINTER_LOCALTIME_R)
     fi
 
-    # HP-UX 11i (B.11.11) or higher
+    # HP-UX 11i v2 (B.11.23) or higher
     changequote(<<,>>)
     case "$OS_RELEASE" in
-    [C-Z]*|B.[2-9]*|B.1[2-9]*|B.11.[2-9]*|B.11.1[1-9]*)
+    [C-Z]*|B.[2-9]*|B.1[2-9]*|B.11.[3-9]*|B.11.2[3-9]*)
         USE_IPV6=1
         ;;
     esac
@@ -1267,7 +1331,7 @@ tools are selected during the Xcode/Developer Tools installation.])
     if test "$DEFAULT_IMPL_STRATEGY" = "_EMU"; then
         USE_NSPR_THREADS=1
         USE_PTHREADS=
-        USE_USER_THREADS=
+        USE_USER_PTHREADS=
     elif test "$DEFAULT_IMPL_STRATEGY" = "_PTH"; then
         USE_PTHREADS=1
         if test "$USE_NSPR_THREADS"; then
@@ -1434,10 +1498,15 @@ tools are selected during the Xcode/Developer Tools installation.])
             CXX="$CXX -m32"
         fi
         ;;
+    ppc|powerpc)
+        PR_MD_ASFILES=os_Linux_ppc.s
+        ;;
     powerpc64)
         if test -n "$USE_64"; then
             CC="$CC -m64"
             CXX="$CXX -m64"
+        else
+            PR_MD_ASFILES=os_Linux_ppc.s
         fi
         ;;
     m68k)
@@ -1480,9 +1549,29 @@ tools are selected during the Xcode/Developer Tools installation.])
         _CC_MAJOR_VERSION=`echo $CC_VERSION | awk -F\. '{ print $1 }'`
         _CC_MINOR_VERSION=`echo $CC_VERSION | awk -F\. '{ print $2 }'`
         MSC_VER=${_CC_MAJOR_VERSION}${_CC_MINOR_VERSION}
+
+        # Ensure that mt is Microsoft (R) Manifest Tool and not magnetic
+        # tape manipulation utility (or something else)
+        if test "$MSC_VER" -ge "1400"; then
+            changequote(,)
+            _MSMT_VER_FILTER='s|.* \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p'
+            changequote([,])
+
+            MSMT_TOOL=`mt 2>&1|grep 'Microsoft (R) Manifest Tool'`
+            if test -n "$MSMT_TOOL"; then
+                MSMANIFEST_TOOL_VERSION=`echo ${MSMT_TOOL}|sed -ne "$_MSMT_VER_FILTER"`
+                if test -z "$MSMANIFEST_TOOL_VERSION"; then
+                    AC_MSG_WARN([Unknown version of the Microsoft (R) Manifest Tool.])
+                fi
+                MT=mt
+                unset MSMT_TOOL
+            else
+                AC_MSG_ERROR([Microsoft (R) Manifest Tool must be in your \$PATH.])
+            fi
+        fi
         
         CFLAGS="$CFLAGS -W3 -nologo -GF -Gy"
-        DLLFLAGS='-OUT:"$@"'
+        DLLFLAGS="$DLLFLAGS -OUT:\"\$@\""
         _DEBUG_FLAGS=-Z7
         _OPTIMIZE_FLAGS=-O2
         if test -z "$MOZ_OPTIMIZE"; then
@@ -1526,9 +1615,6 @@ tools are selected during the Xcode/Developer Tools installation.])
         
         if test "$OS_TARGET" = "WINNT"; then
             CFLAGS="$CFLAGS -GT"
-            if test "$CPU_ARCH" = "x86"; then
-                CFLAGS="$CFLAGS -G5"
-            fi
             LIBNSPR='$(dist_libdir)/libnspr$(MOD_MAJOR_VERSION).$(LIB_SUFFIX)'
             LIBPLC='$(dist_libdir)/libplc$(MOD_MAJOR_VERSION).$(LIB_SUFFIX)'
         else
@@ -1656,7 +1742,9 @@ mips-nec-sysv*)
     AC_DEFINE(XP_UNIX)
     AC_DEFINE(NETBSD)
     AC_DEFINE(HAVE_BSD_FLOCK)
-    USE_NSPR_THREADS=1
+    if test -z "$USE_NSPR_THREADS"; then
+        USE_PTHREADS=1
+    fi
     MDCPUCFG_H=_netbsd.cfg
     PR_MD_CSRCS=netbsd.c
 
@@ -1738,6 +1826,7 @@ mips-sony-newsos*)
     DSO_CFLAGS=-fPIC
     MDCPUCFG_H=_openbsd.cfg
     PR_MD_CSRCS=openbsd.c
+    OS_LIBS="-lc"
     if test -z "$USE_NSPR_THREADS"; then
         USE_PTHREADS=1
     fi
@@ -1899,7 +1988,7 @@ mips-sony-newsos*)
     ;;
 
 *-solaris*)
-    if test -z "$USE_USER_THREADS" && test -z "$USE_NATIVE_THREADS"; then
+    if test -z "$USE_NSPR_THREADS"; then
         USE_PTHREADS=1
     fi
     AC_DEFINE(XP_UNIX)
@@ -1909,20 +1998,35 @@ mips-sony-newsos*)
     AC_DEFINE(__svr4__)
     AC_DEFINE(SOLARIS)
     AC_DEFINE(HAVE_FCNTL_FILE_LOCKING)
+    CPU_ARCH=`uname -p`
     MDCPUCFG_H=_solaris.cfg
     PR_MD_CSRCS=solaris.c
     LD=/usr/ccs/bin/ld
     MKSHLIB='$(CC) $(DSO_LDOPTS) -o $@'
     RESOLVE_LINK_SYMBOLS=1
+    case "${OS_RELEASE}" in
+    5.8|5.9)
+        ;;
+    *)
+        # It is safe to use the -Bdirect linker flag on Solaris 10 or later.
+        USE_B_DIRECT=1
+        ;;
+    esac
     if test -n "$GNU_CC"; then
         DSO_CFLAGS=-fPIC
         if `$CC -print-prog-name=ld` -v 2>&1 | grep -c GNU >/dev/null; then
             GCC_USE_GNU_LD=1
         fi
         DSO_LDOPTS='-shared -Wl,-h,$(notdir $@),-z,combreloc,-z,defs,-z,ignore' 
+        if test -n "$USE_B_DIRECT"; then
+            DSO_LDOPTS="$DSO_LDOPTS,-Bdirect"
+        fi
     else
         DSO_CFLAGS=-KPIC
         DSO_LDOPTS='-G -h $(notdir $@) -z combreloc -z defs -z ignore'
+        if test -n "$USE_B_DIRECT"; then
+            DSO_LDOPTS="$DSO_LDOPTS -Bdirect"
+        fi
     fi
     if test -n "$GNU_CC"; then
         CFLAGS="$CFLAGS -Wall"
@@ -2017,8 +2121,8 @@ mips-sony-newsos*)
         AC_DEFINE(_PR_INET6)
         ;;
     esac
-    if test "$OS_TEST" = "sun4u"; then
-        # 64-bit Solaris requires SPARC V9 architecture, so the following
+    if test "$CPU_ARCH" = "sparc"; then
+        # 64-bit Solaris SPARC requires V9 architecture, so the following
         # is not needed.
         if test -z "$USE_64"; then
             ULTRASPARC_LIBRARY=nspr_flt
@@ -2067,69 +2171,31 @@ mips-sony-newsos*)
     MDCPUCFG_H=_os2.cfg
     RESOLVE_LINK_SYMBOLS=1
 
-    # EMX/GCC build
-    if test -n "$GNU_CC"; then
-        AC_DEFINE(XP_OS2_EMX)
-        AC_DEFINE(OS2)
-        AR=emxomfar
-        AR_FLAGS='r $@'
-        CFLAGS="$CFLAGS -Wall -Zomf"
-        CXXFLAGS="$CFLAGS -Wall -Zomf"
-        MKSHLIB='$(CC) $(DSO_LDOPTS) -o $@'
-        DSO_CFLAGS=
-        DSO_LDOPTS='-Zomf -Zdll -Zmap'
-        LDFLAGS='-Zmap'
-        _OPTIMIZE_FLAGS="-O2 -s"
-        _DEBUG_FLAGS="-g -fno-inline"
-        if test -n "$MOZ_OPTIMIZE"; then
-          DSO_LDOPTS="$DSO_LDOPTS -Zlinker /EXEPACK:2 -Zlinker /PACKCODE -Zlinker /PACKDATA"
-        fi
-        OS_LIBS="-lsocket"
-        IMPLIB='emximp -o'
-        FILTER='emxexp -o'
-
-        # GCC for OS/2 currently predefines these, but we don't want them
-        DEFINES="$DEFINES -Uunix -U__unix -U__unix__"
-
-    # Visual Age C++ build
-    elif test "$VACPP" = "yes"; then
-        AC_DEFINE(XP_OS2_VACPP)
-        AC_DEFINE(OS2,4)
-        AC_DEFINE(_X86_)
-        OBJ_SUFFIX=obj
-        AS=alp
-        ASFLAGS='-Mb'
-        ASM_SUFFIX=asm
-        AR=-ilib
-        AR_FLAGS='/NOL /NOI /O:$(subst /,\\,$@)'
-        CFLAGS='/Q /qlibansi /Gd+ /Gm+ /Su4 /Mp /Tl9'
-        HOST_CFLAGS="$CFLAGS"
-        OS_CFLAGS='/Q /qlibansi /Gd+ /Gm+ /Su4 /Mp /Tl9'
-        OS_EXE_CFLAGS='/Q /qlibansi /Gd+ /Gm+ /Su4 /Mp /Tl9'
-        CXXFLAGS='/Q /qlibansi /Gd+ /Gm+ /Su4 /Mp /Tl9'
-        OS_LIBS='so32dll.lib tcp32dll.lib'
-        LD='-ilink'
-        MKSHLIB='$(LD) $(DSO_LDOPTS)'
-        IMPLIB='implib -nologo -noignorecase'
-        FILTER='cppfilt -q -B -P'
-        _OPTIMIZE_FLAGS='/O+ /Gl+ /qtune=pentium /qarch=pentium'
-        _DEBUG_FLAGS='/Ti+ '
-        LDFLAGS='/NOL /M /L'
-        DLLFLAGS='/O:$@ /DLL /INC:_dllentry /MAP:$(@:.dll=.map) /L /NOL'
-        EXEFLAGS='/OUT:$@ /PMTYPE:VIO /MAP:$(@:.exe=.map) /L /NOL'
-        if test -n "$MOZ_DEBUG"; then
-          LDFLAGS="$LDFLAGS /DE"
-          DLLFLAGS="$DLLFLAGS /DE"
-          EXEFLAGS="$EXEFLAGS /DE"
-        fi
-        if test -n "$MOZ_OPTIMIZE"; then
-          LDFLAGS="$LDFLAGS /OPTFUNC /EXEPACK:2 /PACKCODE /PACKDATA"
-          DLLFLAGS="$DLLFLAGS /OPTFUNC /EXEPACK:2 /PACKCODE /PACKDATA"
-          EXEFLAGS="$EXEFLAGS /OPTFUNC /EXEPACK:2 /PACKCODE /PACKDATA"
-        fi
-        LIBNSPR='$(dist_libdir)/nspr$(MOD_MAJOR_VERSION).$(LIB_SUFFIX)'
-        LIBPLC='$(dist_libdir)/plc$(MOD_MAJOR_VERSION).$(LIB_SUFFIX)'
+    AC_DEFINE(OS2)
+    AR=emxomfar
+    AR_FLAGS='r $@'
+    CFLAGS="$CFLAGS -Wall -Zomf"
+    CXXFLAGS="$CFLAGS -Wall -Zomf"
+    MKSHLIB='$(CC) $(DSO_LDOPTS) -o $@'
+    DSO_CFLAGS=
+    DSO_LDOPTS='-Zomf -Zdll -Zmap'
+    LDFLAGS='-Zmap'
+    _OPTIMIZE_FLAGS="-O2 -s"
+    _DEBUG_FLAGS="-g -fno-inline"
+    if test -n "$MOZ_OPTIMIZE"; then
+      DSO_LDOPTS="$DSO_LDOPTS -Zlinker /EXEPACK:2 -Zlinker /PACKCODE -Zlinker /PACKDATA"
     fi
+    OS_LIBS="-lsocket"
+    IMPLIB='emximp -o'
+    FILTER='emxexp -o'
+    if test -n "$MOZ_OS2_HIGH_MEMORY"; then
+      DSO_LDOPTS="$DSO_LDOPTS -Zhigh-mem"
+      LDFLAGS="$LDFLAGS -Zhigh-mem"
+      AC_DEFINE(MOZ_OS2_HIGH_MEMORY)
+    fi
+
+    # GCC for OS/2 currently predefines these, but we don't want them
+    DEFINES="$DEFINES -Uunix -U__unix -U__unix__"
     ;;
 
 *)
@@ -2372,26 +2438,9 @@ case "$target" in
 	        USE_PTHREADS=
 	    fi])
     ;;
-
-*-solaris*)
-    AC_ARG_WITH(native-threads,
-    [  --with-native-threads   Use native system threads as thread subsystem
-                          (Solaris only)],
-    [ if test "$withval" = "yes"; then
-	    USE_NATIVE_THREADS=1
-	    USE_USER_PTHREADS=
-	    USE_PTHREADS=
-	  fi])
-    ;;
 esac
 
 fi # SKIP_LIBRARY_CHECKS
-
-AC_ARG_ENABLE(cplus,
-    [  --enable-cplus          Enable some c++ api routines],
-    [ if test "$enableval" = "yes"; then
-	    USE_CPLUS=1
-      fi]) 
 
 AC_ARG_ENABLE(ipv6,
     [  --enable-ipv6           Compile ipv6 support],
@@ -2598,14 +2647,10 @@ case "$target" in
     fi
     ;;
 *-solaris*)
-    if test -n "$USE_NATIVE_THREADS"; then
-        AC_DEFINE(_PR_GLOBAL_THREADS_ONLY)
-    else
-        if test -n "$USE_NSPR_THREADS"; then
-            AC_DEFINE(_PR_LOCAL_THREADS_ONLY)
-        fi
+    if test -n "$USE_NSPR_THREADS"; then
+        AC_DEFINE(_PR_LOCAL_THREADS_ONLY)
     fi
-    if test -z "$USE_NSPR_THREADS"; then
+    if test -n "$USE_PTHREADS"; then
         AC_DEFINE(_REENTRANT)
         AC_DEFINE(HAVE_POINTER_LOCALTIME_R)
         if test "$OS_TEST" = "i86pc"; then
@@ -2617,9 +2662,6 @@ case "$target" in
         else
             if test -n "$USE_64"; then
                 PR_MD_ASFILES=os_SunOS_sparcv9.s
-            fi
-            if test -n "$USE_NATIVE_THREADS"; then
-                PR_MD_ASFILES="$PR_MD_ASFILES os_SunOS.s"
             fi
         fi
     fi
@@ -2710,7 +2752,6 @@ AC_SUBST(ENABLE_STRIP)
 AC_SUBST(USE_PTHREADS)
 AC_SUBST(USE_BTHREADS)
 AC_SUBST(USE_USER_PTHREADS)
-AC_SUBST(USE_NATIVE_THREADS)
 AC_SUBST(USE_NSPR_THREADS)
 
 AC_SUBST(LIBNSPR)
@@ -2775,6 +2816,7 @@ AC_SUBST(VISIBILITY_FLAGS)
 AC_SUBST(WRAP_SYSTEM_INCLUDES)
 AC_SUBST(MACOS_SDK_DIR)
 AC_SUBST(NEXT_ROOT)
+AC_SUBST(MT)
 
 dnl ========================================================
 dnl Generate output files.
@@ -2830,5 +2872,7 @@ fi
 if test -n "$USE_CPLUS"; then
     MAKEFILES="$MAKEFILES pr/src/cplus/Makefile pr/src/cplus/tests/Makefile"
 fi
+
+echo $MAKEFILES > unallmakefiles
 
 AC_OUTPUT([$MAKEFILES], [chmod +x config/nspr-config])
