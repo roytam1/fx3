@@ -125,20 +125,10 @@
                                  preference="browser.download.dir"
                                  />          
 
-			    <textbox id="downloadDirDisplay" disabled="true"
-                               style="margin:3px ! important;"
-                               tabindex="54"
-                               flex="1" />                                          
-
-                   <!--   <button id="chooseFolderButton" tabindex="55"
-			                        class='box-prefgroupitem'
-			                        label="&setSaveDirectory.label;"
-			                        oncommand="syncPref(document.getElementById('downloadDir'));downloadChooseFolder();"/>
-			-->
-
                     </hbox>		
                   </vbox>
               </groupbox>
+
             </vbox>
         </groupbox>
     </hbox>

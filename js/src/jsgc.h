@@ -81,6 +81,13 @@ JS_BEGIN_EXTERN_C
 extern uint8 *
 js_GetGCThingFlags(void *thing);
 
+/*
+ * The sole purpose of the function is to preserve public API compatibility
+ * in JS_GetStringBytes which takes only single JSString* argument.
+ */
+JSRuntime*
+js_GetGCStringRuntime(JSString *str);
+
 /* These are compatible with JSDHashEntryStub. */
 struct JSGCRootHashEntry {
     JSDHashEntryHdr hdr;
@@ -162,6 +169,11 @@ js_MarkAtom(JSContext *cx, JSAtom *atom);
             js_MarkAtom(cx, atom);                                            \
     JS_END_MACRO
 
+/*
+ * Always use GC_MARK macro and never call js_MarkGCThing directly so
+ * when GC_MARK_DEBUG is defined the dump of live GC things does not miss
+ * a thing.
+ */
 extern void
 js_MarkGCThing(JSContext *cx, void *thing);
 

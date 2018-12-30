@@ -91,6 +91,9 @@ EXTRA_DSO_LIBS	= \
 		gkgfx \
 		$(NULL)
 
+ifdef MOZ_ENABLE_CAIRO_GFX
+EXTRA_DSO_LIBS	+= thebes
+endif
 
 EXTRA_DSO_LDOPTS = \
 		$(LIBS_DIR) \

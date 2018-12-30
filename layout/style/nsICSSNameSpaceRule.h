@@ -34,6 +34,9 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
+
+/* internal interface for CSS @namespace rules */
+
 #ifndef nsICSSNameSpaceRule_h___
 #define nsICSSNameSpaceRule_h___
 

@@ -66,7 +66,7 @@
 #if !defined(MP_NO_MP_WORD) && !defined(MP_NO_ADD_WORD)
 #define MP_ADD_CARRY(a1, a2, s, cin, cout)   \
     { mp_word w; \
-    w = ((mp_word)(cin)) + (a1) + (a2) \
+    w = ((mp_word)(cin)) + (a1) + (a2); \
     s = ACCUM(w); \
     cout = CARRYOUT(w); }
 

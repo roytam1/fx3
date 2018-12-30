@@ -367,7 +367,7 @@ nsMetricsService::EnableCollectors()
   //
   nsresult rv;
   if (mConfig.IsEventEnabled(NS_LITERAL_STRING(NS_METRICS_NAMESPACE),
-                             NS_LITERAL_STRING("load"))) {
+                             NS_LITERAL_STRING("document"))) {
     rv = nsLoadCollector::Startup();
     NS_ENSURE_SUCCESS(rv, rv);
   } else {
@@ -746,8 +746,13 @@ nsMetricsService::OpenCompleteXMLStream(nsILocalFile *dataFile,
   char *head = PR_smprintf(METRICS_XML_HEAD, clientID.get());
   
   nsCOMPtr<nsIInputStream> stringStream;
+#ifdef MOZILLA_1_8_BRANCH
+  NS_NewCStringInputStream(getter_AddRefs(stringStream),
+                           nsDependentCString(head));
+#else
   NS_NewByteInputStream(getter_AddRefs(stringStream), head, -1,
                         NS_ASSIGNMENT_COPY);
+#endif
   PR_smprintf_free(head);
   NS_ENSURE_STATE(stringStream);
 

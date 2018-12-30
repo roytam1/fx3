@@ -5714,8 +5714,13 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
         // A numeric property accessed and the numeric property is a
         // child frame. Define a property for this index.
 
+        PRBool doSecurityCheckInAddProperty = sDoSecurityCheckInAddProperty;
+        sDoSecurityCheckInAddProperty = PR_FALSE;
+
         *_retval = ::JS_DefineElement(cx, obj, JSVAL_TO_INT(id), JSVAL_VOID,
                                       nsnull, nsnull, 0);
+
+        sDoSecurityCheckInAddProperty = doSecurityCheckInAddProperty;
 
         if (*_retval) {
           *objp = obj;
