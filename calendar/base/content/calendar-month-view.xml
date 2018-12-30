@@ -1130,6 +1130,11 @@
             targetDate.second = 0;
           }
 
+          if (targetDate.compare(finishDate) == 0) {
+              // Zero length events are silly, but we have to handle them
+              return [this.findBoxForDate(targetDate)];
+          }
+
           while (targetDate.compare(finishDate) == -1) {
             var box = this.findBoxForDate(targetDate);
 
@@ -1268,9 +1273,6 @@
               this.calView.doAddItem(occ);
           },
           onDeleteItem: function (aItem) {
-            if (!(aItem instanceof Components.interfaces.calIEvent))
-              return;
-
             var occs = aItem.getOccurrencesBetween(this.calView.startDate,
                                                    this.calView.queryEndDate,
                                                    {});

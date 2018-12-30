@@ -53,9 +53,7 @@ public:
   /**
    * This method must be called before using an instance of this class.
    */
-  PRBool Init() {
-    return mEventSet.Init();
-  }
+  PRBool Init();
 
   /**
    * Restore the default configuration.
@@ -71,19 +69,24 @@ public:
    * Call this method to determine if the given event type is enabled for
    * collection.
    */
-  PRBool IsEventEnabled(const nsAString &eventNS, const nsAString &eventName);
+  PRBool IsEventEnabled(const nsAString &eventNS,
+                        const nsAString &eventName) const;
 
   /**
    * Get the limit on the number of events that should be collected.
    */
-  PRInt32 EventLimit() {
+  PRInt32 EventLimit() const {
+    NS_ASSERTION(mEventSet.IsInitialized(),
+                 "nsMetricsConfig::Init not called");
     return mEventLimit;
   }
 
   /**
    * Get the upload interval (measured in seconds).
    */
-  PRInt32 UploadInterval() {
+  PRInt32 UploadInterval() const {
+    NS_ASSERTION(mEventSet.IsInitialized(),
+                 "nsMetricsConfig::Init not called");
     return mUploadInterval;
   }
 
@@ -91,6 +94,8 @@ public:
    * Set the upload interval (measured in seconds).
    */
   void SetUploadInterval(PRInt32 uploadInterval) {
+    NS_ASSERTION(mEventSet.IsInitialized(),
+                 "nsMetricsConfig::Init not called");
     mUploadInterval = uploadInterval;
   }
 
