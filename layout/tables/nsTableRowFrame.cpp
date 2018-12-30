@@ -165,8 +165,8 @@ TallestCellGotShorter(nscoord aOld,
 
 /* ----------- nsTableRowFrame ---------- */
 
-nsTableRowFrame::nsTableRowFrame()
-  : nsHTMLContainerFrame()
+nsTableRowFrame::nsTableRowFrame(nsStyleContext* aContext)
+  : nsHTMLContainerFrame(aContext)
 {
   mBits.mRowIndex = mBits.mFirstInserted = 0;
   ResetHeight(0);
@@ -185,13 +185,12 @@ nsTableRowFrame::~nsTableRowFrame()
 NS_IMETHODIMP
 nsTableRowFrame::Init(nsIContent*      aContent,
                       nsIFrame*        aParent,
-                      nsStyleContext*  aContext,
                       nsIFrame*        aPrevInFlow)
 {
   nsresult  rv;
 
   // Let the base class do its initialization
-  rv = nsHTMLContainerFrame::Init(aContent, aParent, aContext, aPrevInFlow);
+  rv = nsHTMLContainerFrame::Init(aContent, aParent, aPrevInFlow);
 
   // record that children that are ignorable whitespace should be excluded 
   mState |= NS_FRAME_EXCLUDE_IGNORABLE_WHITESPACE;
@@ -939,7 +938,6 @@ nsTableRowFrame::ReflowChildren(nsPresContext*          aPresContext,
         // the cell wants to be bigger than what was available last time or
         // it is a style change reflow or we are printing, then we must reflow the
         // cell. Otherwise we can skip the reflow.
-        nsIFrame* kidNextInFlow = kidFrame->GetNextInFlow();
         nsSize cellDesiredSize = cellFrame->GetDesiredSize();
         if ((availCellWidth != cellFrame->GetPriorAvailWidth())       ||
             (cellDesiredSize.width > cellFrame->GetPriorAvailWidth()) ||
@@ -1528,7 +1526,6 @@ nsTableRowFrame::CollapseRowIfNecessary(nscoord aRowOffset,
     tableFrame->SetNeedToCollapse(PR_TRUE);
   }
 
-  PRInt32 rowIndex = GetRowIndex();
   nsRect rowRect = GetRect();
   rowRect.y -= aRowOffset;
   rowRect.width  = aWidth;
@@ -1536,9 +1533,9 @@ nsTableRowFrame::CollapseRowIfNecessary(nscoord aRowOffset,
   nscoord shift = 0;
   nscoord cellSpacingX = tableFrame->GetCellSpacingX();
   nscoord cellSpacingY = tableFrame->GetCellSpacingY();
-  nsTableCellFrame* cellFrame = GetFirstCell();
-  
+
   if (aCollapseGroup || collapseRow) {
+    nsTableCellFrame* cellFrame = GetFirstCell();
     aDidCollapse = PR_TRUE;
     shift = rowRect.height + cellSpacingY;
     while (cellFrame) {
@@ -1586,9 +1583,11 @@ nsTableRowFrame::CollapseRowIfNecessary(nscoord aRowOffset,
         // spans into
         prevColIndex = (iter.IsLeftToRight()) ?
                        cellColIndex + (cellColSpan - 1) : cellColIndex;
+        PRInt32 startIndex = (iter.IsLeftToRight()) ?
+                             cellColIndex : cellColIndex + (cellColSpan - 1);
         PRInt32 actualColSpan = cellColSpan;
         PRBool isVisible = PR_FALSE;
-        for (PRInt32 colX = cellColIndex; actualColSpan > 0;
+        for (PRInt32 colX = startIndex; actualColSpan > 0;
              colX += colIncrement, actualColSpan--) {
 
           nsTableColFrame* colFrame = tableFrame->GetColFrame(colX);
@@ -1758,9 +1757,9 @@ void nsTableRowFrame::SetContinuousBCBorderWidth(PRUint8     aForSide,
 /* ----- global methods ----- */
 
 nsIFrame* 
-NS_NewTableRowFrame(nsIPresShell* aPresShell)
+NS_NewTableRowFrame(nsIPresShell* aPresShell, nsStyleContext* aContext)
 {
-  return new (aPresShell) nsTableRowFrame;
+  return new (aPresShell) nsTableRowFrame(aContext);
 }
 
 #ifdef DEBUG

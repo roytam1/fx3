@@ -92,13 +92,13 @@ static const char kEventQueueServiceCID[] = NS_EVENTQUEUESERVICE_CONTRACTID;
 //----------nsHTMLScrollFrame-------------------------------------------
 
 nsIFrame*
-NS_NewHTMLScrollFrame(nsIPresShell* aPresShell, PRBool aIsRoot)
+NS_NewHTMLScrollFrame(nsIPresShell* aPresShell, nsStyleContext* aContext, PRBool aIsRoot)
 {
-  return new (aPresShell) nsHTMLScrollFrame(aPresShell, aIsRoot);
+  return new (aPresShell) nsHTMLScrollFrame(aPresShell, aContext, aIsRoot);
 }
 
-nsHTMLScrollFrame::nsHTMLScrollFrame(nsIPresShell* aShell, PRBool aIsRoot)
-  : nsHTMLContainerFrame(),
+nsHTMLScrollFrame::nsHTMLScrollFrame(nsIPresShell* aShell, nsStyleContext* aContext, PRBool aIsRoot)
+  : nsHTMLContainerFrame(aContext),
     mInner(this, aIsRoot, PR_FALSE)
 {
 }
@@ -690,9 +690,12 @@ nsHTMLScrollFrame::PlaceScrollArea(const ScrollReflowState& aState)
   // Store the new overflow area. Note that this changes where an outline
   // of the scrolled frame would be painted, but scrolled frames can't have
   // outlines (the outline would go on this scrollframe instead).
-  nsRect* overflowArea = scrolledFrame->GetOverflowAreaProperty(PR_TRUE); 
-  NS_ASSERTION(overflowArea, "should have created rect");
-  *overflowArea = scrolledArea;
+  // Using FinishAndStoreOverflow is needed so NS_FRAME_OUTSIDE_CHILDREN
+  // gets set correctly.  It also messes with the overflow rect in the
+  // -moz-hidden-unscrollable case, but scrolled frames can't have
+  // 'overflow' either.
+  scrolledFrame->FinishAndStoreOverflow(&scrolledArea,
+                                        scrolledFrame->GetSize());
 
   mInner.PostOverflowEvents();
 }
@@ -899,13 +902,13 @@ NS_INTERFACE_MAP_END_INHERITING(nsHTMLContainerFrame)
 //----------nsXULScrollFrame-------------------------------------------
 
 nsIFrame*
-NS_NewXULScrollFrame(nsIPresShell* aPresShell, PRBool aIsRoot)
+NS_NewXULScrollFrame(nsIPresShell* aPresShell, nsStyleContext* aContext, PRBool aIsRoot)
 {
-  return new (aPresShell) nsXULScrollFrame(aPresShell, aIsRoot);
+  return new (aPresShell) nsXULScrollFrame(aPresShell, aContext, aIsRoot);
 }
 
-nsXULScrollFrame::nsXULScrollFrame(nsIPresShell* aShell, PRBool aIsRoot)
-  : nsBoxFrame(aShell, aIsRoot),
+nsXULScrollFrame::nsXULScrollFrame(nsIPresShell* aShell, nsStyleContext* aContext, PRBool aIsRoot)
+  : nsBoxFrame(aShell, aContext, aIsRoot),
     mInner(this, aIsRoot, PR_TRUE),
     mMaxElementWidth(0)
 {
