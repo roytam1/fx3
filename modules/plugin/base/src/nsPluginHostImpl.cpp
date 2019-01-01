@@ -415,7 +415,7 @@ nsActivePlugin::~nsActivePlugin()
       mInstance->Destroy();
 
     NS_RELEASE(mInstance);
-    NS_RELEASE(mPeer);
+    NS_IF_RELEASE(mPeer);
   }
   PL_strfree(mURL);
 }
@@ -3876,7 +3876,7 @@ NS_IMETHODIMP nsPluginHostImpl::TrySetUpPluginInstance(const char *aMimeType,
   // InstantiateEmbeddedPlugin() next), Java plugin will create the proxy JNI
   // if it is not created yet. If that happens, LiveConnect will be broken.
   // Before lazy start JVM was implemented, since at this point the browser
-  // already created the proxy JNI buring startup, the problem did not happen.
+  // already created the proxy JNI during startup, the problem did not happen.
   // But after the lazy start was implemented, at this point the proxy JNI was
   // not created yet, so the Java plugin created the proxy JNI, and broke
   // liveConnect.
