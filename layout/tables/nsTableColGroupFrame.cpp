@@ -173,10 +173,20 @@ nsTableColGroupFrame::GetLastRealColGroup(nsTableFrame* aTableFrame,
 
 // don't set mColCount here, it is done in AddColsToTable
 NS_IMETHODIMP
-nsTableColGroupFrame::SetInitialChildList(nsPresContext* aPresContext,
-                                          nsIAtom*        aListName,
+nsTableColGroupFrame::SetInitialChildList(nsIAtom*        aListName,
                                           nsIFrame*       aChildList)
 {
+  if (!mFrames.IsEmpty()) {
+    // We already have child frames which means we've already been
+    // initialized
+    NS_NOTREACHED("unexpected second call to SetInitialChildList");
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (aListName) {
+    // All we know about is the unnamed principal child list
+    NS_NOTREACHED("unknown frame list");
+    return NS_ERROR_INVALID_ARG;
+  } 
   nsTableFrame* tableFrame = nsTableFrame::GetTableFrame(this);
   if (!tableFrame)
     return NS_ERROR_NULL_POINTER;
@@ -186,7 +196,7 @@ nsTableColGroupFrame::SetInitialChildList(nsPresContext* aPresContext,
     tableFrame->CreateAnonymousColFrames(this, GetSpan(), eColAnonymousColGroup, 
                                          PR_FALSE, nsnull, &firstChild);
     if (firstChild) {
-      SetInitialChildList(aPresContext, aListName, firstChild);
+      SetInitialChildList(aListName, firstChild);
     }
     return NS_OK; 
   }
@@ -270,7 +280,7 @@ nsTableColGroupFrame::RemoveChild(nsTableColFrame& aChild,
     colIndex = aChild.GetColIndex();
     nextChild = aChild.GetNextSibling();
   }
-  if (mFrames.DestroyFrame(GetPresContext(), (nsIFrame*)&aChild)) {
+  if (mFrames.DestroyFrame((nsIFrame*)&aChild)) {
     mColCount--;
     if (aResetSubsequentColIndices) {
       if (nextChild) { // reset inside this and all following colgroups
@@ -316,7 +326,7 @@ nsTableColGroupFrame::RemoveFrame(nsIAtom*        aListName,
     nsTableFrame::AppendDirtyReflowCommand(tableFrame);
   }
   else {
-    mFrames.DestroyFrame(GetPresContext(), aOldFrame);
+    mFrames.DestroyFrame(aOldFrame);
   }
 
   return NS_OK;

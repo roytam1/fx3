@@ -3302,13 +3302,6 @@ nsDOMClassInfo::PostCreate(nsIXPConnectWrappedNative *wrapper,
   }
 #endif
 
-  JSObject *global = GetGlobalJSObject(cx, obj);
-
-  jsval val;
-  if (!::JS_GetProperty(cx, global, mData->mName, &val)) {
-    return NS_ERROR_UNEXPECTED;
-  }
-
   return NS_OK;
 }
 
@@ -4611,14 +4604,18 @@ public:
 
   nsresult Install(JSContext *cx, JSObject *target, jsval thisAsVal)
   {
-    if (!::JS_DefineUCProperty(cx, target,
-                               NS_REINTERPRET_CAST(const jschar *, mClassName),
-                               nsCRT::strlen(mClassName), thisAsVal, nsnull,
-                               nsnull, 0)) {
-      return NS_ERROR_UNEXPECTED;
-    }
-    
-    return NS_OK;
+    PRBool doSecurityCheckInAddProperty =
+      nsDOMClassInfo::sDoSecurityCheckInAddProperty;
+    nsDOMClassInfo::sDoSecurityCheckInAddProperty = PR_FALSE;
+
+    JSBool ok = ::JS_DefineUCProperty(cx, target,
+                                      NS_REINTERPRET_CAST(const jschar *, mClassName),
+                                      nsCRT::strlen(mClassName), thisAsVal, nsnull,
+                                      nsnull, 0);
+
+    nsDOMClassInfo::sDoSecurityCheckInAddProperty =
+      doSecurityCheckInAddProperty;
+    return ok ? NS_OK : NS_ERROR_UNEXPECTED;
   }
 
 private:

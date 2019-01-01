@@ -585,8 +585,7 @@ nsFrame::Init(nsIContent*      aContent,
   return NS_OK;
 }
 
-NS_IMETHODIMP nsFrame::SetInitialChildList(nsPresContext* aPresContext,
-                                           nsIAtom*        aListName,
+NS_IMETHODIMP nsFrame::SetInitialChildList(nsIAtom*        aListName,
                                            nsIFrame*       aChildList)
 {
   // XXX This shouldn't be getting called at all, but currently is for backwards
@@ -625,14 +624,15 @@ nsFrame::RemoveFrame(nsIAtom*        aListName,
   return NS_ERROR_UNEXPECTED;
 }
 
-NS_IMETHODIMP
-nsFrame::Destroy(nsPresContext* aPresContext)
+void
+nsFrame::Destroy()
 {
   // Get the view pointer now before the frame properties disappear
   // when we call NotifyDestroyingFrame()
   nsIView* view = GetView();
+  nsPresContext* presContext = GetPresContext();
 
-  nsIPresShell *shell = aPresContext->GetPresShell();
+  nsIPresShell *shell = presContext->GetPresShell();
   if (shell) {
     NS_ASSERTION(!(mState & NS_FRAME_OUT_OF_FLOW) ||
                  !shell->FrameManager()->GetPlaceholderFrameFor(this),
@@ -648,7 +648,7 @@ nsFrame::Destroy(nsPresContext* aPresContext)
 
   //XXX Why is this done in nsFrame instead of some frame class
   // that actually loads images?
-  aPresContext->StopImagesFor(this);
+  presContext->StopImagesFor(this);
 
   if (view) {
     // Break association between view and frame
@@ -666,8 +666,6 @@ nsFrame::Destroy(nsPresContext* aPresContext)
   // recycler.
   size_t* sz = (size_t*)this;
   shell->FreeFrame(*sz, (void*)this);
-
-  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -2055,6 +2053,7 @@ nsFrame::PeekBackwardAndForward(nsSelectionAmount aAmountBack,
                    PR_TRUE,
                    aJumpLines,
                    PR_TRUE,  //limit on scrolled views
+                   PR_FALSE,
                    PR_FALSE);
   rv = PeekOffset(aPresContext, &startpos);
   if (NS_FAILED(rv))
@@ -2069,6 +2068,7 @@ nsFrame::PeekBackwardAndForward(nsSelectionAmount aAmountBack,
                  PR_FALSE,
                  aJumpLines,
                  PR_TRUE,  //limit on scrolled views
+                 PR_FALSE,
                  PR_FALSE);
   rv = PeekOffset(aPresContext, &endpos);
   if (NS_FAILED(rv))
@@ -4496,9 +4496,11 @@ nsFrame::GetFrameFromDirection(nsPresContext* aPresContext, nsPeekOffsetStruct *
     nsIFrame *firstVisual;
     nsIFrame *lastVisual;
 
-    result = it->CheckLineOrder(thisLine, &lineIsReordered, &firstVisual, &lastVisual);
-    if (NS_FAILED(result))
-      return result;
+    if (aPos->mVisual) {
+      result = it->CheckLineOrder(thisLine, &lineIsReordered, &firstVisual, &lastVisual);
+      if (NS_FAILED(result))
+        return result;
+    }
 
     if (lineIsReordered) {
       firstFrame = firstVisual;
@@ -4575,10 +4577,12 @@ nsFrame::GetFrameFromDirection(nsPresContext* aPresContext, nsPeekOffsetStruct *
   else
     aPos->mStartOffset = -1;
 #ifdef IBMBIDI
-  PRUint8 newLevel = NS_GET_EMBEDDING_LEVEL(traversedFrame);
-  PRUint8 newBaseLevel = NS_GET_BASE_LEVEL(traversedFrame);
-  if ((newLevel & 1) != (newBaseLevel & 1)) // The new frame is reverse-direction, go to the other end
-    aPos->mStartOffset = -1 - aPos->mStartOffset;
+  if (aPos->mVisual) {
+    PRUint8 newLevel = NS_GET_EMBEDDING_LEVEL(traversedFrame);
+    PRUint8 newBaseLevel = NS_GET_BASE_LEVEL(traversedFrame);
+    if ((newLevel & 1) != (newBaseLevel & 1)) // The new frame is reverse-direction, go to the other end
+      aPos->mStartOffset = -1 - aPos->mStartOffset;
+  }
 #endif
   aPos->mResultFrame = traversedFrame;
   return NS_OK;

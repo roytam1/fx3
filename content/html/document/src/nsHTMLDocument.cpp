@@ -122,6 +122,8 @@
 #include "nsIDocumentViewer.h"
 #include "nsIWyciwygChannel.h"
 #include "nsIScriptElement.h"
+#include "nsIScriptError.h"
+#include "nsArray.h"
 
 #include "nsIPrompt.h"
 //AHMED 12-2
@@ -958,8 +960,24 @@ nsHTMLDocument::StartDocumentLoad(const char* aCommand,
 void
 nsHTMLDocument::DocumentWriteTerminationFunc(nsISupports *aRef)
 {
-  nsIDocument *doc = NS_REINTERPRET_CAST(nsIDocument *, aRef);
-  nsHTMLDocument *htmldoc = NS_REINTERPRET_CAST(nsHTMLDocument *, doc);
+  nsCOMPtr<nsIArray> arr = do_QueryInterface(aRef);
+  NS_ASSERTION(arr, "Must have array!");
+
+  nsCOMPtr<nsIDocument> doc = do_QueryElementAt(arr, 0);
+  NS_ASSERTION(doc, "Must have document!");
+  
+  nsCOMPtr<nsIParser> parser = do_QueryElementAt(arr, 1);
+  NS_ASSERTION(parser, "Must have parser!");
+
+  nsHTMLDocument *htmldoc = NS_STATIC_CAST(nsHTMLDocument *,
+                                           NS_STATIC_CAST(nsIDocument*,
+                                                          doc.get()));
+
+  // Check whether htmldoc still has the same parser.  If not, it's
+  // not for us to mess with it.
+  if (htmldoc->mParser != parser) {
+    return;
+  }
 
   // If the document is in the middle of a document.write() call, this
   // most likely means that script on a page document.write()'d out a
@@ -972,7 +990,7 @@ nsHTMLDocument::DocumentWriteTerminationFunc(nsISupports *aRef)
   // script that was written out by document.write().
 
   if (!htmldoc->mWriteLevel && htmldoc->mWriteState != eDocumentOpened) {
-    // Release the documents parser so that the call to EndLoad()
+    // Release the document's parser so that the call to EndLoad()
     // doesn't just return early and set the termination function again.
 
     htmldoc->mParser = nsnull;
@@ -1010,15 +1028,25 @@ nsHTMLDocument::EndLoad()
           //   document.write("foo");
           //   location.href = "http://www.mozilla.org";
           //   document.write("bar");
-          
-          nsresult rv =
-            scx->SetTerminationFunction(DocumentWriteTerminationFunc,
-                                        NS_STATIC_CAST(nsIDocument *, this));
-          // If we fail to set the termination function, just go ahead
-          // and EndLoad now.  The slight bugginess involved is better
-          // than leaking.
+
+          nsCOMPtr<nsIMutableArray> arr;
+          nsresult rv = NS_NewArray(getter_AddRefs(arr));
           if (NS_SUCCEEDED(rv)) {
-            return;
+            rv = arr->AppendElement(NS_STATIC_CAST(nsIDocument*, this),
+                                    PR_FALSE);
+            if (NS_SUCCEEDED(rv)) {
+              rv = arr->AppendElement(mParser, PR_FALSE);
+              if (NS_SUCCEEDED(rv)) {
+                rv = scx->SetTerminationFunction(DocumentWriteTerminationFunc,
+                                                 arr);
+                // If we fail to set the termination function, just go ahead
+                // and EndLoad now.  The slight bugginess involved is better
+                // than leaking.
+                if (NS_SUCCEEDED(rv)) {
+                  return;
+                }
+              }
+            }
           }
         }
       }
@@ -2906,28 +2934,37 @@ nsHTMLDocument::GetSelection(nsAString& aReturn)
   return rv;
 }
 
+static void
+ReportUseOfDeprecatedMethod(nsHTMLDocument* aDoc, const char* aWarning)
+{
+  nsContentUtils::ReportToConsole(nsContentUtils::eDOM_PROPERTIES,
+                                  aWarning,
+                                  nsnull, 0,
+                                  NS_STATIC_CAST(nsIDocument*, aDoc)->
+                                    GetDocumentURI(),
+                                  EmptyString(), 0, 0,
+                                  nsIScriptError::warningFlag,
+                                  "HTML Document");
+}
+
 NS_IMETHODIMP
 nsHTMLDocument::CaptureEvents(PRInt32 aEventFlags)
 {
-  nsCOMPtr<nsIEventListenerManager> manager;
-  nsresult rv = GetListenerManager(PR_TRUE, getter_AddRefs(manager));
-  NS_ENSURE_SUCCESS(rv, rv);
-  return manager->CaptureEvent(aEventFlags);
+  ReportUseOfDeprecatedMethod(this, "UseOfCaptureEventsWarning");
+  return NS_OK;
 }
 
 NS_IMETHODIMP
 nsHTMLDocument::ReleaseEvents(PRInt32 aEventFlags)
 {
-  nsCOMPtr<nsIEventListenerManager> manager;
-  nsresult rv = GetListenerManager(PR_FALSE, getter_AddRefs(manager));
-  NS_ENSURE_SUCCESS(rv, rv);
-  return manager ? manager->ReleaseEvent(aEventFlags) : NS_OK;
+  ReportUseOfDeprecatedMethod(this, "UseOfReleaseEventsWarning");
+  return NS_OK;
 }
 
 NS_IMETHODIMP
 nsHTMLDocument::RouteEvent(nsIDOMEvent* aEvt)
 {
-  //XXX Not the best solution -joki
+  ReportUseOfDeprecatedMethod(this, "UseOfRouteEventWarning");
   return NS_OK;
 }
 

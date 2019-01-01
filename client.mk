@@ -114,8 +114,10 @@ AVAILABLE_PROJECTS = \
   macbrowser \
   $(NULL)
 
+# Trailing / on top-level mozilla dir required to stop fast-update thinking
+# it is a module name.
 MODULES_NS_core :=                              \
-  mozilla                                       \
+  mozilla/                                      \
   mozilla/js                                    \
   mozilla/js/src                                \
   mozilla/js/jsd                                \
@@ -364,7 +366,7 @@ MODULES_all :=                                  \
 #MOZ_CO_TAG          = <tag>
 NSPR_CO_TAG          = NSPRPUB_PRE_4_2_CLIENT_BRANCH
 NSS_CO_TAG           = NSS_3_11_20060403_TAG
-LDAPCSDK_CO_TAG      = ldapcsdk_50_client_branch
+LDAPCSDK_CO_TAG      = ldapcsdk_5_17_client_branch
 LOCALES_CO_TAG       =
 
 BUILD_MODULES = all

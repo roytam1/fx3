@@ -38,15 +38,15 @@
 
 #include "nscore.h"
 #include "nsScreen.h"
-#include "nsIDOMWindow.h"
+#include "nsPIDOMWindow.h"
 #include "nsIScriptGlobalObject.h"
 #include "nsIDocShell.h"
 #include "nsIDeviceContext.h"
+#include "nsPresContext.h"
 #include "nsCOMPtr.h"
+#include "nsIDocumentViewer.h"
 #include "nsDOMClassInfo.h"
-#include "nsIBaseWindow.h"
-#include "nsIWidget.h"
-
+#include "nsIInterfaceRequestorUtils.h"
 
 //
 //  Screen class implementation
@@ -201,23 +201,33 @@ nsScreen::GetDeviceContext()
   if(!mDocShell)
     return nsnull;
 
-  nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(mDocShell);
-  if (!baseWindow)
+  // Now make sure our size is up to date.  That will mean that the device
+  // context does the right thing on multi-monitor systems when we return it to
+  // the caller.  It will also make sure that our prescontext has been created,
+  // if we're supposed to have one.
+  nsCOMPtr<nsPIDOMWindow> win = do_GetInterface(mDocShell);
+  if (!win) {
+    // No reason to go on
+    return nsnull;
+  }
+
+  win->EnsureSizeUpToDate();
+  
+  nsCOMPtr<nsIContentViewer> contentViewer;
+  mDocShell->GetContentViewer(getter_AddRefs(contentViewer));
+
+  nsCOMPtr<nsIDocumentViewer> docViewer(do_QueryInterface(contentViewer));
+  if(!docViewer)
     return nsnull;
 
-  nsCOMPtr<nsIWidget> widget;
-  baseWindow->GetMainWidget(getter_AddRefs(widget));
-  if (!widget)
-    return nsnull;
+  nsCOMPtr<nsPresContext> presContext;
+  docViewer->GetPresContext(getter_AddRefs(presContext));
 
-  // nsIWidget::GetDeviceContext addrefs, this method doesn't.
-  // Release before returning the pointer.
-  nsIDeviceContext *dc = widget->GetDeviceContext();
-  if (!dc)
-    return nsnull;
+  nsIDeviceContext* context = nsnull;
+  if(presContext)
+    context = presContext->DeviceContext();
 
-  dc->Release();
-  return dc;
+  return context;
 }
 
 nsresult

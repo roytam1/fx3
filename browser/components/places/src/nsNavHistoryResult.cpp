@@ -2205,6 +2205,19 @@ nsNavHistoryQueryResultNode::OnPageChanged(nsIURI *aURI, PRUint32 aWhat,
 }
 
 
+// nsNavHistoryQueryResultNode::OnPageExpired
+//
+//    Do nothing. Perhaps we want to handle this case. If so, add the call to
+//    the result to enumerate the history observers.
+
+NS_IMETHODIMP
+nsNavHistoryQueryResultNode::OnPageExpired(nsIURI* aURI, PRTime aVisitTime,
+                                           PRBool aWholeEntry)
+{
+  return NS_OK;
+}
+
+
 // nsNavHistoryQueryResultNode bookmark observers
 //
 //    These are the bookmark observer functions for query nodes. They listen
@@ -3269,6 +3282,10 @@ nsNavHistoryResult::AddEverythingObserver(nsNavHistoryQueryResultNode* aNode)
       history->AddObserver(this, PR_TRUE);
       mIsHistoryObserver = PR_TRUE;
   }
+  if (mEverythingObservers.IndexOf(aNode) != mEverythingObservers.NoIndex) {
+    NS_NOTREACHED("Attempting to register an observer twice!");
+    return;
+  }
   mEverythingObservers.AppendElement(aNode);
 }
 
@@ -3291,6 +3308,10 @@ nsNavHistoryResult::AddBookmarkObserver(nsNavHistoryFolderResultNode* aNode,
     mIsBookmarksObserver = PR_TRUE;
   }
   FolderObserverList* list = BookmarkObserversForId(aFolder, PR_TRUE);
+  if (list->IndexOf(aNode) != list->NoIndex) {
+    NS_NOTREACHED("Attempting to register an observer twice!");
+    return;
+  }
   list->AppendElement(aNode);
 }
 
@@ -3705,6 +3726,20 @@ nsNavHistoryResult::OnPageChanged(nsIURI *aURI,
   return NS_OK;
 }
 
+
+// nsNavHistoryResult;:OnPageExpired (nsINavHistoryObserver)
+//
+//    Don't do anything when pages expire. Perhaps we want to find the item
+//    to delete it.
+
+NS_IMETHODIMP
+nsNavHistoryResult::OnPageExpired(nsIURI* aURI, PRTime aVisitTime,
+                                  PRBool aWholeEntry)
+{
+  return NS_OK;
+}
+
+
 // nsNavHistoryResultTreeViewer ************************************************
 
 NS_IMPL_ADDREF(nsNavHistoryResultTreeViewer)
@@ -3771,6 +3806,36 @@ nsNavHistoryResultTreeViewer::ComputeShowSessions()
     return;
 
   mShowSessions = PR_TRUE;
+}
+
+
+// nsNavHistoryResultTreeViewer::GetRowSessionStatus
+
+nsNavHistoryResultTreeViewer::SessionStatus
+nsNavHistoryResultTreeViewer::GetRowSessionStatus(PRInt32 row)
+{
+  NS_ASSERTION(row >= 0 && row < PRInt32(mVisibleElements.Length()),
+               "Invalid row!");
+
+  nsNavHistoryResultNode *node = mVisibleElements[row];
+  if (! node->IsVisit())
+    return Session_None; // not a visit, so there are no sessions
+  nsNavHistoryVisitResultNode* visit = node->GetAsVisit();
+
+  if (visit->mSessionId != 0) {
+    if (row == 0) {
+      return Session_Start;
+    } else {
+      nsNavHistoryResultNode* previousNode = mVisibleElements[row - 1];
+      if (previousNode->IsVisit() &&
+          visit->mSessionId != previousNode->GetAsVisit()->mSessionId) {
+        return Session_Start;
+      } else {
+        return Session_Continue;
+      }
+    }
+  }
+  return Session_None;
 }
 
 
@@ -4581,22 +4646,19 @@ NS_IMETHODIMP nsNavHistoryResultTreeViewer::GetRowProperties(PRInt32 row,
   // Next handle properties for session information.
   if (! mShowSessions)
     return NS_OK; // don't need to bother to compute session boundaries
-  if (! node->IsVisit())
-    return NS_OK; // not a visit, so there are no sessions
 
-  nsNavHistoryVisitResultNode* visit = node->GetAsVisit();
-  if (visit->mSessionId != 0) {
-    if (row == 0) {
+  switch (GetRowSessionStatus(row))
+  {
+    case Session_Start:
       properties->AppendElement(nsNavHistory::sSessionStartAtom);
-    } else {
-      nsNavHistoryResultNode* previousNode = mVisibleElements[row - 1];
-      if (previousNode->IsVisit() &&
-          visit->mSessionId != previousNode->GetAsVisit()->mSessionId) {
-        properties->AppendElement(nsNavHistory::sSessionStartAtom);
-      } else {
-        properties->AppendElement(nsNavHistory::sSessionContinueAtom);
-      }
-    }
+      break;
+    case Session_Continue:
+      properties->AppendElement(nsNavHistory::sSessionContinueAtom);
+      break;
+    case Session_None:
+      break;
+    default: 
+      NS_NOTREACHED("Invalid session type");
   }
   return NS_OK;
 }
@@ -4902,7 +4964,10 @@ NS_IMETHODIMP nsNavHistoryResultTreeViewer::GetCellText(PRInt32 row,
         // information I know how to use. Only show this for URI-based items.
         _retval.Truncate(0);
       } else {
-        return FormatFriendlyTime(node->mTime, _retval);
+        if (GetRowSessionStatus(row) != Session_Continue)
+          return FormatFriendlyTime(node->mTime, _retval);
+        _retval.Truncate(0);
+        break;
       }
       break;
     }
@@ -5139,7 +5204,7 @@ nsNavHistoryResultTreeViewer::FormatFriendlyTime(PRTime aTime,
    * To enable, you'll need to put these in places.properties:
    *   0MinutesAgo=<1 minute ago
    *   1MinutesAgo=1 minute ago
-   *   XMinutesAgo=%s minutes ago
+   *   XMinutesAgo=%S minutes ago
 
   static const PRInt64 minuteThreshold = (PRInt64)1000000 * 60 * 60;
   if (ago > -10000000 && ago < minuteThreshold) {

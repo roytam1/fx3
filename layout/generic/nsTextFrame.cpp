@@ -262,7 +262,7 @@ public:
                               
   void PaintText(nsIRenderingContext& aRenderingContext, nsPoint aPt);
   
-  NS_IMETHOD Destroy(nsPresContext* aPresContext);
+  virtual void Destroy();
   
   NS_IMETHOD GetCursor(const nsPoint& aPoint,
                        nsIFrame::Cursor& aCursor);
@@ -1391,14 +1391,14 @@ NS_IMETHODIMP nsTextFrame::GetAccessible(nsIAccessible** aAccessible)
 
 
 //-----------------------------------------------------------------------------
-NS_IMETHODIMP
-nsTextFrame::Destroy(nsPresContext* aPresContext)
+void
+nsTextFrame::Destroy()
 {
   if (mNextContinuation) {
     mNextContinuation->SetPrevInFlow(nsnull);
   }
   // Let the base class destroy the frame
-  return nsFrame::Destroy(aPresContext);
+  nsFrame::Destroy();
 }
 
 class nsContinuingTextFrame : public nsTextFrame {
@@ -1409,7 +1409,7 @@ public:
                   nsIFrame*        aParent,
                   nsIFrame*        aPrevInFlow);
 
-  NS_IMETHOD Destroy(nsPresContext* aPresContext);
+  virtual void Destroy();
 
   virtual nsIFrame* GetPrevContinuation() const {
     return mPrevContinuation;
@@ -1485,14 +1485,14 @@ nsContinuingTextFrame::Init(nsIContent*      aContent,
   return rv;
 }
 
-NS_IMETHODIMP
-nsContinuingTextFrame::Destroy(nsPresContext* aPresContext)
+void
+nsContinuingTextFrame::Destroy()
 {
   if (mPrevContinuation || mNextContinuation) {
     nsSplittableFrame::RemoveFromFlow(this);
   }
   // Let the base class destroy the frame
-  return nsFrame::Destroy(aPresContext);
+  nsFrame::Destroy();
 }
 
 nsIFrame*
@@ -4515,7 +4515,7 @@ nsTextFrame::PeekOffset(nsPresContext* aPresContext, nsPeekOffsetStruct *aPos)
   // one "on the left" - the first frame on the next
   // line.
   //
-  // Note:
+  // Note (for visual caret movement):
   // eDirPrevious means 'left-then-up' if the containing block is LTR, 
   // 'right-then-up' if it is RTL.
   // eDirNext means 'right-then-down' if the containing block is LTR, 
@@ -4524,7 +4524,8 @@ nsTextFrame::PeekOffset(nsPresContext* aPresContext, nsPeekOffsetStruct *aPos)
   // previous paragraph", and eDirNext means "go to the visual beginning of 
   // the next paragraph"
 
-  PRBool isReverseDirection = (NS_GET_EMBEDDING_LEVEL(this) & 1) != (NS_GET_BASE_LEVEL(this) & 1);
+  PRBool isReverseDirection = aPos->mVisual ?
+    (NS_GET_EMBEDDING_LEVEL(this) & 1) != (NS_GET_BASE_LEVEL(this) & 1) : PR_FALSE;
   PRBool movementIsInFrameDirection = 
     ((aPos->mDirection == eDirNext) && !isReverseDirection) ||
     ((aPos->mDirection == eDirPrevious) && isReverseDirection);
@@ -4598,15 +4599,7 @@ nsTextFrame::PeekOffset(nsPresContext* aPresContext, nsPeekOffsetStruct *aPos)
   switch (aPos->mAmount){
     case eSelectNoAmount:
     {
-      // Transform text from content into renderable form
-      nsIDocument* doc = mContent->GetDocument();
-      if (!doc) {
-        return NS_OK;
-      }
-      nsTextTransformer tx(aPresContext);
-      PrepareUnicodeText(tx, &indexBuffer, &paintBuffer, &textLength);
-
-      if (textLength)//if no renderable length, you can't park here.
+      if (!IsEmpty()) //if no renderable length, you can't park here.
       {
         aPos->mContentOffset = aPos->mStartOffset;
         result = NS_OK;

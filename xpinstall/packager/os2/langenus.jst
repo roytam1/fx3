@@ -2,9 +2,8 @@
 var srDest;
 var err;
 var fProgram;
-var platformNode;
 
-platformNode = getPlatform();
+var platformNode = getPlatform();
 /* BEGIN TEMPORARY UNTIL xpinstall/packager/common/share.t is fixed*/
 platformNode = "win";
 /* END TEMPORARY */
@@ -14,12 +13,10 @@ logComment("initInstall: platformNode=" + platformNode);
 
 // ----LOCALIZATION NOTE: translate only these ------
 var prettyName = "English (US) Language Pack";
-var langcode = "en";
-var chromeNode = langcode + "-US";
+var chromeNode = "en-US";
 // --- END CHANGABLE STUFF ---
 var regName    = "locales/mozilla/" + chromeNode;
 var chromeName = chromeNode + ".jar";
-var platformName = langcode + "-" + platformNode + ".jar";
 var localeName = "locale/" + chromeNode + "/";
 
 srDest = $SpaceRequired$:bin;
@@ -56,7 +53,6 @@ if(verifyDiskSpace(fProgram, srDest))
   {
     // register chrome
     var cf = getFolder(fProgram, "chrome/"+chromeName);
-    var pf = getFolder(fProgram, "chrome/"+platformName);
 
     registerChrome(chromeType, cf, localeName + "global/");
     registerChrome(chromeType, cf, localeName + "communicator/");
@@ -72,15 +68,20 @@ if(verifyDiskSpace(fProgram, srDest))
     registerChrome(chromeType, cf, localeName + "autoconfig/");
     registerChrome(chromeType, cf, localeName + "cookie/");
     registerChrome(chromeType, cf, localeName + "wallet/");
-    registerChrome(chromeType, cf, localeName + "content-packs/");
     registerChrome(chromeType, cf, localeName + "help/");
     registerChrome(chromeType, cf, localeName + "pippki/");
     registerChrome(chromeType, cf, localeName + "pipnss/");
     registerChrome(chromeType, cf, localeName + "p3p/");
 
-    registerChrome(chromeType, pf, localeName + "global-platform/");
-    registerChrome(chromeType, pf, localeName + "communicator-platform/");
-    registerChrome(chromeType, pf, localeName + "navigator-platform/");
+    registerChrome(chromeType, cf, localeName + "global-region/");
+    registerChrome(chromeType, cf, localeName + "communicator-region/");
+    registerChrome(chromeType, cf, localeName + "editor-region/");
+    registerChrome(chromeType, cf, localeName + "messenger-region/");
+    registerChrome(chromeType, cf, localeName + "navigator-region/");
+
+    registerChrome(chromeType, cf, localeName + "global-platform/" + platformNode + "/");
+    registerChrome(chromeType, cf, localeName + "communicator-platform/" + platformNode + "/");
+    registerChrome(chromeType, cf, localeName + "navigator-platform/" + platformNode + "/");
  
     err = performInstall(); 
     logComment("performInstall() returned: " + err);

@@ -45,6 +45,8 @@ include $(DEPTH)/config/autoconf.mk
 
 DIRS		= \
 		branding \
+		common \
+		locales \
 		$(NULL)
 
 # XXX Once SeaMonkey becomes a fully fledged xul app, we can remove

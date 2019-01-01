@@ -886,7 +886,10 @@ VFY_VerifyDigestWithAlgorithmID;
 ;+};
 ;+NSS_3.11.1 {
 ;+    global:
+SEC_ASN1EncodeUnsignedInteger;
 SEC_RegisterDefaultHttpClient;
+NSS_RegisterShutdown;
+NSS_UnregisterShutdown;
 ;+    local:
 ;+       *;
 ;+};
