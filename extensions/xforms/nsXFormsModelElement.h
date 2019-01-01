@@ -269,6 +269,12 @@ public:
 
   static nsresult NeedsPostRefresh(nsIXFormsControl* aControl);
   static void CancelPostRefresh(nsIXFormsControl* aControl);
+
+  /**
+   * Returns the DOM element for the model.
+   */
+  already_AddRefed<nsIDOMElement> GetDOMElement();
+
 private:
 
   NS_HIDDEN_(already_AddRefed<nsIDOMDocument>)
@@ -343,7 +349,10 @@ private:
   NS_HIDDEN_(nsresult) HandleUnload(nsIDOMEvent *aEvent);
 
   NS_HIDDEN_(nsresult) RefreshSubTree(nsXFormsControlListItem *aCurrent,
-                                      PRBool                    aForceRebind);
+                                      PRBool                   aForceRebind);
+
+  NS_HIDDEN_(nsresult) ValidateDocument(nsIDOMDocument *aInstanceDocument,
+                                        PRBool         *aResult);
 
   nsIDOMElement            *mElement;
   nsCOMPtr<nsISchemaLoader> mSchemas;
