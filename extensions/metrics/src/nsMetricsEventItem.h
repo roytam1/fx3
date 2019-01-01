@@ -40,9 +40,9 @@
 #define nsMetricsEventItem_h__
 
 #include "nsIMetricsService.h"
-#include "nsCOMArray.h"
+#include "nsTArray.h"
 #include "nsCOMPtr.h"
-#include "nsString.h"
+#include "nsStringAPI.h"
 
 class nsIPropertyBag;
 
@@ -63,7 +63,7 @@ class nsMetricsEventItem : public nsIMetricsEventItem
   nsString mNamespace;
   nsString mName;
   nsCOMPtr<nsIPropertyBag> mProperties;
-  nsCOMArray<nsIMetricsEventItem> mChildren;
+  nsTArray< nsCOMPtr<nsIMetricsEventItem> > mChildren;
 };
 
 #endif  // nsMetricsEventItem_h__

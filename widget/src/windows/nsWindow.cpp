@@ -530,7 +530,9 @@ static PRBool is_vk_down(int vk)
 //
 #ifndef WM_APPCOMMAND
 #define WM_APPCOMMAND  0x0319
+#endif
 
+#ifndef APPCOMMAND_BROWSER_BACKWARD
 #define APPCOMMAND_BROWSER_BACKWARD       1
 #define APPCOMMAND_BROWSER_FORWARD        2
 #define APPCOMMAND_BROWSER_REFRESH        3
@@ -567,7 +569,7 @@ static PRBool is_vk_down(int vk)
 //#define GET_FLAGS_LPARAM(lParam)      (LOWORD(lParam))
 //#define GET_KEYSTATE_LPARAM(lParam)   GET_FLAGS_LPARAM(lParam)
 
-#endif  // #ifndef WM_APPCOMMAND
+#endif  // #ifndef APPCOMMAND_BROWSER_BACKWARD
 
 static PRBool LangIDToCP(WORD aLangID, UINT& oCP)
 {
@@ -4586,11 +4588,11 @@ PRBool nsWindow::ProcessMessage(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT 
           break;
         }
       }
-#else
+#endif
       // check whether IME window do mouse operation
       if (IMEMouseHandling(NS_MOUSE_LEFT_BUTTON_DOWN, IMEMOUSE_LDOWN, lParam))
         break;
-#endif
+
       result = DispatchMouseEvent(NS_MOUSE_LEFT_BUTTON_DOWN, wParam, lParam);
       DispatchPendingEvents();
     }
@@ -4784,7 +4786,7 @@ PRBool nsWindow::ProcessMessage(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT 
 #ifdef ACCESSIBILITY
       if (nsWindow::gIsAccessibilityOn) {
         // Create it for the first time so that it can start firing events
-        GetRootAccessible();
+        nsCOMPtr<nsIAccessible> rootAccessible = GetRootAccessible();
       }
 #endif
 
@@ -5026,7 +5028,6 @@ PRBool nsWindow::ProcessMessage(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT 
     case WM_INPUTLANGCHANGE:
       result = OnInputLangChange((HKL)lParam, aRetValue);
       break;
-#endif
 
     case WM_IME_STARTCOMPOSITION:
       result = OnIMEStartComposition();
@@ -5064,7 +5065,6 @@ PRBool nsWindow::ProcessMessage(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT 
       result = OnIMESetContext(wParam, lParam);
       break;
 
-#ifndef WINCE
     case WM_DROPFILES:
     {
 #if 0
@@ -5107,13 +5107,13 @@ PRBool nsWindow::ProcessMessage(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT 
       LRESULT lAcc = 0;
       IAccessible *msaaAccessible = NULL;
       if (lParam == OBJID_CLIENT) { // oleacc.dll will be loaded dynamically
-        nsIAccessible *rootAccessible = GetRootAccessible(); // Held by a11y cache
+        nsCOMPtr<nsIAccessible> rootAccessible = GetRootAccessible(); // Held by a11y cache
         if (rootAccessible) {
           rootAccessible->GetNativeInterface((void**)&msaaAccessible); // does an addref
         }
       }
       else if (lParam == OBJID_CARET) {  // each root accessible owns a caret accessible
-        nsIAccessible *rootAccessible = GetRootAccessible();  // Held by a11y cache
+        nsCOMPtr<nsIAccessible> rootAccessible = GetRootAccessible();  // Held by a11y cache
         nsCOMPtr<nsIAccessibleDocument> accDoc(do_QueryInterface(rootAccessible));
         if (accDoc) {
           nsCOMPtr<nsIAccessible> accessibleCaret;
@@ -5362,18 +5362,13 @@ LPCWSTR nsWindow::WindowClassW()
     WNDCLASSW wc;
 
 //    wc.style         = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
+    wc.style         = CS_DBLCLKS;
     wc.lpfnWndProc   = nsWindow::DefaultWindowProc;
     wc.cbClsExtra    = 0;
     wc.cbWndExtra    = 0;
     wc.hInstance     = nsToolkit::mDllInstance;
-#ifdef WINCE
-    wc.style         = 0;
-    wc.hIcon         = NULL;
-#else
-    wc.style         = CS_DBLCLKS;
     // XXX : we don't need LoadIconW for now (see bug 171349, comment 181)
     wc.hIcon         = ::LoadIcon(::GetModuleHandle(NULL), IDI_APPLICATION);
-#endif
     wc.hCursor       = NULL;
     wc.hbrBackground = mBrush;
     wc.lpszMenuName  = NULL;
@@ -5430,22 +5425,13 @@ LPCWSTR nsWindow::WindowPopupClassW()
   if (!nsWindow::sIsPopupClassRegistered) {
     WNDCLASSW wc;
 
-#ifndef WINCE
     wc.style = CS_DBLCLKS | CS_XP_DROPSHADOW;
-#else
-    wc.style = 0;
-#endif
-
     wc.lpfnWndProc   = nsWindow::DefaultWindowProc;
     wc.cbClsExtra    = 0;
     wc.cbWndExtra    = 0;
     wc.hInstance     = nsToolkit::mDllInstance;
-#ifdef WINCE
-    wc.hIcon         = NULL;
-#else
     // XXX : we don't need LoadIconW for now (see bug 171349, comment 181)
     wc.hIcon         = ::LoadIcon(::GetModuleHandle(NULL), IDI_APPLICATION);
-#endif
     wc.hCursor       = NULL;
     wc.hbrBackground = mBrush;
     wc.lpszMenuName  = NULL;
@@ -7547,6 +7533,7 @@ NS_IMETHODIMP nsWindow::CancelIMEComposition()
 PRBool
 nsWindow::IMEMouseHandling(PRUint32 aEventType, PRInt32 aAction, LPARAM lParam)
 {
+#ifndef WINCE
   POINT ptPos;
   ptPos.x = (short)LOWORD(lParam);
   ptPos.y = (short)HIWORD(lParam);
@@ -7566,6 +7553,7 @@ nsWindow::IMEMouseHandling(PRUint32 aEventType, PRInt32 aAction, LPARAM lParam)
       }
     }
   }
+#endif
   return PR_FALSE;
 }
 
@@ -8134,7 +8122,7 @@ nsWindow :: DealWithPopups ( HWND inWnd, UINT inMsg, WPARAM inWParam, LPARAM inL
 
 
 #ifdef ACCESSIBILITY
-nsIAccessible* nsWindow::GetRootAccessible()
+already_AddRefed<nsIAccessible> nsWindow::GetRootAccessible()
 {
   nsWindow::gIsAccessibilityOn = TRUE;
 

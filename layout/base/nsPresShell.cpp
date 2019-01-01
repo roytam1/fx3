@@ -406,10 +406,6 @@ protected:
 #define NS_MAX_REFLOW_TIME    1000000
 static PRInt32 gMaxRCProcessingTime = -1;
 
-// Set to true to enable async reflow during document load.
-// This flag is initialized from the layout.reflow.async.duringDocLoad pref.
-static PRBool gAsyncReflowDuringDocLoad = PR_FALSE;
-
 // Largest chunk size we recycle
 static const size_t gMaxRecycledSize = 400;
 
@@ -1780,10 +1776,6 @@ PresShell::Init(nsIDocument* aDocument,
     gMaxRCProcessingTime =
       nsContentUtils::GetIntPref("layout.reflow.timeslice",
                                  NS_MAX_REFLOW_TIME);
-
-    gAsyncReflowDuringDocLoad =
-      nsContentUtils::GetBoolPref("layout.reflow.async.duringDocLoad",
-                                  PR_TRUE);
   }
 
   {
@@ -3668,13 +3660,12 @@ PresShell::AppendReflowCommand(nsIFrame*    aTargetFrame,
     delete command;
   }
 
-  // For async reflow during doc load, post a reflow event if we are not batching reflow commands.
-  // For sync reflow during doc load, post a reflow event if we are not batching reflow commands
-  // and the document is not loading.
-  if ((gAsyncReflowDuringDocLoad && !mBatchReflows) ||
-      (!gAsyncReflowDuringDocLoad && !mBatchReflows && !mDocumentLoading)) {
+  // Post a reflow event if we are not batching reflow commands.
+  if (!mBatchReflows) {
     // If we're in the middle of a drag, process it right away (needed for mac,
     // might as well do it on all platforms just to keep the code paths the same).
+    // XXXbz but how does this actually "process it right away"?
+    // Isn't this more like "never process it"?
     if ( !IsDragInProgress() )
       PostReflowEvent();
   }
@@ -6460,11 +6451,7 @@ PresShell::DidCauseReflow()
   if (--mChangeNestCount == 0) {
     // We may have had more reflow commands appended to the queue during
     // our reflow.  Make sure these get processed at some point.
-    if (!gAsyncReflowDuringDocLoad && mDocumentLoading) {
-      FlushPendingNotifications(Flush_Layout);
-    } else {
-      PostReflowEvent();
-    }
+    PostReflowEvent();
   }
 
   return NS_OK;
@@ -6523,54 +6510,57 @@ PresShell::ProcessReflowCommands(PRBool aInterruptible)
     mDocument->BeginUpdate(UPDATE_ALL);
     mDocument->EndUpdate(UPDATE_ALL);
 
-    AUTO_LAYOUT_PHASE_ENTRY_POINT(GetPresContext(), Reflow);
-    mIsReflowing = PR_TRUE;
+    // Scope for the reflow entry point
+    {
+      AUTO_LAYOUT_PHASE_ENTRY_POINT(GetPresContext(), Reflow);
+      mIsReflowing = PR_TRUE;
 
-    do {
-      // Coalesce the reflow commands into a tree.
-      IncrementalReflow reflow;
-      for (PRInt32 i = mReflowCommands.Count() - 1; i >= 0; --i) {
-        nsHTMLReflowCommand *command =
-          NS_STATIC_CAST(nsHTMLReflowCommand *, mReflowCommands[i]);
+      do {
+        // Coalesce the reflow commands into a tree.
+        IncrementalReflow reflow;
+        for (PRInt32 i = mReflowCommands.Count() - 1; i >= 0; --i) {
+          nsHTMLReflowCommand *command =
+            NS_STATIC_CAST(nsHTMLReflowCommand *, mReflowCommands[i]);
 
-        IncrementalReflow::AddCommandResult res =
-          reflow.AddCommand(mPresContext, command);
-        if (res == IncrementalReflow::eEnqueued ||
-            res == IncrementalReflow::eCancel) {
-          // Remove the command from the queue.
-          mReflowCommands.RemoveElementAt(i);
-          ReflowCommandRemoved(command);
-          if (res == IncrementalReflow::eCancel)
-            delete command;
-        }
-        else {
-          // The reflow command couldn't be added to the tree; leave
-          // it in the queue, and we'll handle it next time.
+          IncrementalReflow::AddCommandResult res =
+            reflow.AddCommand(mPresContext, command);
+          if (res == IncrementalReflow::eEnqueued ||
+              res == IncrementalReflow::eCancel) {
+            // Remove the command from the queue.
+            mReflowCommands.RemoveElementAt(i);
+            ReflowCommandRemoved(command);
+            if (res == IncrementalReflow::eCancel)
+              delete command;
+          }
+          else {
+            // The reflow command couldn't be added to the tree; leave
+            // it in the queue, and we'll handle it next time.
 #ifdef DEBUG
-          printf("WARNING: Couldn't add reflow command, so splitting.\n");
+            printf("WARNING: Couldn't add reflow command, so splitting.\n");
 #endif
+          }
         }
-      }
 
 #ifdef DEBUG
-      if (VERIFY_REFLOW_NOISY_RC & gVerifyReflowFlags) {
-        printf("Incremental reflow tree:\n");
-        reflow.Dump(mPresContext);
-      }
+        if (VERIFY_REFLOW_NOISY_RC & gVerifyReflowFlags) {
+          printf("Incremental reflow tree:\n");
+          reflow.Dump(mPresContext);
+        }
 #endif
 
-      // Dispatch an incremental reflow.
-      reflow.Dispatch(mPresContext, desiredSize, maxSize, *rcx);
+        // Dispatch an incremental reflow.
+        reflow.Dispatch(mPresContext, desiredSize, maxSize, *rcx);
 
-      // Keep going until we're out of reflow commands, or we've run
-      // past our deadline.
-    } while (mReflowCommands.Count() &&
-             (!aInterruptible || PR_IntervalNow() < deadline));
+        // Keep going until we're out of reflow commands, or we've run
+        // past our deadline.
+      } while (mReflowCommands.Count() &&
+               (!aInterruptible || PR_IntervalNow() < deadline));
 
-    // XXXwaterson for interruptible reflow, examine the tree and
-    // re-enqueue any unflowed reflow targets.
+      // XXXwaterson for interruptible reflow, examine the tree and
+      // re-enqueue any unflowed reflow targets.
 
-    mIsReflowing = PR_FALSE;
+      mIsReflowing = PR_FALSE;
+    }
 
     NS_IF_RELEASE(rcx);
 
@@ -6646,34 +6636,32 @@ nsresult
 PresShell::ReflowCommandAdded(nsHTMLReflowCommand* aRC)
 {
 
-  if (gAsyncReflowDuringDocLoad) {
-    NS_PRECONDITION(mRCCreatedDuringLoad >= 0, "PresShell's reflow command queue is in a bad state.");
-    if (mDocumentLoading) {
-      aRC->AddFlagBits(NS_RC_CREATED_DURING_DOCUMENT_LOAD);
-      mRCCreatedDuringLoad++;
+  NS_PRECONDITION(mRCCreatedDuringLoad >= 0, "PresShell's reflow command queue is in a bad state.");
+  if (mDocumentLoading) {
+    aRC->AddFlagBits(NS_RC_CREATED_DURING_DOCUMENT_LOAD);
+    mRCCreatedDuringLoad++;
 
 #ifdef PR_LOGGING
-      if (PR_LOG_TEST(gLog, PR_LOG_DEBUG)) {
-        nsIFrame* target;
-        aRC->GetTarget(target);
+    if (PR_LOG_TEST(gLog, PR_LOG_DEBUG)) {
+      nsIFrame* target;
+      aRC->GetTarget(target);
 
-        nsIAtom* type = target->GetType();
-        NS_ASSERTION(type, "frame didn't override GetType()");
+      nsIAtom* type = target->GetType();
+      NS_ASSERTION(type, "frame didn't override GetType()");
 
-        nsAutoString typeStr(NS_LITERAL_STRING("unknown"));
-        if (type)
-          type->ToString(typeStr);
+      nsAutoString typeStr(NS_LITERAL_STRING("unknown"));
+      if (type)
+        type->ToString(typeStr);
 
-        PR_LOG(gLog, PR_LOG_DEBUG,
-               ("presshell=%p, ReflowCommandAdded(%p) target=%p[%s] mRCCreatedDuringLoad=%d\n",
-                this, aRC, target, NS_ConvertUTF16toUTF8(typeStr).get(), mRCCreatedDuringLoad));
-      }
+      PR_LOG(gLog, PR_LOG_DEBUG,
+             ("presshell=%p, ReflowCommandAdded(%p) target=%p[%s] mRCCreatedDuringLoad=%d\n",
+              this, aRC, target, NS_ConvertUTF16toUTF8(typeStr).get(), mRCCreatedDuringLoad));
+    }
 #endif
 
-      if (!mDocumentOnloadBlocked) {
-        mDocument->BlockOnload();
-        mDocumentOnloadBlocked = PR_TRUE;
-      }
+    if (!mDocumentOnloadBlocked) {
+      mDocument->BlockOnload();
+      mDocumentOnloadBlocked = PR_TRUE;
     }
   }
   return NS_OK;
@@ -6686,15 +6674,13 @@ PresShell::ReflowCommandRemoved(nsHTMLReflowCommand* aRC)
   
   PL_DHashTableOperate(&mReflowCommandTable, aRC, PL_DHASH_REMOVE);
   
-  if (gAsyncReflowDuringDocLoad) {
-    NS_PRECONDITION(mRCCreatedDuringLoad >= 0, "PresShell's reflow command queue is in a bad state.");  
-    if (aRC->GetFlagBits() & NS_RC_CREATED_DURING_DOCUMENT_LOAD) {
-      mRCCreatedDuringLoad--;
+  NS_PRECONDITION(mRCCreatedDuringLoad >= 0, "PresShell's reflow command queue is in a bad state.");  
+  if (aRC->GetFlagBits() & NS_RC_CREATED_DURING_DOCUMENT_LOAD) {
+    mRCCreatedDuringLoad--;
 
-      PR_LOG(gLog, PR_LOG_DEBUG,
-             ("presshell=%p, ReflowCommandRemoved(%p) mRCCreatedDuringLoad=%d\n",
-              this, aRC, mRCCreatedDuringLoad));
-    }
+    PR_LOG(gLog, PR_LOG_DEBUG,
+           ("presshell=%p, ReflowCommandRemoved(%p) mRCCreatedDuringLoad=%d\n",
+            this, aRC, mRCCreatedDuringLoad));
   }
   return NS_OK;
 }

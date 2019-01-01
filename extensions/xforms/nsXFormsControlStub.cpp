@@ -148,26 +148,27 @@ nsXFormsControlStubBase::ResetBoundNode(const nsString     &aBindAttribute,
   // Clear existing bound node, etc.
   mBoundNode = nsnull;
   mUsesModelBinding = PR_FALSE;
+  mAppearDisabled = PR_FALSE;
   mDependencies.Clear();
   RemoveIndexListeners();
 
-  if (!mHasParent || !mBindAttrsCount)
+  if (!mHasParent || !HasBindingAttribute())
     return NS_OK;
 
   nsCOMPtr<nsIDOMXPathResult> result;
-  nsresult rv =
-    ProcessNodeBinding(aBindAttribute,
-                       aResultType,
-                       getter_AddRefs(result));
+  nsresult rv = ProcessNodeBinding(aBindAttribute, aResultType,
+                                   getter_AddRefs(result));
 
   if (NS_FAILED(rv)) {
     nsXFormsUtils::ReportError(NS_LITERAL_STRING("controlBindError"), mElement);
     return rv;
   }
-  
-  if (!result)
+
+  if (rv == NS_OK_XFORMS_DEFERRED || !result) {
+    // Binding was deferred, or not bound
     return NS_OK;
-    
+  }
+
   // Get context node, if any
   if (mUsesModelBinding) {
     // When bound via @bind, we'll get a snapshot back
@@ -176,24 +177,21 @@ nsXFormsControlStubBase::ResetBoundNode(const nsString     &aBindAttribute,
     result->GetSingleNodeValue(getter_AddRefs(mBoundNode));
   }
 
-  if (mBoundNode && mModel) {
-    mModel->SetStates(this, mBoundNode);
-  } else if (mModel) {
-    // we should have been successful.  Must be pointing to a node that
-    // doesn't exist in the instance document.  Disable the control
-    // per 4.2.2 in the spec
+  if (!mBoundNode) {
+    // If there's no result (ie, no instance node) returned by the above, it
+    // means that the binding is not pointing to an instance data node, so we
+    // should disable the control.
+    mAppearDisabled = PR_TRUE;
 
-    nsCOMPtr<nsIXTFElementWrapper> xtfWrap(do_QueryInterface(mElement));
-    NS_ENSURE_STATE(xtfWrap);
-    xtfWrap->SetIntrinsicState(NS_EVENT_STATE_DISABLED);
+    nsCOMPtr<nsIXTFElementWrapper> wrapper(do_QueryInterface(mElement));
+    NS_ENSURE_STATE(wrapper);
 
-    // Dispatch event
-    nsXFormsUtils::DispatchEvent(mElement, eEvent_Disabled);
+    return wrapper->SetIntrinsicState(kDisabledIntrinsicState);
   }
 
   if (aResult) {
     *aResult = nsnull;
-    result.swap(*aResult);
+    result.swap(*aResult); // transfers ref
   }
 
   return NS_OK;
@@ -204,6 +202,15 @@ nsXFormsControlStubBase::Bind()
 {
   return ResetBoundNode(NS_LITERAL_STRING("ref"),
                         nsIDOMXPathResult::FIRST_ORDERED_NODE_TYPE);
+}
+
+NS_IMETHODIMP
+nsXFormsControlStubBase::Refresh()
+{
+  // XXX: In theory refresh should never be called when there is no model,
+  // but that's definately not the case now.
+  return (mModel && !mAppearDisabled) ? mModel->SetStates(this, mBoundNode)
+                                      : NS_OK;
 }
 
 NS_IMETHODIMP
@@ -233,18 +240,27 @@ nsXFormsControlStubBase::MaybeAddToModel(nsIModelElementPrivate *aOldModel,
 {
   // XXX: just doing pointer comparison would be nice....
   PRBool sameModel = PR_FALSE;
-  nsCOMPtr<nsIDOM3Node> n3Model(do_QueryInterface(mModel));
-  nsCOMPtr<nsIDOMNode> nOldModel(do_QueryInterface(aOldModel));
-  NS_ASSERTION(n3Model, "model element not supporting nsIDOM3Node?!");
-  nsresult rv = n3Model->IsSameNode(nOldModel, &sameModel);
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsresult rv;
+
+  if (mModel) {
+    nsCOMPtr<nsIDOM3Node> n3Model(do_QueryInterface(mModel));
+    nsCOMPtr<nsIDOMNode> nOldModel(do_QueryInterface(aOldModel));
+    NS_ASSERTION(n3Model, "model element not supporting nsIDOM3Node?!");
+    rv = n3Model->IsSameNode(nOldModel, &sameModel);
+    NS_ENSURE_SUCCESS(rv, rv);
+  } else {
+    sameModel = !aOldModel;
+  }
+
   if (!sameModel) {
     if (aOldModel) {
       rv = aOldModel->RemoveFormControl(this);
       NS_ENSURE_SUCCESS(rv, rv);
     }
-    rv = mModel->AddFormControl(this, aParent);
-    NS_ENSURE_SUCCESS(rv, rv);
+    if (mModel) {
+      rv = mModel->AddFormControl(this, aParent);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
   }
   return NS_OK;
 }
@@ -258,6 +274,14 @@ nsXFormsControlStubBase::ProcessNodeBinding(const nsString          &aBindingAtt
 {
   nsStringArray indexesUsed;
 
+  if (aResult) {
+    *aResult = nsnull;
+  }
+
+  if (aModel) {
+    *aModel = nsnull;
+  }
+
   // let's not go through all of this rigamarol if we don't have a chance
   // in heck of binding anyhow.  Check to see if the models will be receptive
   // to some binding.  readyForBindProperty is set when they are.  Make sure
@@ -266,10 +290,15 @@ nsXFormsControlStubBase::ProcessNodeBinding(const nsString          &aBindingAtt
 
   nsCOMPtr<nsIDOMDocument> domDoc;
   mElement->GetOwnerDocument(getter_AddRefs(domDoc));
+  if (!domDoc) {
+    // We are not in a document, so we'll "defer the binding" for now. When
+    // the control gets inserted into a document, we'll Bind() again.
+    return NS_OK_XFORMS_DEFERRED;
+  }
 
   if (!nsXFormsUtils::IsDocumentReadyForBind(domDoc)) {
     nsXFormsModelElement::DeferElementBind(domDoc, this);
-    return NS_OK;
+    return NS_OK_XFORMS_DEFERRED;
   }
 
   nsresult rv;
@@ -287,6 +316,7 @@ nsXFormsControlStubBase::ProcessNodeBinding(const nsString          &aBindingAtt
                                           getter_AddRefs(parentControl),
                                           &mDependencies,
                                           &indexesUsed);
+  NS_ENSURE_SUCCESS(rv, rv);
   NS_ENSURE_STATE(mModel);
 
   rv = MaybeAddToModel(oldModel, parentControl);
@@ -546,34 +576,37 @@ nsXFormsControlStubBase::OnDestroyed()
 }
 
 nsresult
-nsXFormsControlStubBase::ForceModelRebind()
+nsXFormsControlStubBase::ForceModelDetach(PRBool aRebind)
 {
   if (mModel) {
     // Remove from model, so Bind() will be forced to reattach
     mModel->RemoveFormControl(this);
     mModel = nsnull;
   }
+
+  if (!aRebind) {
+    return NS_OK;
+  }
+
   nsresult rv = Bind();
   NS_ENSURE_SUCCESS(rv, rv);
-  return Refresh();
+  return rv == NS_OK_XFORMS_DEFERRED ? NS_OK : Refresh();
 }
 
 
 nsresult
 nsXFormsControlStubBase::DocumentChanged(nsIDOMDocument *aNewDocument)
 {
-  // We need to re-evaluate our instance data binding when our document
-  // changes, since our context can change
-
-  if (aNewDocument) {
-    // The intrinsic state needs to be initialized here since
-    // SetIntrinsicState will do nothing until the element lives in a document.
-    ResetProperties();
-  
-    return ForceModelRebind();
+  // If we are inserted into a document and we have no model, we are probably
+  // being initialized, so we should set our intrinsic state to the default
+  // value
+  if (aNewDocument && !mModel && mElement) {
+    nsCOMPtr<nsIXTFElementWrapper> xtfWrap(do_QueryInterface(mElement));
+    NS_ENSURE_STATE(xtfWrap);
+    xtfWrap->SetIntrinsicState(kDefaultIntrinsicState);
   }
 
-  return NS_OK;
+  return ForceModelDetach(mHasParent && aNewDocument);
 }
 
 nsresult
@@ -582,7 +615,7 @@ nsXFormsControlStubBase::ParentChanged(nsIDOMElement *aNewParent)
   mHasParent = aNewParent != nsnull;
   // We need to re-evaluate our instance data binding when our parent changes,
   // since xmlns declarations or our context could have changed.
-  return mHasParent ? ForceModelRebind() : NS_OK;
+  return ForceModelDetach(mHasParent);
 }
 
 nsresult
@@ -664,18 +697,6 @@ nsXFormsControlStubBase::GetContext(nsAString      &aModelID,
 }
 
 void
-nsXFormsControlStubBase::ResetProperties()
-{
-  nsCOMPtr<nsIXTFElementWrapper> xtfWrap(do_QueryInterface(mElement));
-  if (!xtfWrap) {
-    return;
-  }
-
-  // enabled is on pr. default
-  xtfWrap->SetIntrinsicState(NS_EVENT_STATE_ENABLED);
-}
-
-void
 nsXFormsControlStubBase::AddRemoveSNBAttr(nsIAtom *aName, const nsAString &aValue) 
 {
   nsAutoString attrStr, attrValue;
@@ -691,9 +712,6 @@ nsXFormsControlStubBase::AddRemoveSNBAttr(nsIAtom *aName, const nsAString &aValu
     // empty value, treat it like the binding attr is being removed.
     --mBindAttrsCount;
     NS_ASSERTION(mBindAttrsCount>=0, "bad mojo!  mBindAttrsCount < 0!");
-    if (!mBindAttrsCount) {
-      ResetProperties();
-    }
   }
 }
 
@@ -713,8 +731,9 @@ void
 nsXFormsControlStubBase::AfterSetAttribute(nsIAtom *aName)
 {
   if (IsBindingAttribute(aName)) {
-    Bind();
-    Refresh();
+    nsresult rv = Bind();
+    if (NS_SUCCEEDED(rv) &&  rv != NS_OK_XFORMS_DEFERRED)
+      Refresh();
   }
 
 }

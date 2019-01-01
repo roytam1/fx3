@@ -16,10 +16,10 @@
  *
  * The Initial Developer of the Original Code is
  * Mozilla Foundation.
- * Portions created by the Initial Developer are Copyright (C) 2005
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
- * Contributor(s): Alex Vincent <ajvincent@gmail.com>
+ * Contributor(s):
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,27 +35,28 @@
  *
  * ***** END LICENSE BLOCK ***** */
 //-----------------------------------------------------------------------------
-var bug = 234389;
-var summary = 'Do not Crash when overloaded toString causes infinite recursion';
+var bug = 330352;
+var summary = 'Very non-greedy regexp causes crash in jsregexp.c';
 var actual = 'No Crash';
 var expect = 'No Crash';
 
 printBugNumber (bug);
 printStatus (summary);
 
-var foo = {
-  toString: function() {
-    if (this.re.test(this)) {
-      return "";
-    }
-    return this.value;
-  },
-  
-  value: "foo",
-  
-  re: /bar/
-};
+if ("AB".match(/(.*?)*?B/))
+{
+  printStatus(RegExp.lastMatch);
+}
+reportCompare(expect, actual, summary + ': "AB".match(/(.*?)*?B/)');
 
-var f = foo.toString();
-  
-reportCompare(expect, actual, summary);
+if ("AB".match(/(.*)*?B/))
+{
+  printStatus(RegExp.lastMatch);
+}
+reportCompare(expect, actual, summary + ': "AB".match(/(.*)*?B/)');
+
+if ("AB".match(/(.*?)*B/))
+{
+  printStatus(RegExp.lastMatch);
+}
+reportCompare(expect, actual, summary + ': "AB".match(/(.*?)*B/)');
