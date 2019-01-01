@@ -139,6 +139,7 @@ function loadDialog(item)
         if (startDate.isDate) {
             setElementValue("event-all-day", true, "checked");
             endDate.day -= 1;
+            gItemDuration.days -= 1;
 
             // The date/timepicker uses jsDate internally. Because jsDate does
             // not know the concept of dates we end up displaying times unequal
@@ -910,6 +911,9 @@ function loadDetails() {
     updateAlarm();
 
     updateTaskAlarmWarnings();
+
+    updateURL(item.getProperty("URL"));
+    return;
 }
 
 function updateToDoStatus(status, passedInCompletedDate)
@@ -973,4 +977,39 @@ function updateToDoStatus(status, passedInCompletedDate)
         setElementValue("completed-date-picker", oldCompletedDate);
         disableElement("completed-date-picker");
     }
+}
+
+function updateURL(aValue) 
+{
+    var button = document.getElementById("load-url-button");
+    button.setAttribute("disabled", true)
+
+    if (!aValue) {
+        return;
+    }
+
+    // The user might have just put in 'www.foo.com', correct that here
+    if (aValue.indexOf( ":" ) == -1) {
+        aValue = "http://" + aValue;
+    }
+    try {
+        makeURL(aValue);
+        // If we made it this far, that means it's a valid url
+        button.removeAttribute("disabled");
+    } catch(ex) {}
+
+    return;
+}
+
+function loadURL()
+{
+    var url = getElementValue("item-url");
+
+    // The user might have just put in 'www.foo.com', correct that here
+    if (url.indexOf( ":" ) == -1) {
+       url = "http://" + url;
+    }
+
+    launchBrowser(url);
+    return;
 }

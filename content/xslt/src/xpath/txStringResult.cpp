@@ -67,11 +67,13 @@ short StringResult::getResultType() {
     return txAExprResult::STRING;
 } //-- getResultType
 
-void StringResult::stringValue(nsAString& str)  {
-    str.Append(mValue);
-} //-- stringValue
+void
+StringResult::stringValue(nsString& aResult)
+{
+    aResult.Append(mValue);
+}
 
-nsAString*
+const nsString*
 StringResult::stringValuePointer()
 {
     return &mValue;

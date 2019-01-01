@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -16,7 +16,7 @@
  *
  * The Initial Developer of the Original Code is
  * Peter Van der Beken.
- * Portions created by the Initial Developer are Copyright (C) 2003
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
@@ -37,50 +37,28 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-/*
- * Implementations of nsIDOMDOMStringList and nsIDOMNameList, used by various
- * DOM3 stuff and some interfaces specified by WHATWG.
- */
+#include "txExpr.h"
 
-#ifndef nsDOMLists_h___
-#define nsDOMLists_h___
-
-#include "nsIDOMDOMStringList.h"
-#include "nsIDOMNameList.h"
-#include "nsVoidArray.h"
-
-class nsDOMStringList : public nsIDOMDOMStringList
+nsresult
+Expr::evaluateToBool(txIEvalContext* aContext, PRBool& aResult)
 {
-public:
-  nsDOMStringList();
-  virtual ~nsDOMStringList();
+    nsRefPtr<txAExprResult> exprRes;
+    nsresult rv = evaluate(aContext, getter_AddRefs(exprRes));
+    NS_ENSURE_SUCCESS(rv, rv);
 
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIDOMDOMSTRINGLIST
+    aResult = exprRes->booleanValue();
 
-  PRBool Add(const nsAString& aName)
-  {
-    return mNames.AppendString(aName);
-  }
+    return NS_OK;
+}
 
-private:
-  nsStringArray mNames;
-};
-
-class nsNameList : public nsIDOMNameList
+nsresult
+Expr::evaluateToString(txIEvalContext* aContext, nsString& aResult)
 {
-public:
-  nsNameList();
-  virtual ~nsNameList();
+    nsRefPtr<txAExprResult> exprRes;
+    nsresult rv = evaluate(aContext, getter_AddRefs(exprRes));
+    NS_ENSURE_SUCCESS(rv, rv);
 
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIDOMNAMELIST
+    exprRes->stringValue(aResult);
 
-  PRBool Add(const nsAString& aNamespaceURI, const nsAString& aName);
-
-private:
-  nsStringArray mNamespaceURIs;
-  nsStringArray mNames;
-};
-
-#endif /* nsDOMLists_h___ */
+    return NS_OK;
+}

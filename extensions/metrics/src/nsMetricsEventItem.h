@@ -1,4 +1,5 @@
 /* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim:set ts=2 sw=2 sts=2 et cindent: */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -12,16 +13,14 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is mozilla.org code.
+ * The Original Code is the Metrics extension.
  *
- * The Initial Developer of the Original Code is
- * Peter Van der Beken.
- * Portions created by the Initial Developer are Copyright (C) 2003
+ * The Initial Developer of the Original Code is Google Inc.
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Peter Van der Beken <peterv@propagandism.org>
- *
+ *  Brian Ryner <bryner@brianryner.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -37,50 +36,33 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-/*
- * Implementations of nsIDOMDOMStringList and nsIDOMNameList, used by various
- * DOM3 stuff and some interfaces specified by WHATWG.
- */
+#ifndef nsMetricsEventItem_h__
+#define nsMetricsEventItem_h__
 
-#ifndef nsDOMLists_h___
-#define nsDOMLists_h___
+#include "nsIMetricsService.h"
+#include "nsCOMArray.h"
+#include "nsCOMPtr.h"
 
-#include "nsIDOMDOMStringList.h"
-#include "nsIDOMNameList.h"
-#include "nsVoidArray.h"
+class nsIPropertyBag;
 
-class nsDOMStringList : public nsIDOMDOMStringList
+// nsMetricsEventItem implements a single event item that can store properties.
+
+class nsMetricsEventItem : public nsIMetricsEventItem
 {
-public:
-  nsDOMStringList();
-  virtual ~nsDOMStringList();
+ public:
+  nsMetricsEventItem(const nsAString &itemNamespace,
+                     const nsAString &itemName);
 
   NS_DECL_ISUPPORTS
-  NS_DECL_NSIDOMDOMSTRINGLIST
+  NS_DECL_NSIMETRICSEVENTITEM
 
-  PRBool Add(const nsAString& aName)
-  {
-    return mNames.AppendString(aName);
-  }
+ private:
+  ~nsMetricsEventItem();
 
-private:
-  nsStringArray mNames;
+  nsString mNamespace;
+  nsString mName;
+  nsCOMPtr<nsIPropertyBag> mProperties;
+  nsCOMArray<nsIMetricsEventItem> mChildren;
 };
 
-class nsNameList : public nsIDOMNameList
-{
-public:
-  nsNameList();
-  virtual ~nsNameList();
-
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIDOMNAMELIST
-
-  PRBool Add(const nsAString& aNamespaceURI, const nsAString& aName);
-
-private:
-  nsStringArray mNamespaceURIs;
-  nsStringArray mNames;
-};
-
-#endif /* nsDOMLists_h___ */
+#endif  // nsMetricsEventItem_h__
