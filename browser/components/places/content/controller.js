@@ -49,6 +49,7 @@ const NHRVO = Ci.nsINavHistoryResultViewObserver;
 // default_places.html!
 const ORGANIZER_ROOT_HISTORY = "place:&beginTime=-2592000000000&beginTimeRef=1&endTime=7200000000&endTimeRef=2&sort=4&type=1";
 const ORGANIZER_ROOT_BOOKMARKS = "place:&folder=2&group=3&excludeItems=1";
+const ORGANIZER_SUBSCRIPTIONS_QUERY = "place:&annotation=livemark%2FfeedURI";
 
 // Place entries that are containers, e.g. bookmark folders or queries. 
 const TYPE_X_MOZ_PLACE_CONTAINER = "text/x-moz-place-container";
@@ -966,51 +967,54 @@ var PlacesController = {
       if (selectedNode.uri.indexOf("livemark%2F") != -1) {
         isLivemarkItem = true;
         command.setAttribute("label", strings.getString("livemarkReloadAll"));
+      }
+      else {
+        var name;
+        if (this.nodeIsLivemarkContainer(selectedNode)) {
+          isLivemarkItem = true;
+          name = selectedNode.title;
         }
-        else {
-          var name;
-          if (this.nodeIsLivemarkContainer(selectedNode)) {
-            isLivemarkItem = true;
-            name = selectedNode.title;
-          }
-          else if (this.nodeIsURI(selectedNode)) {
-            var uri = this._uri(selectedNode.uri);
-            isLivemarkItem = this.annotations.hasAnnotation(uri, "livemark/bookmarkFeedURI");
-            if (isLivemarkItem)
-              name = selectedNode.parent.title;
-          }
-
+        else if (this.nodeIsURI(selectedNode)) {
+          var uri = this._uri(selectedNode.uri);
+          isLivemarkItem = this.annotations.hasAnnotation(uri, "livemark/bookmarkFeedURI");
           if (isLivemarkItem)
-            command.setAttribute("label", strings.getFormattedString("livemarkReloadOne", [name]));
+            name = selectedNode.parent.title;
         }
+
+        if (isLivemarkItem)
+          command.setAttribute("label", strings.getFormattedString("livemarkReloadOne", [name]));
+      }
     }
     
     if (!isLivemarkItem)
       command.setAttribute("label", strings.getString("livemarkReload"));
       
-    this._setEnabled("placesCmd_reload", isLivemarkItem);
+    this._setEnabled("placesCmd_reload", isLivemarkItem);  
   },
   
   /** 
    * Gather information about the selection according to the following
-   * rules: 
-   * Selection Grammar: 
-   *    is-link       "link"
-   *    is-links      "links"
-   *    is-folder     "folder"
-   *    is-mutable    "mutable"
-   *    is-mixed      "mixed"
-   *    is-removable  "removable"
-   *    is-multiselect"multiselect"
-   *    is-container  "remotecontainer"
-   *    is-query      "query"
+   * rules:
+   *    "link"              single selection is URI
+   *    "links"             all selected items are links, and there are at least 2
+   *    "folder"            selection is a folder
+   *    "query"             selection is a query
+   *    "remotecontainer"   selection is a remote container
+   *    "separator"         selection is a separator line
+   *    "host"              selection is a host
+   *    "mutable"           selection can have items inserted or reordered
+   *    "mixed"             selection contains more than one type
+   *    "allLivemarks"      selection is a query containing every livemark
+   *    "multiselect"       seleciton contains more than one item
+   * In addition, a property is set corresponding to each of the selected 
+   * items' annotation names.
+   *    
    * @returns an object with each of the properties above set if the selection
    *          matches that rule. 
    * Note: This can be slow, so don't call it anywhere performance critical!
    */
   _buildSelectionMetadata: function PC__buildSelectionMetadata() {
     var metadata = { };
-    
     var v = this.activeView;
     var hasSingleSelection = v.hasSingleSelection;
     if (v.selectedURINode && hasSingleSelection)
@@ -1084,7 +1088,18 @@ var PlacesController = {
         for (var j = 0; j < names.length; ++j)
           metadata[names[i]] = true;
       }
-      
+      else if (this.nodeIsQuery(node)) {
+        // Various queries might live in the left-hand side of the organizer window.
+        // If this one happens to have collected all the livemark feeds, allow its
+        // context menu to contain "Reload All Livemarks". That will usually only
+        // mean the Subscriptions folder, but if some other folder happens to use
+        // the same query, it's fine too.  Queries have very limited data (no 
+        // annotations), so we're left checking the query URI directly.
+        uri = this._uri(node.uri);
+        if (uri.spec == ORGANIZER_SUBSCRIPTIONS_QUERY)
+          metadata["allLivemarks"] = true;
+      }
+            
       if (nodes[i].parent != lastParent || nodes[i].type != lastType)
         metadata["mixed"] = true;
     }
@@ -2206,6 +2221,8 @@ function PlacesBaseTransaction() {
 PlacesBaseTransaction.prototype = {
   bookmarks: Cc["@mozilla.org/browser/nav-bookmarks-service;1"].
              getService(Ci.nsINavBookmarksService),
+  livemarks: Cc["@mozilla.org/browser/livemark-service;1"].
+             getService(Ci.nsILivemarkService),
   LOG: LOG,
   redoTransaction: function PIT_redoTransaction() {
     throw Cr.NS_ERROR_NOT_IMPLEMENTED;
@@ -2578,5 +2595,51 @@ PlacesEditBookmarkKeywordTransaction.prototype = {
 
   undoTransaction: function PEBKT_undoTransaction() {
     this.bookmarks.setKeywordForURI(this._uri, this._oldKeyword);
+  }
+};
+
+/**
+ * Edit a live bookmark's site URI.
+ */
+function PlacesEditLivemarkSiteURITransaction(folderId, uri) {
+  this._folderId = folderId;
+  this._newURI = uri;
+  this._oldURI = null;
+  this.redoTransaction = this.doTransaction;
+}
+PlacesEditLivemarkSiteURITransaction.prototype = {
+  __proto__: PlacesBaseTransaction.prototype,
+
+  doTransaction: function PELSUT_doTransaction() {
+    this._oldURI = this.livemarks.getSiteURI(this._folderId);
+    this.livemarks.setSiteURI(this._folderId, this._newURI);
+  },
+
+  undoTransaction: function PELSUT_undoTransaction() {
+    this.livemarks.setSiteURI(this._folderId, this._oldURI);
+  }
+};
+
+/**
+ * Edit a live bookmark's feed URI.
+ */
+function PlacesEditLivemarkFeedURITransaction(folderId, uri) {
+  this._folderId = folderId;
+  this._newURI = uri;
+  this._oldURI = null;
+  this.redoTransaction = this.doTransaction;
+}
+PlacesEditLivemarkFeedURITransaction.prototype = {
+  __proto__: PlacesBaseTransaction.prototype,
+
+  doTransaction: function PELFUT_doTransaction() {
+    this._oldURI = this.livemarks.getFeedURI(this._folderId);
+    this.livemarks.setFeedURI(this._folderId, this._newURI);
+    this.livemarks.reloadLivemarkFolder(this._folderId);
+  },
+
+  undoTransaction: function PELFUT_undoTransaction() {
+    this.livemarks.setFeedURI(this._folderId, this._oldURI);
+    this.livemarks.reloadLivemarkFolder(this._folderId);
   }
 };

@@ -317,10 +317,11 @@ nsBrowserStatusHandler.prototype =
   
 /* moved this as global */ 
   
-  function MiniNavStartup()
+function MiniNavStartup()
 {
   var homepage = "http://www.mozilla.org";
-  
+  var homepages = null; 
+    
   try {
     
     gBrowser = document.getElementById("content");
@@ -368,11 +369,15 @@ nsBrowserStatusHandler.prototype =
       var page = gPref.getCharPref("browser.startup.homepage");
       var bookmarkstore = gPref.getCharPref("browser.bookmark.store");
       
-      if (page != null)
-      {
-        var fixedUpURI = gURIFixup.createFixupURI(page, 2 /*fixup url*/ );
-        homepage = fixedUpURI.spec;
+      if ( page.split("|").length > 1 ) {
+           homepages = page.split("|");
+      } else {
+        if (page != null) {
+            var fixedUpURI = gURIFixup.createFixupURI(page, 2 /*fixup url*/ );
+            homepage = fixedUpURI.spec;
+        }
       }
+
     } catch (ignore) {}
     
   } catch (e) {
@@ -385,7 +390,11 @@ nsBrowserStatusHandler.prototype =
                        "@mozilla.org/transfer;1",
                        new TransferItemFactory());
 
-  loadURI(homepage);
+  if(homepages) {
+    gBrowser.loadTabs(homepages,true,true); // force load in background.
+  } else {
+    loadURI(homepage);
+  }
   loadBookmarks(bookmarkstore);
   
   /*
@@ -794,9 +803,15 @@ function BrowserViewFind() {
  * Has to go through some other approach like a XML-based rule system. 
  * Those are constraints conditions and action. 
  **/
-
 function BrowserViewHomebar() {
-  document.getElementById("browserleftbar").collapsed=!document.getElementById("browserleftbar").collapsed;
+
+  var wholeHomebarState = document.getElementById("browserleftbar").collapsed;
+
+  document.getElementById("browserleftbar").collapsed = !wholeHomebarState;
+
+  if(!wholeHomebarState) { 
+    document.getElementById("homebarcontainer").style.display="block"; 
+  } 
 }
 
 /** 
@@ -1040,6 +1055,14 @@ function DoBrowserSB(sKey) {
   }  
 }
 
+function DoBrowserGM(xmlRef) {
+  try { 
+    gBrowser.selectedTab = gBrowser.addTab('chrome://minimo/content/moduleview/moduleload.xhtml?url='+xmlRef);
+    browserInit(gBrowser.selectedTab);
+  } catch (e) {   
+  }  
+}
+
 /* Toolbar specific code - to be removed from here */ 
 
 
@@ -1162,7 +1185,8 @@ function DoFullScreen()
 {
   gFullScreen = !gFullScreen;
   
-  document.getElementById("nav-bar").hidden = gFullScreen;
+  document.getElementById("mini-toolbars").hidden = gFullScreen;
+  document.getElementById("browserleftbar").collapsed = gFullScreen;
   
   // Is this the simpler approach to count tabs? 
   if(gBrowser.mPanelContainer.childNodes.length>1) {

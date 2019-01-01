@@ -170,17 +170,15 @@ nsLivemarkService::Init()
 
   pRDF->GetResource(NS_LITERAL_CSTRING(DC_NAMESPACE_URI "date"),
                     getter_AddRefs(mLMDC_date));
-  
+
   // Initialize the list of livemarks from the list of URIs
   // that have a feed uri annotation.
-  nsIURI ** pLivemarks;
-  PRUint32 numLivemarks;
-  rv = mAnnotationService->GetPagesWithAnnotation(NS_LITERAL_CSTRING(LMANNO_FEEDURI),
-                                                  &numLivemarks,
-                                                  &pLivemarks);
+  nsCOMArray<nsIURI> pLivemarks;
+  rv = mAnnotationService->GetPagesWithAnnotationCOMArray(
+      NS_LITERAL_CSTRING(LMANNO_FEEDURI), &pLivemarks);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  for (PRUint32 i = 0; i < numLivemarks; ++i) {
+  for (PRInt32 i = 0; i < pLivemarks.Count(); ++i) {
 
     // Get the feed URI from the annotation.
     nsAutoString feedURIString;
@@ -213,8 +211,6 @@ nsLivemarkService::Init()
     NS_ENSURE_TRUE(li, NS_ERROR_OUT_OF_MEMORY);
     NS_ENSURE_TRUE(mLivemarks.AppendElement(li), NS_ERROR_OUT_OF_MEMORY);
   }
-  if (numLivemarks > 0)
-    nsMemory::Free(pLivemarks);
 
   return rv;
 }
@@ -264,9 +260,9 @@ nsLivemarkService::CreateLivemark(PRInt64 aFolder,
 {
   // Create the livemark as a bookmark container
   nsNavBookmarks *bookmarks = nsNavBookmarks::GetBookmarksService();
-  nsresult rv = bookmarks->CreateContainer(aFolder, aName, aIndex,
+  nsresult rv = bookmarks->CreateContainer(aFolder, aName,
                                            NS_LITERAL_STRING(NS_LIVEMARKSERVICE_CONTRACTID),
-                                           aNewLivemark);
+                                           aIndex, aNewLivemark);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Get the livemark URI
@@ -470,7 +466,7 @@ nsLivemarkService::SetFeedURI(PRInt64 aContainer, nsIURI *aFeedURI)
 
   // Now update our internal table
   PRInt32 livemarkIndex = GetLivemarkIndex(aContainer);
-  NS_ENSURE_TRUE(livemarkIndex == -1, NS_ERROR_FAILURE);
+  NS_ENSURE_TRUE(livemarkIndex > -1, NS_ERROR_FAILURE);
 
   mLivemarks[livemarkIndex]->feedURI = aFeedURI;
 
