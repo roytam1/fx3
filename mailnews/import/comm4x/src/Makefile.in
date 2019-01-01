@@ -93,16 +93,15 @@ ifndef MOZ_STATIC_MAIL_BUILD
 CPPSRCS	 += nsComm4xMailFactory.cpp 
 
 ifeq ($(USE_SHORT_LIBNAME),1)
-EXTRA_DSO_LIBS += msgbsutl
+EXTRA_DSO_LIBS = msgbsutl
 else
-EXTRA_DSO_LIBS += msgbaseutil
+EXTRA_DSO_LIBS = msgbaseutil
 endif
-
-EXTRA_DSO_LIBS += mozreg_s
 
 EXTRA_DSO_LDOPTS = \
 	$(LIBS_DIR) \
 	$(EXTRA_DSO_LIBS) \
+	$(DEPTH)/modules/libreg/src/$(LIB_PREFIX)mozreg_s.$(LIB_SUFFIX) \
 	$(MOZ_COMPONENT_LIBS) \
 	$(MOZ_XPCOM_OBSOLETE_LIBS) \
 	$(NULL)
