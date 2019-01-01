@@ -99,7 +99,7 @@ JS_FRIEND_DATA(JSObjectOps) js_ObjectOps = {
 
 JSClass js_ObjectClass = {
     js_Object_str,
-    0,
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
     JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,
     JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,   JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
@@ -1197,7 +1197,8 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             if (obj != callerScopeChain) {
                 if (!js_CheckPrincipalsAccess(cx, obj,
                                               caller->script->principals,
-                                              cx->runtime->atomState.evalAtom)) {
+                                              cx->runtime->atomState.evalAtom))
+                {
                     return JS_FALSE;
                 }
 
@@ -1853,13 +1854,6 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
     if (!proto)
         return NULL;
 
-#if JS_HAS_OBJ_PROTO_PROP
-    if (!JS_InitClass(cx, obj, NULL, &js_WithClass, With, 0,
-                      NULL, NULL, NULL, NULL)) {
-        return NULL;
-    }
-#endif
-
     /* ECMA (15.1.2.1) says 'eval' is also a property of the global object. */
     if (!OBJ_GET_PROPERTY(cx, proto,
                           ATOM_TO_JSID(cx->runtime->atomState.evalAtom),
@@ -2127,7 +2121,7 @@ bad:
 JSBool
 js_FindClassObject(JSContext *cx, JSObject *start, jsid id, jsval *vp)
 {
-    JSObject *obj, *pobj;
+    JSObject *obj, *cobj, *pobj;
     JSProtoKey key;
     JSProperty *prop;
     JSScopeProperty *sprop;
@@ -2149,10 +2143,10 @@ js_FindClassObject(JSContext *cx, JSObject *start, jsid id, jsval *vp)
     if (JSID_IS_INT(id)) {
         key = JSID_TO_INT(id);
         JS_ASSERT(key != JSProto_Null);
-        if (!js_GetCachedPrototype(cx, obj, key, &pobj))
+        if (!js_GetClassObject(cx, obj, key, &cobj))
             return JS_FALSE;
-        if (pobj) {
-            *vp = OBJECT_TO_JSVAL(pobj);
+        if (cobj) {
+            *vp = OBJECT_TO_JSVAL(cobj);
             return JS_TRUE;
         }
         id = ATOM_TO_JSID(cx->runtime->atomState.classAtoms[key]);
@@ -4165,40 +4159,47 @@ JSBool
 js_XDRObject(JSXDRState *xdr, JSObject **objp)
 {
     JSContext *cx;
+    JSAtom *atom;
     JSClass *clasp;
     uint32 classId, classDef;
     JSProtoKey protoKey;
     jsid classKey;
-    JSAtom *atom;
     JSObject *proto;
 
     cx = xdr->cx;
+    atom = NULL;
     if (xdr->mode == JSXDR_ENCODE) {
         clasp = OBJ_GET_CLASS(cx, *objp);
         classId = JS_XDRFindClassIdByName(xdr, clasp->name);
         classDef = !classId;
-        if (classDef && !JS_XDRRegisterClass(xdr, clasp, &classId))
-            return JS_FALSE;
-        protoKey = JSCLASS_CACHED_PROTO_KEY(clasp);
-        if (protoKey != JSProto_Null) {
-            classDef |= (protoKey << 1);
-            classKey = INT_TO_JSID(protoKey);
-        } else {
-            atom = js_Atomize(cx, clasp->name, strlen(clasp->name), 0);
-            if (!atom)
+        if (classDef) {
+            if (!JS_XDRRegisterClass(xdr, clasp, &classId))
                 return JS_FALSE;
-            classKey = ATOM_TO_JSID(atom);
+            protoKey = JSCLASS_CACHED_PROTO_KEY(clasp);
+            if (protoKey != JSProto_Null) {
+                classDef |= (protoKey << 1);
+            } else {
+                atom = js_Atomize(cx, clasp->name, strlen(clasp->name), 0);
+                if (!atom)
+                    return JS_FALSE;
+            }
         }
     } else {
         clasp = NULL;           /* quell GCC overwarning */
         classDef = 0;
-        classKey = 0;
     }
 
-    /* XDR a flag word followed (if true) by the class name. */
+    /*
+     * XDR a flag word, which could be 0 for a class use, in which case no
+     * name follows, only the id in xdr's class registry; 1 for a class def,
+     * in which case the flag word is followed by the class name transferred
+     * from or to atom; or a value greater than 1, an odd number that when
+     * divided by two yields the JSProtoKey for class.  In the last case, as
+     * in the 0 classDef case, no name is transferred via atom.
+     */
     if (!JS_XDRUint32(xdr, &classDef))
         return JS_FALSE;
-    if (classDef && !js_XDRCStringAtom(xdr, &atom))
+    if (classDef == 1 && !js_XDRCStringAtom(xdr, &atom))
         return JS_FALSE;
 
     if (!JS_XDRUint32(xdr, &classId))
