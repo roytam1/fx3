@@ -36,96 +36,54 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsMacResources.h"
-#include <Resources.h>
-#include <Processes.h>
+#include <Carbon/Carbon.h>
 
-short nsMacResources::mRefNum				= kResFileNotOpened;
-short nsMacResources::mSaveResFile	= 0;
+short nsMacResources::mRefNum      = kResFileNotOpened;
+short nsMacResources::mSaveResFile = 0;
 
-#if !defined(XP_MACOSX)
-pascal OSErr __NSInitialize(const CFragInitBlock *theInitBlock);
-pascal OSErr __initializeResources(const CFragInitBlock *theInitBlock);
-
-pascal void __NSTerminate(void);
-pascal void __terminateResources(void);
-
-//----------------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------------
-pascal OSErr __initializeResources(const CFragInitBlock *theInitBlock)
-{
-    OSErr err = __NSInitialize(theInitBlock);
-    if (err)
-    	return err;
-
-	short saveResFile = ::CurResFile();
-
-	short refNum = FSpOpenResFile(theInitBlock->fragLocator.u.onDisk.fileSpec, fsRdPerm);
-	nsMacResources::SetLocalResourceFile(refNum);
-
-	::UseResFile(saveResFile);
-
-	return ::ResError();
-}
-
-
-//----------------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------------
-pascal void __terminateResources(void)
-{
-	::CloseResFile(nsMacResources::GetLocalResourceFile());
-    __NSTerminate();
-}
-#endif /*!XP_MACOSX*/
-
-//----------------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------------
 
 nsresult nsMacResources::OpenLocalResourceFile()
 {
-#ifdef XP_MACOSX
   if (mRefNum == kResFileNotOpened) {
-    ProcessSerialNumber PSN;
-    ProcessInfoRec pinfo;
-    FSSpec appSpec;
-
-    PSN.highLongOfPSN = 0;
-    PSN.lowLongOfPSN = kCurrentProcess;
-    pinfo.processInfoLength = sizeof(pinfo);
-    pinfo.processName = NULL;
-    pinfo.processAppSpec = &appSpec;
-
-    if (GetProcessInformation(&PSN, &pinfo) == noErr) {
-      FSSpec resSpec = { appSpec.vRefNum, appSpec.parID, "\plibwidget.rsrc" };
-      FSRef resRef;
-      if (FSpMakeFSRef(&resSpec, &resRef) == noErr)
-        FSOpenResourceFile(&resRef, 0, NULL, fsRdPerm, &mRefNum);
+    CFBundleRef appBundle = ::CFBundleGetMainBundle();
+    if (appBundle) {
+      CFURLRef executable = ::CFBundleCopyExecutableURL(appBundle);
+      if (executable) {
+        CFURLRef binDir = ::CFURLCreateCopyDeletingLastPathComponent(
+                           kCFAllocatorDefault, executable);
+        if (binDir) {
+          CFURLRef resourceFile = ::CFURLCreateCopyAppendingPathComponent(
+                                   kCFAllocatorDefault, binDir,
+                                   CFSTR("libwidget.rsrc"), PR_FALSE);
+          if (resourceFile) {
+            FSRef resourceRef;
+            if (::CFURLGetFSRef(resourceFile, &resourceRef))
+              ::FSOpenResourceFile(&resourceRef, 0, NULL, fsRdPerm, &mRefNum);
+            ::CFRelease(resourceFile);
+          }
+          ::CFRelease(binDir);
+        }
+        ::CFRelease(executable);
+      }
     }
   }
-#endif
-	if (mRefNum == kResFileNotOpened)
-		return NS_ERROR_NOT_INITIALIZED;
+  if (mRefNum == kResFileNotOpened)
+    return NS_ERROR_NOT_INITIALIZED;
 
-	mSaveResFile = ::CurResFile();
-	::UseResFile(mRefNum);
+  mSaveResFile = ::CurResFile();
+  ::UseResFile(mRefNum);
 
-	return (::ResError() == noErr ? NS_OK : NS_ERROR_FAILURE);
+  return (::ResError() == noErr ? NS_OK : NS_ERROR_FAILURE);
 }
 
 
-//----------------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------------
-
 nsresult nsMacResources::CloseLocalResourceFile()
 {
-	if (mRefNum == kResFileNotOpened)
-		return NS_ERROR_NOT_INITIALIZED;
+  if (mRefNum == kResFileNotOpened)
+    return NS_ERROR_NOT_INITIALIZED;
 
-	::UseResFile(mSaveResFile);
+  ::UseResFile(mSaveResFile);
 
-	return (::ResError() == noErr ? NS_OK : NS_ERROR_FAILURE);
+  return (::ResError() == noErr ? NS_OK : NS_ERROR_FAILURE);
 }
 
