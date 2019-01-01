@@ -1547,11 +1547,7 @@ nsHTMLDocument::GetReferrer(nsAString& aReferrer)
 void
 nsHTMLDocument::GetDomainURI(nsIURI **aURI)
 {
-  *aURI = nsnull;
-
-  nsIPrincipal *principal = GetNodePrincipal();
-  if (!principal)
-    return;
+  nsIPrincipal *principal = NodePrincipal();
 
   principal->GetDomain(aURI);
   if (!*aURI) {
@@ -1632,15 +1628,11 @@ nsHTMLDocument::SetDomain(const nsAString& aDomain)
   if (NS_FAILED(NS_NewURI(getter_AddRefs(newURI), newURIString)))
     return NS_ERROR_FAILURE;
 
-  nsresult rv = NS_ERROR_NOT_AVAILABLE;
-  nsIPrincipal* principal = GetNodePrincipal();
-  if (principal) {
-    rv = principal->SetDomain(newURI);
+  nsresult rv = NodePrincipal()->SetDomain(newURI);
 
-    // Bug 13871: Frameset spoofing - note that document.domain was set
-    if (NS_SUCCEEDED(rv)) {
-      mDomainWasSet = PR_TRUE;
-    }
+  // Bug 13871: Frameset spoofing - note that document.domain was set
+  if (NS_SUCCEEDED(rv)) {
+    mDomainWasSet = PR_TRUE;
   }
 
   return rv;
@@ -1862,10 +1854,7 @@ nsHTMLDocument::GetCookie(nsAString& aCookie)
     // Get a URI from the document principal. We use the original
     // codebase in case the codebase was changed by SetDomain
     nsCOMPtr<nsIURI> codebaseURI;
-    nsIPrincipal* principal = GetNodePrincipal();
-    if (principal) {
-      principal->GetURI(getter_AddRefs(codebaseURI));
-    }
+    NodePrincipal()->GetURI(getter_AddRefs(codebaseURI));
 
     if (!codebaseURI) {
       // Document's principal is not a codebase (may be system), so
@@ -1895,10 +1884,7 @@ nsHTMLDocument::SetCookie(const nsAString& aCookie)
     }
 
     nsCOMPtr<nsIURI> codebaseURI;
-    nsIPrincipal* principal = GetNodePrincipal();
-    if (principal) {
-      principal->GetURI(getter_AddRefs(codebaseURI));
-    }
+    NodePrincipal()->GetURI(getter_AddRefs(codebaseURI));
 
     if (!codebaseURI) {
       // Document's principal is not a codebase (may be system), so
@@ -2010,17 +1996,21 @@ nsHTMLDocument::OpenCommon(const nsACString& aContentType, PRBool aReplace)
   // but only if we still have a window (i.e. our window object the
   // current inner window in our outer window).
 
+  // Hold onto ourselves on the offchance that we're down to one ref
+  nsCOMPtr<nsIDOMDocument> kungFuDeathGrip =
+    do_QueryInterface((nsIHTMLDocument*)this);
+
   nsPIDOMWindow *window = GetInnerWindow();
   if (window) {
-    // Hold onto ourselves on the offchance that we're down to one ref
-
-    nsCOMPtr<nsIDOMDocument> kungFuDeathGrip =
-      do_QueryInterface((nsIHTMLDocument*)this);
+    // Rememer the old scope in case the call to SetNewDocument changes it.
+    nsCOMPtr<nsIScriptGlobalObject> oldScope(do_QueryReferent(mScopeObject));
 
     rv = window->SetNewDocument(this, nsnull, PR_FALSE);
+    NS_ENSURE_SUCCESS(rv, rv);
 
-    if (NS_FAILED(rv)) {
-      return rv;
+    nsCOMPtr<nsIScriptGlobalObject> newScope(do_QueryReferent(mScopeObject));
+    if (oldScope && newScope != oldScope) {
+      nsContentUtils::ReparentContentWrappersInScope(oldScope, newScope);
     }
   }
 
@@ -3656,17 +3646,12 @@ nsHTMLDocument::SetDesignMode(const nsAString & aDesignMode)
     return NS_ERROR_FAILURE;
 
   nsresult rv = NS_OK;
-  // test if the above works if document.domain is set for Midas document
-  // (www.netscape.com --> netscape.com)
-  nsIPrincipal *principal = GetNodePrincipal();
-  if (!principal)
-    return NS_ERROR_FAILURE;
   nsCOMPtr<nsIPrincipal> subject;
   nsIScriptSecurityManager *secMan = nsContentUtils::GetSecurityManager();
   rv = secMan->GetSubjectPrincipal(getter_AddRefs(subject));
   NS_ENSURE_SUCCESS(rv, rv);
   if (subject) {
-     rv = secMan->CheckSameOriginPrincipal(subject, principal);
+     rv = secMan->CheckSameOriginPrincipal(subject, NodePrincipal());
      NS_ENSURE_SUCCESS(rv, rv);
   }
 

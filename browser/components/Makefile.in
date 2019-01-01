@@ -70,6 +70,10 @@ else
 DIRS += history bookmarks
 endif
 
+ifdef MOZ_FEEDS
+DIRS += feeds
+endif
+
 DIRS += build
 
 include $(topsrcdir)/config/rules.mk

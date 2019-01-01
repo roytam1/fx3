@@ -309,43 +309,28 @@
 
 
   <!-- CASE: <DEFAULT> -->
-  <binding id="xformswidget-case">
-    <content>
-      <html:div anonid="container" class="-moz-xforms-case-container">
-        <children/>
-      </html:div>
-    </content>
-
+  <binding id="xformswidget-case-base" extends="#xformswidget-general">
     <implementation implements="nsIXFormsCaseUIElement">
       <constructor>
         this.QueryInterface(Components.interfaces.nsIXFormsCaseElement).
           widgetAttached();
       </constructor>
 
-      <field name="_container">null</field>
-      <property name="container" readonly="true">
+      <property name="control" readonly="true">
         <getter>
-          if (!this._container) {
-            this._container = document.
-              getAnonymousElementByAttribute(this, "anonid", "container");
-          }
-          return this._container;
+          if (!this._control)
+            this._control = this.getControlElement();
+          return this._control;
         </getter>
       </property>
 
       <method name="caseSelected">
         <parameter name="aEnable"/>
         <body>
-          if (aEnable) {
-            this.container.style.display = "inherit";
-          } else {
-            this.container.style.display = "none"
-          }
-
+          this.control.selected = aEnable;
           return true;
         </body>
       </method>
-
     </implementation>
   </binding>
 
@@ -488,4 +473,24 @@
       </method>
     </implementation>
   </binding>
+
+
+  <!-- REPEAT -->
+  <binding id="xformswidget-repeat-base" extends="#xformswidget-accessors">
+
+    <implementation implements="nsIXFormsRepeatUIElement">
+      <property name="anonymousRepeatContent" readonly="true">
+        <getter>
+          if (!this._anonymousRepeatContent) {
+            this._anonymousRepeatContent =
+              document.getAnonymousElementByAttribute(this, "anonid", "insertion");
+          }
+          return this._anonymousRepeatContent;
+
+        </getter>
+      </property>
+      <field name="_anonymousRepeatContent">null</field>
+    </implementation>
+  </binding>
+
 </bindings>

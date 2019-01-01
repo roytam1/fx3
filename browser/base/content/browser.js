@@ -78,6 +78,9 @@ const BROWSER_ADD_BM_FEATURES = "centerscreen,chrome,dialog,resizable,modal";
 const BROWSER_ADD_BM_FEATURES = "centerscreen,chrome,dialog,resizable,dependent";
 #endif
 
+const TYPE_MAYBE_FEED = "application/vnd.mozilla.maybe.feed";
+const TYPE_XUL = "application/vnd.mozilla.xul+xml";
+
 var gBrowserGlue = Components.classes["@mozilla.org/browser/browserglue;1"]
                              .getService(nsCI.nsIBrowserGlue);
 var gRDF = null;
@@ -875,9 +878,6 @@ function prepareForStartup()
   window.QueryInterface(nsCI.nsIDOMChromeWindow).browserDOMWindow =
     new nsBrowserAccess();
 
-  window.browserContentListener =
-    new nsBrowserContentListener(window, gBrowser);
-
   // set default character set if provided
   if ("arguments" in window && window.arguments.length > 1 && window.arguments[1]) {
     if (window.arguments[1].indexOf("charset=") != -1) {
@@ -1145,7 +1145,6 @@ function BrowserShutdown()
         .XULBrowserWindow = null;
   window.QueryInterface(nsCI.nsIDOMChromeWindow).browserDOMWindow = null;
 
-  window.browserContentListener.close();
   // Close the app core.
   if (appCore)
     appCore.close();
@@ -2937,8 +2936,8 @@ const BrowserSearch = {
              getService(Ci.nsIBrowserSearchService);
     var engine;
   
-    // If the search bar is visible, use the current engine, otherwise, fall back
-    // to the default engine.
+    // If the search bar is visible, use the current engine, otherwise, fall
+    // back to the default engine.
     if (this.getSearchBar())
       engine = ss.currentEngine;
     else
@@ -2960,9 +2959,17 @@ const BrowserSearch = {
   getSearchBar: function BrowserSearch_getSearchBar() {
     var searchBar = document.getElementById("searchbar");
     if (searchBar && !searchBar.parentNode.parentNode.collapsed &&
-        !(window.getComputedStyle(searchBar.parentNode, null).display == "none"))
+        window.getComputedStyle(searchBar.parentNode, null).display != "none")
       return searchBar;
     return null;
+  },
+
+  loadAddEngines: function BrowserSearch_loadAddEngines() {
+    var newWindowPref = gPrefService.getIntPref("browser.link.open_newwindow");
+    var where = newWindowPref == 3 ? "tab" : "window";
+    var regionBundle = document.getElementById("bundle_browser_region");
+    var searchEnginesURL = regionBundle.getString("searchEnginesURL");
+    openUILinkIn(searchEnginesURL, where);
   }
 }
 
@@ -3967,138 +3974,6 @@ function displaySecurityInfo()
   BrowserPageInfo(null, "securityTab");
 }
 
-function nsBrowserContentListener(toplevelWindow, contentWindow)
-{
-    // this one is not as easy as you would hope.
-    // need to convert toplevelWindow to an XPConnected object, instead
-    // of a DOM-based object, to be able to QI() it to nsIXULWindow
-
-    this.init(toplevelWindow, contentWindow);
-}
-
-/* implements nsIURIContentListener */
-
-nsBrowserContentListener.prototype =
-{
-    init: function(toplevelWindow, contentWindow)
-    {
-        const nsIWebBrowserChrome = Components.interfaces.nsIWebBrowserChrome;
-        this.toplevelWindow = toplevelWindow;
-        this.contentWindow = contentWindow;
-
-        // hook up the whole parent chain thing
-        var windowDocShell = this.convertWindowToDocShell(toplevelWindow);
-        if (windowDocShell) {
-            windowDocshell
-              .QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-              .getInterface(Components.interfaces.nsIURIContentListener)
-              .parentContentListener = this;
-        }
-        var registerWindow = false;
-        try {
-          var treeItem = contentWindow.docShell.QueryInterface(Components.interfaces.nsIDocShellTreeItem);
-          var treeOwner = treeItem.treeOwner;
-          var interfaceRequestor = treeOwner.QueryInterface(Components.interfaces.nsIInterfaceRequestor);
-          var webBrowserChrome = interfaceRequestor.getInterface(nsIWebBrowserChrome);
-          if (webBrowserChrome)
-          {
-            var chromeFlags = webBrowserChrome.chromeFlags;
-            var res = chromeFlags & nsIWebBrowserChrome.CHROME_ALL;
-            var res2 = chromeFlags & nsIWebBrowserChrome.CHROME_DEFAULT;
-            if ( res == nsIWebBrowserChrome.CHROME_ALL || res2 == nsIWebBrowserChrome.CHROME_DEFAULT)
-            {
-              registerWindow = true;
-            }
-         }
-       } catch (ex) {}
-
-        // register ourselves
-       if (registerWindow)
-       {
-        var uriLoader = Components.classes["@mozilla.org/uriloader;1"].getService(Components.interfaces.nsIURILoader);
-        uriLoader.registerContentListener(this);
-       }
-    },
-    close: function()
-    {
-        this.contentWindow = null;
-        var uriLoader = Components.classes["@mozilla.org/uriloader;1"].getService(Components.interfaces.nsIURILoader);
-
-        uriLoader.unRegisterContentListener(this);
-    },
-    QueryInterface: function(iid)
-    {
-        if (iid.equals(Components.interfaces.nsIURIContentListener) ||
-            iid.equals(Components.interfaces.nsISupportsWeakReference) ||
-            iid.equals(Components.interfaces.nsISupports))
-          return this;
-        throw Components.results.NS_NOINTERFACE;
-    },
-    onStartURIOpen: function(uri)
-    {
-        // ignore and don't abort
-        return false;
-    },
-
-    doContent: function(contentType, isContentPreferred, request, contentHandler)
-    {
-        // forward the doContent to our content area webshell
-        var docShell = this.contentWindow.docShell;
-        var contentListener;
-        try {
-            contentListener =
-                docShell.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                .getInterface(Components.interfaces.nsIURIContentListener);
-        } catch (ex) {
-            dump(ex);
-        }
-
-        if (!contentListener) return false;
-
-        return contentListener.doContent(contentType, isContentPreferred, request, contentHandler);
-
-    },
-
-    isPreferred: function(contentType, desiredContentType)
-    {
-        // seems like we should be getting this from helper apps or something
-        switch(contentType) {
-            case "text/html":
-            case "text/xul":
-            case "text/rdf":
-            case "text/xml":
-            case "text/css":
-            case "image/gif":
-            case "image/jpeg":
-            case "image/png":
-            case "text/plain":
-            case "application/http-index-format":
-                return true;
-        }
-        return false;
-    },
-    canHandleContent: function(contentType, isContentPreferred, desiredContentType)
-    {
-        var docShell = this.contentWindow.docShell;
-        var contentListener;
-        try {
-            contentListener =
-                docShell.QueryInterface(Components.interfaces.nsIInterfaceRequestor).getInterface(Components.interfaces.nsIURIContentListener);
-        } catch (ex) {
-            dump(ex);
-        }
-        if (!contentListener) return false;
-
-        return contentListener.canHandleContent(contentType, isContentPreferred, desiredContentType);
-    },
-    convertWindowToDocShell: function(win) {
-        // don't know how to do this
-        return null;
-    },
-    loadCookie: null,
-    parentContentListener: null
-}
-
 // |forceOpen| is a bool that indicates that the sidebar should be forced open.  In other words
 // the toggle won't be allowed to close the sidebar.
 function toggleSidebar(aCommandID, forceOpen) {
@@ -4436,11 +4311,6 @@ nsContextMenu.prototype = {
         // Show if user clicked on something which has metadata.
         this.showItem( "context-metadata", this.onMetaDataItem );
     },
-    // called when the menu is going away
-    hiding : function() {
-        InlineSpellCheckerUI.clearSuggestionsFromMenu();
-        InlineSpellCheckerUI.clearDictionaryListFromMenu();
-    },
     // Set various context menu attributes based on the state of the world.
     setTarget : function ( node, event ) {
         const xulNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
@@ -4465,6 +4335,15 @@ nsContextMenu.prototype = {
         this.inFrame           = false;
         this.hasBGImage        = false;
         this.bgImageURL        = "";
+
+        // Clear any old spellchecking items from the menu, this used to
+        // be in the menu hiding code but wasn't getting called in all
+        // situations. Here, we can ensure it gets cleaned up any time the
+        // menu is shown. Note: must be before uninit because that clears the
+        // internal vars
+        InlineSpellCheckerUI.clearSuggestionsFromMenu();
+        InlineSpellCheckerUI.clearDictionaryListFromMenu();
+
         InlineSpellCheckerUI.uninit();
 
         // Remember the node that was clicked.
@@ -5919,29 +5798,20 @@ var MailIntegration = {
   }
 };
 
-function BrowserOpenExtensions(aOpenMode)
+function BrowserOpenAddonsMgr()
 {
   const EMTYPE = "Extension:Manager";
-
   var wm = Components.classes["@mozilla.org/appshell/window-mediator;1"]
                      .getService(Components.interfaces.nsIWindowMediator);
-  var needToOpen = true;
-  var windowType = EMTYPE + "-" + aOpenMode;
-  var windows = wm.getEnumerator(windowType);
-  while (windows.hasMoreElements()) {
-    var theEM = windows.getNext().QueryInterface(Components.interfaces.nsIDOMWindowInternal);
-    if (theEM.document.documentElement.getAttribute("windowtype") == windowType) {
-      theEM.focus();
-      needToOpen = false;
-      break;
-    }
+  var theEM = wm.getMostRecentWindow(EMTYPE);
+  if (theEM) {
+    theEM.focus();
+    return;
   }
 
-  if (needToOpen) {
-    const EMURL = "chrome://mozapps/content/extensions/extensions.xul?type=" + aOpenMode;
-    const EMFEATURES = "chrome,dialog=no,resizable";
-    window.openDialog(EMURL, "", EMFEATURES);
-  }
+  const EMURL = "chrome://mozapps/content/extensions/extensions.xul";
+  const EMFEATURES = "chrome,menubar,extra-chrome,toolbar,dialog=no,resizable";
+  window.openDialog(EMURL, "", EMFEATURES);
 }
 
 function escapeNameValuePair(aName, aValue, aIsFormUrlEncoded)

@@ -50,8 +50,7 @@ JS_BEGIN_EXTERN_C
 struct JSFunction {
     JSObject     *object;       /* back-pointer to GC'ed object header */
     uint16       nargs;         /* minimum number of actual arguments */
-    uint8        flags;         /* bound method and other flags, see jsapi.h */
-    JSPackedBool interpreted;   /* use u.i if true, u.n if false */
+    uint16       flags;         /* bound method and other flags, see jsapi.h */
     union {
         struct {
             uint16   extra;     /* number of arg slots for local GC roots */
@@ -68,19 +67,22 @@ struct JSFunction {
     JSClass      *clasp;        /* if non-null, constructor for this class */
 };
 
-#define FUN_NATIVE(fun)         ((fun)->interpreted ? NULL : (fun)->u.n.native)
-#define FUN_SCRIPT(fun)         ((fun)->interpreted ? (fun)->u.i.script : NULL)
+#define JSFUN_INTERPRETED    0x8000 /* use u.i if set, u.n if unset */
+
+#define FUN_INTERPRETED(fun) ((fun)->flags & JSFUN_INTERPRETED)
+#define FUN_NATIVE(fun)      (FUN_INTERPRETED(fun) ? NULL : (fun)->u.n.native)
+#define FUN_SCRIPT(fun)      (FUN_INTERPRETED(fun) ? (fun)->u.i.script : NULL)
 
 extern JSClass js_ArgumentsClass;
 extern JSClass js_CallClass;
 
-/* JS_FRIEND_DATA so that JSVAL_IS_FUNCTION is callable from outside */
+/* JS_FRIEND_DATA so that VALUE_IS_FUNCTION is callable from the shell. */
 extern JS_FRIEND_DATA(JSClass) js_FunctionClass;
 
 /*
  * NB: jsapi.h and jsobj.h must be included before any call to this macro.
  */
-#define JSVAL_IS_FUNCTION(cx, v)                                              \
+#define VALUE_IS_FUNCTION(cx, v)                                              \
     (!JSVAL_IS_PRIMITIVE(v) &&                                                \
      OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(v)) == &js_FunctionClass)
 

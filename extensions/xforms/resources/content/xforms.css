@@ -322,13 +322,28 @@ xul|*:root select > label, xul|*:root select1 > label {
   padding-top: 4px;
 }
 
-/* case widgets */
-case {
-  -moz-binding: url('chrome://xforms/content/xforms.xml#xformswidget-case');
+/* switch/case widgets */
+xul|*:root switch {
+  -moz-binding: url('chrome://xforms/content/xforms-xul.xml#xformswidget-switch');
+}
+html|*:root case {
+  -moz-binding: url('chrome://xforms/content/xforms-xhtml.xml#xformswidget-case');
 }
 
-case > html|div.-moz-xforms-case-container {
+html|*:root switch {
+  -moz-binding: url('chrome://xforms/content/xforms.xml#xformswidget-accessors');
+}
+xul|*:root case {
+  -moz-binding: url('chrome://xforms/content/xforms-xul.xml#xformswidget-case');
+}
+
+  /* switch/case styles */
+html|*:root case > html|div.-moz-xforms-case-container {
   display: inherit;
+}
+
+xul|*:root case xul|box[anonid="control"] {
+  -moz-box-orient: inherit;
 }
 
 /* select, select1 widgets */
@@ -557,6 +572,27 @@ html|*:root upload[mozType|type="http://www.w3.org/2001/XMLSchema#anyURI"],
 html|*:root upload[mozType|type="http://www.w3.org/2001/XMLSchema#base64Binary"],
 html|*:root upload[mozType|type="http://www.w3.org/2001/XMLSchema#hexBinary"] {
   -moz-binding: url('chrome://xforms/content/xforms-xhtml.xml#xformswidget-upload');
+}
+
+/* repeat widgets */
+html|*:root repeat {
+  -moz-binding: url('chrome://xforms/content/xforms-xhtml.xml#xformswidget-repeat');
+}
+
+xul|*:root repeat {
+  -moz-binding: url('chrome://xforms/content/xforms-xul.xml#xformswidget-repeat');
+}
+
+/* repeat styles */
+html|*:root repeat[appearance="compact"] .xf-repeat-item {
+  display: inline;
+}
+
+xul|*:root repeat[appearance="compact"] *|*[anonid="insertion"] {
+  -moz-box-orient: horizontal;
+}
+xul|*:root repeat .xf-repeat-item {
+  -moz-box-flex: 1;
 }
 
 /* default MIP styling */

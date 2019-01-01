@@ -560,7 +560,6 @@ BuildSpanDepTable(JSContext *cx, JSCodeGenerator *cg)
                 return JS_FALSE;
             break;
 
-#if JS_HAS_SWITCH_STATEMENT
           case JOF_TABLESWITCH:
           {
             jsbytecode *pc2;
@@ -608,7 +607,6 @@ BuildSpanDepTable(JSContext *cx, JSCodeGenerator *cg)
             len = 1 + pc2 - pc;
             break;
           }
-#endif /* JS_HAS_SWITCH_STATEMENT */
         }
 
         JS_ASSERT(len > 0);
@@ -2320,7 +2318,6 @@ EmitNumberOp(JSContext *cx, jsdouble dval, JSCodeGenerator *cg)
     return EmitAtomIndexOp(cx, JSOP_NUMBER, ALE_INDEX(ale), cg);
 }
 
-#if JS_HAS_SWITCH_STATEMENT
 static JSBool
 EmitSwitch(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
            JSStmtInfo *stmtInfo)
@@ -2765,7 +2762,6 @@ bad:
     ok = JS_FALSE;
     goto out;
 }
-#endif /* JS_HAS_SWITCH_STATEMENT */
 
 JSBool
 js_EmitFunctionBody(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body,
@@ -2798,7 +2794,7 @@ js_EmitFunctionBody(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body,
     fun->u.i.script = js_NewScriptFromCG(cx, cg, fun);
     if (!fun->u.i.script)
         return JS_FALSE;
-    JS_ASSERT(fun->interpreted);
+    JS_ASSERT(FUN_INTERPRETED(fun));
     if (cg->treeContext.flags & TCF_FUN_HEAVYWEIGHT)
         fun->flags |= JSFUN_HEAVYWEIGHT;
     return JS_TRUE;
@@ -2922,13 +2918,11 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             return JS_FALSE;
         atomIndex = ALE_INDEX(ale);
 
-#if JS_HAS_LEXICAL_CLOSURE
         /* Emit a bytecode pointing to the closure object in its immediate. */
         if (pn->pn_op != JSOP_NOP) {
             EMIT_ATOM_INDEX_OP(pn->pn_op, atomIndex);
             break;
         }
-#endif
 
         /* Top-level named functions need a nop for decompilation. */
         noteIndex = js_NewSrcNote2(cx, cg, SRC_FUNCDEF, (ptrdiff_t)atomIndex);
@@ -2943,7 +2937,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          */
         CG_SWITCH_TO_PROLOG(cg);
 
-#if JS_HAS_LEXICAL_CLOSURE
         if (cg->treeContext.flags & TCF_IN_FUNCTION) {
             JSObject *obj, *pobj;
             JSProperty *prop;
@@ -2984,9 +2977,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 pc += VARNO_LEN;
                 SET_ATOM_INDEX(pc, atomIndex);
             }
-        } else
-#endif
+        } else {
             EMIT_ATOM_INDEX_OP(JSOP_DEFFUN, atomIndex);
+        }
 
         CG_SWITCH_TO_MAIN(cg);
         break;
@@ -3107,12 +3100,10 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         ok = js_PopStatementCG(cx, cg);
         break;
 
-#if JS_HAS_SWITCH_STATEMENT
       case TOK_SWITCH:
         /* Out of line to avoid bloating js_EmitTree's stack frame size. */
         ok = EmitSwitch(cx, cg, pn, &stmtInfo);
         break;
-#endif /* JS_HAS_SWITCH_STATEMENT */
 
       case TOK_WHILE:
         js_PushStatement(&cg->treeContext, &stmtInfo, STMT_WHILE_LOOP, top);
@@ -3135,7 +3126,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         ok = js_PopStatementCG(cx, cg);
         break;
 
-#if JS_HAS_DO_WHILE_LOOP
       case TOK_DO:
         /* Emit an annotated nop so we know to decompile a 'do' keyword. */
         if (js_NewSrcNote(cx, cg, SRC_WHILE) < 0 ||
@@ -3169,7 +3159,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             return JS_FALSE;
         ok = js_PopStatementCG(cx, cg);
         break;
-#endif /* JS_HAS_DO_WHILE_LOOP */
 
       case TOK_FOR:
         beq = 0;                /* suppress gcc warnings */
@@ -3511,8 +3500,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         ok = js_PopStatementCG(cx, cg);
         break;
 
-#if JS_HAS_EXCEPTIONS
-
       case TOK_TRY:
       {
         ptrdiff_t start, end, catchStart, finallyCatch, catchJump;
@@ -3813,8 +3800,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         break;
       }
 
-#endif /* JS_HAS_EXCEPTIONS */
-
       case TOK_VAR:
         off = noteIndex = -1;
         for (pn2 = pn->pn_head; ; pn2 = pn2->pn_next) {
@@ -3983,7 +3968,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
              * that it appears useless to the compiler.
              */
             useful = wantval = !cx->fp->fun ||
-                               !cx->fp->fun->interpreted ||
+                               !FUN_INTERPRETED(cx->fp->fun) ||
                                (cx->fp->flags & JSFRAME_SPECIAL);
             if (!useful) {
                 if (!CheckSideEffects(cx, &cg->treeContext, pn2, &useful))
@@ -4305,12 +4290,8 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
       case TOK_BITAND:
       case TOK_EQOP:
       case TOK_RELOP:
-#if JS_HAS_IN_OPERATOR
       case TOK_IN:
-#endif
-#if JS_HAS_INSTANCEOF
       case TOK_INSTANCEOF:
-#endif
       case TOK_SHOP:
       case TOK_PLUS:
       case TOK_MINUS:
@@ -4349,9 +4330,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         }
         break;
 
-#if JS_HAS_EXCEPTIONS
       case TOK_THROW:
-#endif
 #if JS_HAS_XML_SUPPORT
       case TOK_AT:
       case TOK_DEFAULT:
@@ -4361,9 +4340,15 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
       case TOK_UNARYOP:
         /* Unary op, including unary +/-. */
         pn2 = pn->pn_kid;
+        op = pn->pn_op;
+        if (op == JSOP_TYPEOF) {
+            for (pn3 = pn2; pn3->pn_type == TOK_RP; pn3 = pn3->pn_kid)
+                continue;
+            if (pn3->pn_type != TOK_NAME)
+                op = JSOP_TYPEOFEXPR;
+        }
         if (!js_EmitTree(cx, cg, pn2))
             return JS_FALSE;
-        op = pn->pn_op;
 #if JS_HAS_XML_SUPPORT
         if (op == JSOP_XMLNAME &&
             js_NewSrcNote2(cx, cg, SRC_PCBASE,
@@ -4588,7 +4573,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             return JS_FALSE;
         break;
 
-#if JS_HAS_INITIALIZERS
       case TOK_RB:
         /*
          * Emit code for [a, b, c] of the form:
@@ -4722,7 +4706,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         EMIT_UINT16_IMM_OP(JSOP_USESHARP, (jsatomid) pn->pn_num);
         break;
 #endif /* JS_HAS_SHARP_VARS */
-#endif /* JS_HAS_INITIALIZERS */
 
       case TOK_RP:
         /*

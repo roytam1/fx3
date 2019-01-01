@@ -279,6 +279,20 @@ js_HasLengthProperty(JSContext *cx, JSObject *obj, jsuint *lengthp)
     return ValueIsLength(cx, v, lengthp);
 }
 
+JSBool
+js_IsArrayLike(JSContext *cx, JSObject *obj, JSBool *answerp, jsuint *lengthp)
+{
+    JSClass *clasp;
+    
+    clasp = OBJ_GET_CLASS(cx, obj);
+    *answerp = (clasp == &js_ArgumentsClass || clasp == &js_ArrayClass);
+    if (!*answerp) {
+        *lengthp = 0;
+        return JS_TRUE;
+    }
+    return js_GetLengthProperty(cx, obj, lengthp);
+}
+
 /*
  * This get function is specific to Array.prototype.length and other array
  * instance length properties.  It calls back through the class get function
@@ -331,21 +345,6 @@ array_addProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 static JSBool
 array_convert(JSContext *cx, JSObject *obj, JSType type, jsval *vp)
 {
-    jsuint length;
-
-    if (JS_VERSION_IS_1_2(cx)) {
-        if (!js_GetLengthProperty(cx, obj, &length))
-            return JS_FALSE;
-        switch (type) {
-          case JSTYPE_NUMBER:
-            return IndexToValue(cx, length, vp);
-          case JSTYPE_BOOLEAN:
-            *vp = BOOLEAN_TO_JSVAL(length > 0);
-            return JS_TRUE;
-          default:
-            return JS_TRUE;
-        }
-    }
     return js_TryValueOf(cx, obj, type, vp);
 }
 
@@ -481,12 +480,8 @@ array_join_sub(JSContext *cx, JSObject *obj, enum ArrayToStringOp op,
                 goto done;
             if (id == JSID_HOLE) {
                 str = cx->runtime->emptyString;
-                /*
-                 * For tail holes always append single "," and not ", "
-                 * unless the version is JS1.2 where for extra compatibility
-                 * the full ", " is added even in the tail case.
-                 */
-                if (index + 1 == length && !JS_VERSION_IS_1_2(cx))
+                /* For tail holes always append single "," and not ", ". */
+                if (index + 1 == length)
                     seplen = 1;
                 goto got_str;
             }
@@ -496,17 +491,8 @@ array_join_sub(JSContext *cx, JSObject *obj, enum ArrayToStringOp op,
         if (!ok)
             goto done;
 
-        if ((op != TO_SOURCE || JS_VERSION_IS_1_2(cx)) &&
-            (JSVAL_IS_VOID(v) || JSVAL_IS_NULL(v))) {
+        if (op != TO_SOURCE && (JSVAL_IS_VOID(v) || JSVAL_IS_NULL(v))) {
             str = cx->runtime->emptyString;
-            if (op == TO_SOURCE) {
-                /*
-                 * JS1.2 treats null and undefined in the same way as holes.
-                 * It requires to add terminating ", " after empty string
-                 * representing tail null or undefined.
-                 */
-                goto got_str;
-            }
         } else {
             if (op == TO_LOCALE_STRING) {
                 if (!js_ValueToObject(cx, v, &obj2) ||
@@ -611,13 +597,7 @@ static JSBool
 array_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                jsval *rval)
 {
-    /*
-     * JS1.2 arrays convert to array literals, with a comma followed by a space
-     * between each element.
-     */
-    return array_join_sub(cx, obj,
-                          (JS_VERSION_IS_1_2(cx) ? TO_SOURCE : TO_STRING),
-                          NULL, rval);
+    return array_join_sub(cx, obj, TO_STRING, NULL, rval);
 }
 
 static JSBool
@@ -668,7 +648,6 @@ InitArrayObject(JSContext *cx, JSObject *obj, jsuint length, jsval *vector)
     return InitArrayElements(cx, obj, length, vector);
 }
 
-#if JS_HAS_SOME_PERL_FUN
 /*
  * Perl-inspired join, reverse, and sort.
  */
@@ -1090,9 +1069,7 @@ out:
         JS_free(cx, vec);
     return ok;
 }
-#endif /* JS_HAS_SOME_PERL_FUN */
 
-#if JS_HAS_MORE_PERL_FUN
 /*
  * Perl-inspired push, pop, shift, unshift, and splice methods.
  */
@@ -1112,17 +1089,10 @@ array_push(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             return JS_FALSE;
     }
 
-    /*
-     * If JS1.2, follow Perl4 by returning the last thing pushed.  Otherwise,
-     * return the new array length.
-     */
+    /* Per ECMA-262, return the new array length. */
     length += argc;
-    if (JS_VERSION_IS_1_2(cx)) {
-        *rval = argc ? argv[argc-1] : JSVAL_VOID;
-    } else {
-        if (!IndexToValue(cx, length, rval))
-            return JS_FALSE;
-    }
+    if (!IndexToValue(cx, length, rval))
+        return JS_FALSE;
     return js_SetLengthProperty(cx, obj, length);
 }
 
@@ -1292,54 +1262,35 @@ array_splice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         argv++;
     }
 
-    if (count == 1 && JS_VERSION_IS_1_2(cx)) {
-        /*
-         * JS lacks "list context", whereby in Perl one turns the single
-         * scalar that's spliced out into an array just by assigning it to
-         * @single instead of $single, or by using it as Perl push's first
-         * argument, for instance.
-         *
-         * JS1.2 emulated Perl too closely and returned a non-Array for
-         * the single-splice-out case, requiring callers to test and wrap
-         * in [] if necessary.  So JS1.3, default, and other versions all
-         * return an array of length 1 for uniformity.
-         */
-        if (!IndexToId(cx, begin, &id))
-            return JS_FALSE;
-        if (!OBJ_GET_PROPERTY(cx, obj, id, rval))
-            return JS_FALSE;
-    } else {
-        if (!JS_VERSION_IS_1_2(cx) || count > 0) {
-            /*
-             * Create a new array value to return.  Our ECMA v2 proposal specs
-             * that splice always returns an array value, even when given no
-             * arguments.  We think this is best because it eliminates the need
-             * for callers to do an extra test to handle the empty splice case.
-             */
-            obj2 = js_NewArrayObject(cx, 0, NULL);
-            if (!obj2)
+
+    /*
+     * Create a new array value to return.  Our ECMA v2 proposal specs
+     * that splice always returns an array value, even when given no
+     * arguments.  We think this is best because it eliminates the need
+     * for callers to do an extra test to handle the empty splice case.
+     */
+    obj2 = js_NewArrayObject(cx, 0, NULL);
+    if (!obj2)
+        return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(obj2);
+
+    /* If there are elements to remove, put them into the return value. */
+    if (count > 0) {
+        for (last = begin; last < end; last++) {
+            if (!IndexToExistingId(cx, obj, last, &id))
                 return JS_FALSE;
-            *rval = OBJECT_TO_JSVAL(obj2);
-
-            /* If there are elements to remove, put them into the return value. */
-            if (count > 0) {
-                for (last = begin; last < end; last++) {
-                    if (!IndexToExistingId(cx, obj, last, &id))
-                        return JS_FALSE;
-                    if (id == JSID_HOLE)
-                        continue;       /* don't fill holes in the new array */
-                    if (!OBJ_GET_PROPERTY(cx, obj, id, vp))
-                        return JS_FALSE;
-                    if (!IndexToId(cx, last - begin, &id2))
-                        return JS_FALSE;
-                    if (!OBJ_SET_PROPERTY(cx, obj2, id2, vp))
-                        return JS_FALSE;
-                }
-
-                if (!js_SetLengthProperty(cx, obj2, end - begin))
-                    return JS_FALSE;
-            }
+            if (id == JSID_HOLE)
+                continue;       /* don't fill holes in the new array */
+            if (!OBJ_GET_PROPERTY(cx, obj, id, vp))
+                return JS_FALSE;
+            if (!IndexToId(cx, last - begin, &id2))
+                return JS_FALSE;
+            if (!OBJ_SET_PROPERTY(cx, obj2, id2, vp))
+                return JS_FALSE;
         }
+
+        if (!js_SetLengthProperty(cx, obj2, end - begin))
+            return JS_FALSE;
     }
 
     /* Find the direction (up or down) to copy and make way for argv. */
@@ -1394,9 +1345,7 @@ array_splice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     /* Update length in case we deleted elements from the end. */
     return js_SetLengthProperty(cx, obj, length);
 }
-#endif /* JS_HAS_MORE_PERL_FUN */
 
-#if JS_HAS_SEQUENCE_OPS
 /*
  * Python-esque sequence operations.
  */
@@ -1538,7 +1487,6 @@ array_slice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     }
     return js_SetLengthProperty(cx, nobj, end - begin);
 }
-#endif /* JS_HAS_SEQUENCE_OPS */
 
 #if JS_HAS_ARRAY_EXTRAS
 
@@ -1635,7 +1583,7 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
     JSObject *callable, *thisp, *newarr;
     void *mark;
     JSStackFrame *fp;
-    JSBool ok, b;
+    JSBool ok, cond;
 
     /* Hoist the explicit local root address computation. */
     vp = argv + argc;
@@ -1733,11 +1681,11 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
 
         if (mode > MAP) {
             if (rval2 == JSVAL_NULL) {
-                b = JS_FALSE;
+                cond = JS_FALSE;
             } else if (JSVAL_IS_BOOLEAN(rval2)) {
-                b = JSVAL_TO_BOOLEAN(rval2);
+                cond = JSVAL_TO_BOOLEAN(rval2);
             } else {
-                ok = js_ValueToBoolean(cx, rval2, &b);
+                ok = js_ValueToBoolean(cx, rval2, &cond);
                 if (!ok)
                     goto out;
             }
@@ -1752,7 +1700,7 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
                 goto out;
             break;
           case FILTER:
-            if (!b)
+            if (!cond)
                 break;
             /* Filter passed *vp, push as result. */
             ok = IndexToId(cx, newlen++, &id);
@@ -1763,13 +1711,13 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
                 goto out;
             break;
           case SOME:
-            if (b) {
+            if (cond) {
                 *rval = JSVAL_TRUE;
                 goto out;
             }
             break;
           case EVERY:
-            if (!b) {
+            if (!cond) {
                 *rval = JSVAL_FALSE;
                 goto out;
             }
@@ -1828,24 +1776,18 @@ static JSFunctionSpec array_methods[] = {
     {js_toLocaleString_str, array_toLocaleString,   0,0,0},
 
     /* Perl-ish methods. */
-#if JS_HAS_SOME_PERL_FUN
     {"join",                array_join,             1,JSFUN_GENERIC_NATIVE,0},
     {"reverse",             array_reverse,          0,JSFUN_GENERIC_NATIVE,2},
     {"sort",                array_sort,             1,JSFUN_GENERIC_NATIVE,2},
-#endif
-#if JS_HAS_MORE_PERL_FUN
     {"push",                array_push,             1,JSFUN_GENERIC_NATIVE,0},
     {"pop",                 array_pop,              0,JSFUN_GENERIC_NATIVE,0},
     {"shift",               array_shift,            0,JSFUN_GENERIC_NATIVE,1},
     {"unshift",             array_unshift,          1,JSFUN_GENERIC_NATIVE,1},
     {"splice",              array_splice,           2,JSFUN_GENERIC_NATIVE,1},
-#endif
 
     /* Python-esque sequence methods. */
-#if JS_HAS_SEQUENCE_OPS
     {"concat",              array_concat,           1,JSFUN_GENERIC_NATIVE,1},
     {"slice",               array_slice,            2,JSFUN_GENERIC_NATIVE,1},
-#endif
 
 #if JS_HAS_ARRAY_EXTRAS
     {"indexOf",             array_indexOf,          1,JSFUN_GENERIC_NATIVE,0},
@@ -1877,9 +1819,6 @@ Array(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     if (argc == 0) {
         length = 0;
         vector = NULL;
-    } else if (JS_VERSION_IS_1_2(cx)) {
-        length = (jsuint) argc;
-        vector = argv;
     } else if (argc > 1) {
         length = (jsuint) argc;
         vector = argv;

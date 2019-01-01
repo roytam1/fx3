@@ -57,6 +57,7 @@
 #include "nsIServiceManager.h"
 #include "nsIAccessibilityService.h"
 #endif
+#include "nsDisplayList.h"
 
 #ifdef DEBUG
 #undef NOISY_PUSHING
@@ -817,8 +818,7 @@ NS_IMETHODIMP nsInlineFrame::GetAccessible(nsIAccessible** aAccessible)
   *aAccessible = nsnull;
   nsIAtom *tagAtom = mContent->Tag();
   if ((tagAtom == nsHTMLAtoms::img || tagAtom == nsHTMLAtoms::input || 
-       tagAtom == nsHTMLAtoms::label || tagAtom == nsHTMLAtoms::hr) &&
-      mContent->IsContentOfType(nsIContent::eHTML)) {
+       tagAtom == nsHTMLAtoms::label) && mContent->IsContentOfType(nsIContent::eHTML)) {
     // Only get accessibility service if we're going to use it
     nsCOMPtr<nsIAccessibilityService> accService(do_GetService("@mozilla.org/accessibilityService;1"));
     if (!accService)
@@ -829,8 +829,6 @@ NS_IMETHODIMP nsInlineFrame::GetAccessible(nsIAccessible** aAccessible)
       return accService->CreateHTMLImageAccessible(NS_STATIC_CAST(nsIFrame*, this), aAccessible);
     else if (tagAtom == nsHTMLAtoms::label)  // Creat accessible for <label>
       return accService->CreateHTMLLabelAccessible(NS_STATIC_CAST(nsIFrame*, this), aAccessible);
-    // Create accessible for <hr>
-    return accService->CreateHTMLHRAccessible(NS_STATIC_CAST(nsIFrame*, this), aAccessible);
   }
 
   return NS_ERROR_FAILURE;
@@ -1085,10 +1083,8 @@ nsPositionedInlineFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                           const nsRect&           aDirtyRect,
                                           const nsDisplayListSet& aLists)
 {
-  MarkOutOfFlowChildrenForDisplayList(mAbsoluteContainer.GetFirstChild(), aDirtyRect);
-  nsresult rv = nsHTMLContainerFrame::BuildDisplayList(aBuilder, aDirtyRect, aLists);
-  UnmarkOutOfFlowChildrenForDisplayList(mAbsoluteContainer.GetFirstChild());
-  return rv;
+  aBuilder->MarkFramesForDisplayList(this, mAbsoluteContainer.GetFirstChild(), aDirtyRect);
+  return nsHTMLContainerFrame::BuildDisplayList(aBuilder, aDirtyRect, aLists);
 }
 
 nsIAtom*

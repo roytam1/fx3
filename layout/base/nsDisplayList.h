@@ -236,6 +236,17 @@ public:
   void LeavePresShell(nsIFrame* aReferenceFrame, const nsRect& aDirtyRect);
   
   /**
+   * Mark aFrames and its (next) siblings to be displayed if they
+   * intersect aDirtyRect (which is relative to aDirtyFrame). If the
+   * frame(s) have placeholders that might not be displayed, we mark the
+   * placeholders and their ancestors to ensure that display list construction
+   * descends into them anyway. nsDisplayListBuilder will take care of
+   * unmarking them when it is destroyed.
+   */
+  void MarkFramesForDisplayList(nsIFrame* aDirtyFrame, nsIFrame* aFrames,
+                                const nsRect& aDirtyRect);
+  
+  /**
    * Allocate memory in our arena. It will only be freed when this display list
    * builder is destroyed. This memory holds nsDisplayItems. nsDisplayItem
    * destructors are called as soon as the item is no longer used.
@@ -272,7 +283,8 @@ private:
   nsIFrame*              mIgnoreScrollFrame;
   PLArenaPool            mPool;
   nsCOMPtr<nsISelection> mBoundingSelection;
-  nsTArray<nsIFrame *>   mCaretStates;
+  nsTArray<nsIFrame*>    mCaretStates;
+  nsTArray<nsIFrame*>    mFramesMarkedForDisplay;
   PRPackedBool           mBuildCaret;
   PRPackedBool           mEventDelivery;
   PRPackedBool           mIsBackgroundOnly;
@@ -602,7 +614,7 @@ public:
    */
   typedef PRBool (* SortLEQ)(nsDisplayItem* aItem1, nsDisplayItem* aItem2,
                              void* aClosure);
-  void Sort(SortLEQ aCmp, void* aClosure);
+  void Sort(nsDisplayListBuilder* aBuilder, SortLEQ aCmp, void* aClosure);
 
   /**
    * Optimize the display list for visibility, removing any elements that

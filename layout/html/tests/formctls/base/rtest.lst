@@ -24,6 +24,7 @@ input_radio_strict.html
 input_submit_strict.html
 input_reset_strict.html
 input_file_strict.html
+input_file_strict2.html
 input_hidden_strict.html
 input_image_strict.html
 input_button_strict.html
@@ -40,3 +41,10 @@ button_no_margin_strict.html
 button_with_margin.html
 button_with_margin_strict.html
 button_min_max_widths.html
+button_min_max_widths_strict.html
+button_small_avail_width.html
+button_small_avail_width_strict.html
+button_overconstrained.html
+button_overconstrained_strict.html
+input_button_overconstrained.html
+input_button_overconstrained_strict.html

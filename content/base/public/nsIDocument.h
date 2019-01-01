@@ -91,8 +91,8 @@ class nsIDocumentObserver;
 
 // IID for the nsIDocument interface
 #define NS_IDOCUMENT_IID      \
-{ 0x3b3cb52f, 0xf604, 0x48d5, \
-  { 0xb5, 0x70, 0xf3, 0x25, 0xbb, 0x0a, 0x7a, 0x22 } }
+{ 0x726ce58e, 0x13ab, 0x4c91, \
+  { 0x80, 0x45, 0xa8, 0x7b, 0xfe, 0xd5, 0xfe, 0xcd } }
 
 
 // Flag for AddStyleSheet().
@@ -480,9 +480,10 @@ public:
 
   /**
    * Get the object that is used as the scope for all of the content
-   * wrappers whose owner document is this document. Unlike the script
-   * global object, this never changes once it's set. Use this object
-   * when you're trying to find a content wrapper in XPConnect.
+   * wrappers whose owner document is this document. Unlike the script global
+   * object, this will only return null when the global object for this
+   * document is truly gone. Use this object when you're trying to find a
+   * content wrapper in XPConnect.
    */
   virtual nsIScriptGlobalObject* GetScopeObject() = 0;
 
@@ -898,6 +899,13 @@ public:
    */
   virtual void CopyUserData(const nsINode *aObject,
                             nsIDocument *aDestination) = 0;
+
+  /**
+   * Resets and removes a box object from the document's box object cache
+   *
+   * @param aElement canonical nsIContent pointer of the box object's element
+   */
+  virtual void ClearBoxObjectFor(nsIContent *aContent) = 0;
 
 protected:
   ~nsIDocument()

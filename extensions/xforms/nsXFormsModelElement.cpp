@@ -517,8 +517,7 @@ nsPostRefresh::~nsPostRefresh()
 #ifdef DEBUG_smaug
   printf("~nsPostRefresh\n");
 #endif
-  --sRefreshing;
-  if (sPostRefreshList && !sRefreshing) {
+  if (sPostRefreshList && sRefreshing == 1) {
     while (sPostRefreshList->Count()) {
       // Iterating this way because refresh can lead to
       // additions/deletions in sPostRefreshList.
@@ -531,9 +530,12 @@ nsPostRefresh::~nsPostRefresh()
       if (control)
         control->Refresh();
     }
-    delete sPostRefreshList;
-    sPostRefreshList = nsnull;
+    if (sRefreshing == 1) {
+      delete sPostRefreshList;
+      sPostRefreshList = nsnull;
+    }
   }
+  --sRefreshing;
 }
 
 const nsVoidArray* 
@@ -1057,8 +1059,9 @@ nsXFormsModelElement::SetStates(nsIXFormsControl *aControl,
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Event dispatching is defined by the bound node, so if there's no bound
-  // node, there are no events to send.
-  if (!ns)
+  // node, there are no events to send. xforms-ready also needs to be handled,
+  // because these events are not sent before that.
+  if (!ns || !mReadyHandled)
     return NS_OK;
 
   if (ns->ShouldDispatchValid()) {

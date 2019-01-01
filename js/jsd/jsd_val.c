@@ -139,7 +139,8 @@ jsd_IsValuePrimitive(JSDContext* jsdc, JSDValue* jsdval)
 JSBool
 jsd_IsValueFunction(JSDContext* jsdc, JSDValue* jsdval)
 {
-    return JSVAL_IS_FUNCTION(jsdc->dumbContext, jsdval->val);
+    return !JSVAL_IS_PRIMITIVE(jsdval->val) &&
+           JS_ObjectIsFunction(jsdc->dumbContext, JSVAL_TO_OBJECT(jsdval->val));
 }
 
 JSBool
@@ -150,10 +151,7 @@ jsd_IsValueNative(JSDContext* jsdc, JSDValue* jsdval)
     JSFunction* fun;
     JSExceptionState* exceptionState;
 
-    if(!JSVAL_IS_OBJECT(val))
-        return JS_FALSE;
-
-    if(JSVAL_IS_FUNCTION(cx, val))
+    if(jsd_IsValueFunction(jsdc, jsdval))
     {
         exceptionState = JS_SaveExceptionState(cx);
         fun = JS_ValueToFunction(cx, val);
@@ -165,7 +163,7 @@ jsd_IsValueNative(JSDContext* jsdc, JSDValue* jsdval)
         }
         return JS_GetFunctionScript(cx, fun) ? JS_FALSE : JS_TRUE;
     }
-    return JSVAL_TO_OBJECT(val) && OBJ_IS_NATIVE(JSVAL_TO_OBJECT(val));
+    return !JSVAL_IS_PRIMITIVE(val);
 }
 
 /***************************************************************************/
@@ -227,14 +225,13 @@ const char*
 jsd_GetValueFunctionName(JSDContext* jsdc, JSDValue* jsdval)
 {
     JSContext* cx = jsdc->dumbContext;
-    jsval val = jsdval->val;
     JSFunction* fun;
     JSExceptionState* exceptionState;
 
-    if(!jsdval->funName && JSVAL_IS_FUNCTION(cx, val))
+    if(!jsdval->funName && jsd_IsValueFunction(jsdc, jsdval))
     {
         exceptionState = JS_SaveExceptionState(cx);
-        fun = JS_ValueToFunction(cx, val);
+        fun = JS_ValueToFunction(cx, jsdval->val);
         JS_RestoreExceptionState(cx, exceptionState);
         if(!fun)
             return NULL;
@@ -510,7 +507,7 @@ jsd_GetValuePrototype(JSDContext* jsdc, JSDValue* jsdval)
             return NULL;
         if(!(obj = JSVAL_TO_OBJECT(jsdval->val)))
             return NULL;
-        if(!(proto = OBJ_GET_PROTO(jsdc->dumbContext,obj)))
+        if(!(proto = JS_GetPrototype(jsdc->dumbContext, obj)))
             return NULL;
         jsdval->proto = jsd_NewValue(jsdc, OBJECT_TO_JSVAL(proto));
     }
@@ -532,7 +529,7 @@ jsd_GetValueParent(JSDContext* jsdc, JSDValue* jsdval)
             return NULL;
         if(!(obj = JSVAL_TO_OBJECT(jsdval->val)))
             return NULL;
-        if(!(parent = OBJ_GET_PARENT(jsdc->dumbContext,obj)))
+        if(!(parent = JS_GetParent(jsdc->dumbContext,obj)))
             return NULL;
         jsdval->parent = jsd_NewValue(jsdc, OBJECT_TO_JSVAL(parent));
     }
@@ -555,7 +552,7 @@ jsd_GetValueConstructor(JSDContext* jsdc, JSDValue* jsdval)
             return NULL;
         if(!(obj = JSVAL_TO_OBJECT(jsdval->val)))
             return NULL;
-        if(!(proto = OBJ_GET_PROTO(jsdc->dumbContext,obj)))
+        if(!(proto = JS_GetPrototype(jsdc->dumbContext,obj)))
             return NULL;
         if(!(ctor = JS_GetConstructor(jsdc->dumbContext,proto)))
             return NULL;
@@ -575,8 +572,8 @@ jsd_GetValueClassName(JSDContext* jsdc, JSDValue* jsdval)
         JSObject* obj;
         if(!(obj = JSVAL_TO_OBJECT(val)))
             return NULL;
-        if(OBJ_GET_CLASS(jsdc->dumbContext, obj))
-            jsdval->className = OBJ_GET_CLASS(jsdc->dumbContext, obj)->name;
+        if(JS_GET_CLASS(jsdc->dumbContext, obj))
+            jsdval->className = JS_GET_CLASS(jsdc->dumbContext, obj)->name;
     }
     return jsdval->className;
 }

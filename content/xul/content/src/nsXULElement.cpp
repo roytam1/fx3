@@ -937,8 +937,7 @@ nsXULElement::UnbindFromTree(PRBool aDeep, PRBool aNullParent)
         // anonymous content that the document is changing.
         document->BindingManager()->ChangeDocumentFor(this, document, nsnull);
 
-        nsCOMPtr<nsIDOMNSDocument> nsDoc(do_QueryInterface(document));
-        nsDoc->SetBoxObjectFor(this, nsnull);
+        document->ClearBoxObjectFor(this);
     }
 
     // mControllers can own objects that are implemented
@@ -3081,12 +3080,6 @@ nsXULPrototypeScript::Compile(const PRUnichar* aText,
             return NS_ERROR_UNEXPECTED;
     }
 
-    // Use the enclosing document's principal
-    // XXX is this right? or should we use the protodoc's?
-    nsIPrincipal *principal = aDocument->GetNodePrincipal();
-    if (!principal)
-        return NS_ERROR_FAILURE;
-
     nsCAutoString urlspec;
     aURI->GetSpec(urlspec);
 
@@ -3111,7 +3104,10 @@ nsXULPrototypeScript::Compile(const PRUnichar* aText,
     rv = context->CompileScript(aText,
                                 aTextLength,
                                 nsnull,
-                                principal,
+                                // Use the enclosing document's principal
+                                // XXX is this right? or should we use the
+                                // protodoc's?
+                                aDocument->NodePrincipal(),
                                 urlspec.get(),
                                 aLineNo,
                                 mLangVersion,
