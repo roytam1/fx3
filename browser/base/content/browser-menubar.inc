@@ -357,7 +357,8 @@
                           key="historyHome"/>
                 <menuseparator/>
                 <menuitem label="&historySearchCmd.label;"
-                          command="Browser:SearchHistory"/>
+                          command="Browser:SearchHistory"
+                          key="searchHistoryKb"/>
                 <menuitem label="&historyShowCmd.label;"
                           command="Browser:ShowHistory"/>
                 <menuseparator id="startTabHistorySeparator"/>
@@ -487,6 +488,13 @@
 #else
               <menuitem accesskey="&pageInfoCmd.accesskey;" label="&pageInfoCmd.label;"   
                         key="key_viewInfo" command="View:PageInfo"/>
+#endif
+#ifndef MOZ_PLACES
+              <menuseparator id="sanitizeSeparator"/>
+              <menuitem id="sanitizeItem"
+                        accesskey="&clearPrivateDataCmd.accesskey;"
+                        label="&clearPrivateDataCmd.label;"
+                        key="key_sanitize" command="Tools:Sanitize"/>
 #endif
 #ifndef XP_UNIX
               <menuseparator id="prefSep"/>

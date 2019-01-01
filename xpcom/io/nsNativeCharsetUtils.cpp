@@ -65,12 +65,6 @@ NS_CopyUnicodeToNative(const nsAString  &input, nsACString &output)
     return NS_OK;
 }
 
-NS_COM PRBool
-NS_IsNativeUTF8()
-{
-    return PR_TRUE;
-}
-
 void
 NS_StartupNativeCharsetUtils()
 {
@@ -971,12 +965,6 @@ NS_CopyUnicodeToNative(const nsAString  &input, nsACString &output)
     return NS_OK;
 }
 
-NS_COM PRBool
-NS_IsNativeUTF8()
-{
-    return PR_FALSE;
-}
-
 void
 NS_StartupNativeCharsetUtils()
 {
@@ -1078,12 +1066,6 @@ NS_CopyUnicodeToNative(const nsAString &input, nsACString &output)
     // written.
     output.Truncate(resultLen - resultLeft);
     return NS_OK;
-}
-
-NS_COM PRBool
-NS_IsNativeUTF8()
-{
-    return PR_FALSE;
 }
 
 void
@@ -1289,12 +1271,6 @@ NS_CopyUnicodeToNative(const nsAString  &input, nsACString &output)
     return nsFSStringConversionMac::UCSToFS(input, output);
 }
 
-NS_COM PRBool
-NS_IsNativeUTF8()
-{
-    return PR_FALSE;
-}
-
 void
 NS_StartupNativeCharsetUtils()
 {
@@ -1325,12 +1301,6 @@ NS_CopyUnicodeToNative(const nsAString  &input, nsACString &output)
 {
     LossyCopyUTF16toASCII(input, output);
     return NS_OK;
-}
-
-NS_COM PRBool
-NS_IsNativeUTF8()
-{
-    return PR_FALSE;
 }
 
 void

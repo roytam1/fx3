@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -12,14 +12,15 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is JavaScript Engine testing utilities.
+ * The Original Code is Mozilla XForms support.
  *
  * The Initial Developer of the Original Code is
- * Mozilla Foundation.
+ * Olli Pettay.
  * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
- * Contributor(s): Jesse Ruderman
+ * Contributor(s):
+ *   Olli Pettay <Olli.Pettay@helsinki.fi> (original author)
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -34,23 +35,24 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
-//-----------------------------------------------------------------------------
-var bug = 322177;
-var summary = 'anonymous functions should be anonymous';
-var actual = '';
-var expect = '';
 
-printBugNumber (bug);
-printStatus (summary);
+#include "nsISupports.idl"
 
-var f;
+/**
+ * Interface implemented by the UI part of the ephemeral message and hint.
+ */
 
-f = (function () {});
-expect = '';
-actual = f.name;
-reportCompare(expect, actual, summary + ': (function(){})');
+[scriptable, uuid(631c0e3b-3cd8-4a61-8d93-7f8181a19bf9)]
+interface nsIXFormsEphemeralMessageUI : nsISupports
+{
+  /**
+   * Called, when element should make itself visible.
+   * Parameters are hints to where to place the element.
+   */
+  void show(in long coordinateHintX, in long coordinateHintY);
 
-f = new Function();
-expect = '';
-actual = f.name;
-reportCompare(expect, actual, summary + ': new Function()');
+  /**
+   * Called, when element should hide itself.
+   */
+  void hide();
+};

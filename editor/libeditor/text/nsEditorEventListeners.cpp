@@ -1,4 +1,5 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=4 sw=2 et tw=78: */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -55,12 +56,6 @@
 #include "nsIPrefService.h"
 #include "nsILookAndFeel.h"
 #include "nsPresContext.h"
-#ifdef USE_HACK_REPAINT
-// for repainting hack only
-#include "nsIView.h"
-#include "nsIViewManager.h"
-// end repainting hack only
-#endif
 
 // Drag & Drop, Clipboard
 #include "nsIServiceManager.h"
@@ -530,6 +525,8 @@ nsTextEditorDragListener::DragEnter(nsIDOMEvent* aDragEvent)
       {
         mCaret->Init(presShell);
         mCaret->SetCaretReadOnly(PR_TRUE);
+
+        mOtherCaret = presShell->SetCaret(mCaret);
       }
       mCaretDrawn = PR_FALSE;
     }
@@ -631,7 +628,15 @@ nsTextEditorDragListener::DragDrop(nsIDOMEvent* aMouseEvent)
       mCaretDrawn = PR_FALSE;
     }
     mCaret->SetCaretVisible(PR_FALSE);    // hide it, so that it turns off its timer
-    mCaret = nsnull;      // release it
+
+    nsCOMPtr<nsIPresShell> presShell = do_QueryReferent(mPresShell);
+    if (presShell)
+    {
+      NS_ASSERTION(mOtherCaret, "Where'd my other caret go?");
+      mCaret = presShell->SetCaret(mOtherCaret);
+    }
+
+    mOtherCaret = mCaret = nsnull;
   }
 
   if (!mEditor)
@@ -1047,20 +1052,7 @@ nsTextEditorFocusListener::Focus(nsIDOMEvent* aEvent)
           selCon->SetCaretReadOnly(kIsReadonly);
           selCon->SetCaretEnabled(PR_TRUE);
           selCon->SetDisplaySelection(nsISelectionController::SELECTION_ON);
-#ifdef USE_HACK_REPAINT
-  // begin hack repaint
-          nsIViewManager* viewmgr = ps->GetViewManager();
-          if (viewmgr) {
-            nsIView* view;
-            viewmgr->GetRootView(view);         // views are not refCounted
-            if (view) {
-              viewmgr->UpdateView(view,NS_VMREFRESH_IMMEDIATE);
-            }
-          }
-  // end hack repaint
-#else
           selCon->RepaintSelection(nsISelectionController::SELECTION_NORMAL);
-#endif
         }
       }
     }
@@ -1112,21 +1104,7 @@ nsTextEditorFocusListener::Blur(nsIDOMEvent* aEvent)
           selCon->SetDisplaySelection(nsISelectionController::SELECTION_DISABLED);
         }
 
-#ifdef USE_HACK_REPAINT
-// begin hack repaint
-        nsIViewManager* viewmgr = ps->GetViewManager();
-        if (viewmgr) 
-        {
-          nsIView* view;
-          viewmgr->GetRootView(view);         // views are not refCounted
-          if (view) {
-            viewmgr->UpdateView(view,NS_VMREFRESH_IMMEDIATE);
-          }
-        }
-// end hack repaint
-#else
         selCon->RepaintSelection(nsISelectionController::SELECTION_NORMAL);
-#endif
       }
     }
   }

@@ -330,10 +330,14 @@ nsScriptSecurityManager::SecurityCompareURIs(nsIURI* aSourceURI,
                 // If the port comparison failed, see if either URL has a
                 // port of -1. If so, replace -1 with the default port
                 // for that scheme.
-                if (!*result && (sourcePort == -1 || targetPort == -1))
+                if (NS_SUCCEEDED(rv) && !*result &&
+                    (sourcePort == -1 || targetPort == -1))
                 {
                     NS_ENSURE_STATE(sIOService);
 
+                    NS_ASSERTION(targetScheme.Equals(sourceScheme),
+                                 "Schemes should be equal here");
+                    
                     PRInt32 defaultPort;
                     nsCOMPtr<nsIProtocolHandler> protocolHandler;
                     rv = sIOService->GetProtocolHandler(sourceScheme.get(),
@@ -2937,7 +2941,7 @@ nsScriptSecurityManager::OnChannelRedirect(nsIChannel* oldChannel,
     NS_ENSURE_STATE(oldURI && newURI);
 
     const PRUint32 flags = nsIScriptSecurityManager::DISALLOW_FROM_MAIL |
-                           nsIScriptSecurityManager::DISALLOW_SCRIPT_OR_DATA;
+                           nsIScriptSecurityManager::DISALLOW_SCRIPT;
     return CheckLoadURI(oldURI, newURI, flags);
 }
 

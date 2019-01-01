@@ -949,18 +949,9 @@ nsGenericElement::GetNodeType(PRUint16* aNodeType)
 NS_IMETHODIMP
 nsGenericElement::GetParentNode(nsIDOMNode** aParentNode)
 {
-  nsIContent *parent = GetParent();
+  nsINode *parent = GetNodeParent();
   if (parent) {
     return CallQueryInterface(parent, aParentNode);
-  }
-
-  nsIDocument* doc = GetCurrentDoc();
-  if (doc) {
-    // If we don't have a parent, but we're in the document, we must
-    // be the root node of the document. The DOM says that the root
-    // is the document.
-
-    return CallQueryInterface(doc, aParentNode);
   }
 
   *aParentNode = nsnull;
@@ -1072,24 +1063,10 @@ nsGenericElement::SetPrefix(const nsAString& aPrefix)
   if (!aPrefix.IsEmpty()) {
     prefix = do_GetAtom(aPrefix);
     NS_ENSURE_TRUE(prefix, NS_ERROR_OUT_OF_MEMORY);
-
-    // If the namespace of the element is null then setting a non-null prefix
-    // isn't allowed.
-    if (mNodeInfo->NamespaceID() == kNameSpaceID_None) {
-      return NS_ERROR_DOM_NAMESPACE_ERR;
-    }
   }
 
-  // If the namespace of the element is the XML namespace then setting a prefix
-  // other than xml isn't allowed, if the namespace of the element is not the
-  // XML namespace then setting the prefix to xml isn't allowed.
-  // If the namespace of the element is the XMLNS namespace then setting a
-  // prefix other than xmlns isn't allowed, if the namespace of the element is
-  // not the XMLNS namespace then setting the prefix to xmlns isn't allowed.
-  if (((mNodeInfo->NamespaceID() == kNameSpaceID_XML) !=
-       (prefix == nsGkAtoms::xml)) ||
-      ((mNodeInfo->NamespaceID() == kNameSpaceID_XMLNS) !=
-       (prefix == nsGkAtoms::xmlns))) {
+  if (!nsContentUtils::IsValidNodeName(mNodeInfo->NameAtom(), prefix,
+                                       mNodeInfo->NamespaceID())) {
     return NS_ERROR_DOM_NAMESPACE_ERR;
   }
 
@@ -1766,12 +1743,13 @@ nsGenericElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
     slots->mBindingParent = aBindingParent; // Weak, so no addref happens.
   }
 
-  // Now set the parent; make sure to preserve the bits we have stashed there
-  // Note that checking whether aParent == GetParent() is probably not worth it
-  // here.
-  PtrBits new_bits = NS_REINTERPRET_CAST(PtrBits, aParent);
-  new_bits |= mParentPtrBits & nsIContent::kParentBitMask;
-  mParentPtrBits = new_bits;
+  // Now set the parent
+  if (aParent) {
+    mParentPtrBits = NS_REINTERPRET_CAST(PtrBits, aParent) | PARENT_BIT_PARENT_IS_CONTENT;
+  }
+  else {
+    mParentPtrBits = NS_REINTERPRET_CAST(PtrBits, aDocument);
+  }
 
   nsresult rv;
   
@@ -1881,12 +1859,7 @@ nsGenericElement::UnbindFromTree(PRBool aDeep, PRBool aNullParent)
   }
 
   // Unset things in the reverse order from how we set them in BindToTree
-  mParentPtrBits &= ~PARENT_BIT_INDOCUMENT;
-  
-  if (aNullParent) {
-    // Just mask it out
-    mParentPtrBits &= nsIContent::kParentBitMask;
-  }
+  mParentPtrBits = aNullParent ? 0 : mParentPtrBits & ~PARENT_BIT_INDOCUMENT;
   
   nsDOMSlots *slots = GetExistingDOMSlots();
   if (slots) {
@@ -3049,15 +3022,8 @@ nsGenericElement::doReplaceOrInsertBefore(PRBool aReplace,
     PRBool newContentIsXUL = newContent->IsContentOfType(eXUL);
 
     // Remove the element from the old parent if one exists
-    nsINode* oldParent = newContent->GetParent();
-    if (!oldParent) {
-      oldParent = newContent->GetCurrentDoc();
+    nsINode* oldParent = newContent->GetNodeParent();
 
-      // See bug 53901. Crappy XUL sometimes lies about being in the document
-      if (oldParent && newContentIsXUL && oldParent->IndexOf(newContent) < 0) {
-        oldParent = nsnull;
-      }
-    }
     if (oldParent) {
       PRInt32 removeIndex = oldParent->IndexOf(newContent);
 
@@ -3776,8 +3742,6 @@ nsGenericElement::GetAttrCount() const
 void
 nsGenericElement::List(FILE* out, PRInt32 aIndent) const
 {
-  NS_PRECONDITION(IsInDoc(), "bad content");
-
   PRInt32 indent;
   for (indent = aIndent; --indent >= 0; ) fputs("  ", out);
 

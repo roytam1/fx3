@@ -270,7 +270,7 @@ DestroyGCArena(JSGCArenaList *arenaList, JSGCArena **ap)
     JS_ASSERT(a);
     METER(--arenaList->stats.narenas);
     if (a == arenaList->last)
-        arenaList->lastLimit = a->prev ? GC_THINGS_SIZE : 0;
+        arenaList->lastLimit = (uint16)(a->prev ? GC_THINGS_SIZE : 0);
     *ap = a->prev;
 
 #ifdef DEBUG
@@ -485,6 +485,9 @@ js_DumpGCStats(JSRuntime *rt, FILE *fp)
     fprintf(fp, "     public bytes allocated: %lu\n", UL(rt->gcBytes));
     fprintf(fp, "    private bytes allocated: %lu\n", UL(rt->gcPrivateBytes));
     fprintf(fp, "             alloc attempts: %lu\n", ULSTAT(alloc));
+#ifdef JS_THREADSAFE
+    fprintf(fp, "        alloc without locks: %1u\n", ULSTAT(localalloc));
+#endif
     fprintf(fp, "            total GC things: %lu\n", UL(totalThings));
     fprintf(fp, "        max total GC things: %lu\n", UL(totalMaxThings));
     fprintf(fp, "             GC things size: %lu\n", UL(totalBytes));
@@ -609,7 +612,7 @@ js_AddRootRT(JSRuntime *rt, void *rp, const char *name)
     JS_LOCK_GC(rt);
 #ifdef JS_THREADSAFE
     JS_ASSERT(!rt->gcRunning || rt->gcLevel > 0);
-    if (rt->gcRunning && rt->gcThread != js_CurrentThreadId()) {
+    if (rt->gcRunning && rt->gcThread->id != js_CurrentThreadId()) {
         do {
             JS_AWAIT_GC_DONE(rt);
         } while (rt->gcLevel > 0);
@@ -638,7 +641,7 @@ js_RemoveRoot(JSRuntime *rt, void *rp)
     JS_LOCK_GC(rt);
 #ifdef JS_THREADSAFE
     JS_ASSERT(!rt->gcRunning || rt->gcLevel > 0);
-    if (rt->gcRunning && rt->gcThread != js_CurrentThreadId()) {
+    if (rt->gcRunning && rt->gcThread->id != js_CurrentThreadId()) {
         do {
             JS_AWAIT_GC_DONE(rt);
         } while (rt->gcLevel > 0);
@@ -971,6 +974,46 @@ JS_EXPORT_DATA(void *) js_LiveThingToFind;
 #include "dump_xpc.h"
 #endif
 
+static void
+GetObjSlotName(JSScope *scope, uint32 slot, char *buf, size_t bufsize)
+{
+    jsval nval;
+    JSScopeProperty *sprop;
+
+    if (!scope) {
+        JS_snprintf(buf, bufsize, "**UNKNOWN OBJECT MAP ENTRY**");
+        return;
+    }
+
+    sprop = SCOPE_LAST_PROP(scope);
+    while (sprop && sprop->slot != slot)
+        sprop = sprop->parent;
+
+    if (!sprop) {
+        switch (slot) {
+          case JSSLOT_PROTO:
+            JS_snprintf(buf, bufsize, "__proto__");
+            break;
+          case JSSLOT_PARENT:
+            JS_snprintf(buf, bufsize, "__parent__");
+            break;
+          default:
+            JS_snprintf(buf, bufsize, "**UNKNOWN SLOT %ld**", (long)slot);
+            break;
+        }
+    } else {
+        nval = ID_TO_VALUE(sprop->id);
+        if (JSVAL_IS_INT(nval)) {
+            JS_snprintf(buf, bufsize, "%ld", (long)JSVAL_TO_INT(nval));
+        } else if (JSVAL_IS_STRING(nval)) {
+            JS_snprintf(buf, bufsize, "%s",
+                        JS_GetStringBytes(JSVAL_TO_STRING(nval)));
+        } else {
+            JS_snprintf(buf, bufsize, "**FINALIZED ATOM KEY**");
+        }
+    }
+}
+
 static const char *
 gc_object_class_name(void* thing)
 {
@@ -1167,30 +1210,6 @@ js_MarkAtom(JSContext *cx, JSAtom *atom)
         js_MarkAtom(cx, atom->entry.value);
 }
 
-static jsval *
-NextUnmarkedGCThing(jsval *vp, jsval *end, void **thingp, uint8 **flagpp)
-{
-    jsval v;
-    void *thing;
-    uint8 *flagp;
-
-    while (vp < end) {
-        v = *vp;
-        if (JSVAL_IS_GCTHING(v) && v != JSVAL_NULL) {
-            thing = JSVAL_TO_GCTHING(v);
-            flagp = js_GetGCThingFlags(thing);
-            if (!(*flagp & GCF_MARK)) {
-                JS_ASSERT(*flagp != GCF_FINAL);
-                *thingp = thing;
-                *flagpp = flagp;
-                return vp;
-            }
-        }
-        vp++;
-    }
-    return NULL;
-}
-
 static void
 AddThingToUnscannedBag(JSRuntime *rt, void *thing, uint8 *flagp);
 
@@ -1201,15 +1220,14 @@ MarkGCThingChildren(JSContext *cx, void *thing, uint8 *flagp,
     JSRuntime *rt;
     JSObject *obj;
     jsval v, *vp, *end;
-    JSString *str;
     void *next_thing;
     uint8 *next_flagp;
+    JSString *str;
 #ifdef JS_GCMETER
     uint32 tailCallNesting;
 #endif
 #ifdef GC_MARK_DEBUG
     JSScope *scope;
-    JSScopeProperty *sprop;
     char name[32];
 #endif
 
@@ -1261,99 +1279,55 @@ MarkGCThingChildren(JSContext *cx, void *thing, uint8 *flagp,
         end = vp + ((obj->map->ops->mark)
                     ? obj->map->ops->mark(cx, obj, NULL)
                     : JS_MIN(obj->map->freeslot, obj->map->nslots));
-
-      search_for_unmarked_slot:
-        vp = NextUnmarkedGCThing(vp, end, &thing, &flagp);
-        if (!vp)
-            break;
-        v = *vp;
-
-        /*
-         * Here, thing is the first value in obj->slots referring to an
-         * unmarked GC-thing.
-         */
+        thing = NULL;
+        flagp = NULL;
 #ifdef GC_MARK_DEBUG
         scope = OBJ_IS_NATIVE(obj) ? OBJ_SCOPE(obj) : NULL;
 #endif
-        for (;;) {
-            /* Check loop invariants. */
-            JS_ASSERT(v == *vp && JSVAL_IS_GCTHING(v));
-            JS_ASSERT(thing == JSVAL_TO_GCTHING(v));
-            JS_ASSERT(flagp == js_GetGCThingFlags(thing));
-
-#ifdef GC_MARK_DEBUG
-            if (scope) {
-                uint32 slot;
-                jsval nval;
-
-                slot = vp - obj->slots;
-                for (sprop = SCOPE_LAST_PROP(scope); ; sprop = sprop->parent) {
-                    if (!sprop) {
-                        switch (slot) {
-                          case JSSLOT_PROTO:
-                            strcpy(name, js_proto_str);
-                            break;
-                          case JSSLOT_PARENT:
-                            strcpy(name, js_parent_str);
-                            break;
-                          default:
-                            JS_snprintf(name, sizeof name,
-                                        "**UNKNOWN SLOT %ld**",
-                                        (long)slot);
-                            break;
-                        }
-                        break;
-                    }
-                    if (sprop->slot == slot) {
-                        nval = ID_TO_VALUE(sprop->id);
-                        if (JSVAL_IS_INT(nval)) {
-                            JS_snprintf(name, sizeof name, "%ld",
-                                        (long)JSVAL_TO_INT(nval));
-                        } else if (JSVAL_IS_STRING(nval)) {
-                            JS_snprintf(name, sizeof name, "%s",
-                              JS_GetStringBytes(JSVAL_TO_STRING(nval)));
-                        } else {
-                            strcpy(name, "**FINALIZED ATOM KEY**");
-                        }
-                        break;
-                    }
-                }
-            } else {
-                strcpy(name, "**UNKNOWN OBJECT MAP ENTRY**");
-            }
-#endif
-
-            do {
-                vp = NextUnmarkedGCThing(vp + 1, end, &next_thing, &next_flagp);
-                if (!vp) {
-                    /*
-                     * thing came from the last unmarked GC-thing slot and we
-                     * can optimize tail recursion.
-                     * Since we already know that there is enough C stack
-                     * space, we clear shouldCheckRecursion to avoid extra
-                     * checking in RECURSION_TOO_DEEP.
-                     */
-                    shouldCheckRecursion = JS_FALSE;
-                    goto on_tail_recursion;
-                }
-            } while (next_thing == thing);
+        for (; vp != end; ++vp) {
             v = *vp;
-
+            if (!JSVAL_IS_GCTHING(v) || v == JSVAL_NULL)
+                continue;
+            next_thing = JSVAL_TO_GCTHING(v);
+            if (next_thing == thing)
+                continue;
+            next_flagp = js_GetGCThingFlags(next_thing);
+            if (*next_flagp & GCF_MARK)
+                continue;
+            JS_ASSERT(*next_flagp != GCF_FINAL);
+            if (thing) {
 #ifdef GC_MARK_DEBUG
-            GC_MARK(cx, thing, name);
+                GC_MARK(cx, thing, name);
 #else
-            *flagp |= GCF_MARK;
-            MarkGCThingChildren(cx, thing, flagp, JS_TRUE);
+                *flagp |= GCF_MARK;
+                MarkGCThingChildren(cx, thing, flagp, JS_TRUE);
+#endif
+                if (*next_flagp & GCF_MARK) {
+                    /*
+                     * This happens when recursive MarkGCThingChildren marks
+                     * the thing with flags referred by *next_flagp.
+                     */
+                    thing = NULL;
+                    continue;
+                }
+            }
+#ifdef GC_MARK_DEBUG
+            GetObjSlotName(scope, vp - obj->slots, name, sizeof name);
 #endif
             thing = next_thing;
             flagp = next_flagp;
-            if (*flagp & GCF_MARK) {
-                /*
-                 * This happens when recursive MarkGCThingChildren marks
-                 * flags already stored in caller's *next_flagp.
-                 */
-                goto search_for_unmarked_slot;
-            }
+        }
+        if (thing) {
+            /*
+             * thing came from the last unmarked GC-thing slot and we
+             * can optimize tail recursion.
+             *
+             * Since we already know that there is enough C stack space,
+             * we clear shouldCheckRecursion to avoid extra checking in
+             * RECURSION_TOO_DEEP.
+             */
+            shouldCheckRecursion = JS_FALSE;
+            goto on_tail_recursion;
         }
         break;
 
@@ -1425,8 +1399,8 @@ MarkGCThingChildren(JSContext *cx, void *thing, uint8 *flagp,
 }
 
 /*
- * Not using PAGE_THING_GAP inside this macro to optimize
- * thingsPerUnscannedChunk calculation when thingSize == 2^power.
+ * Avoid using PAGE_THING_GAP inside this macro to optimize the
+ * thingsPerUnscannedChunk calculation when thingSize is a power of two.
  */
 #define GET_GAP_AND_CHUNK_SPAN(thingSize, thingsPerUnscannedChunk, pageGap)   \
     JS_BEGIN_MACRO                                                            \
@@ -1807,7 +1781,6 @@ js_GC(JSContext *cx, uintN gcflags)
     uint32 *bytesptr;
     JSBool all_clear;
 #ifdef JS_THREADSAFE
-    jsword currentThread;
     uint32 requestDebit;
 #endif
 
@@ -1851,8 +1824,7 @@ js_GC(JSContext *cx, uintN gcflags)
 
 #ifdef JS_THREADSAFE
     /* Bump gcLevel and return rather than nest on this thread. */
-    currentThread = js_CurrentThreadId();
-    if (rt->gcThread == currentThread) {
+    if (rt->gcThread && rt->gcThread->id == js_CurrentThreadId()) {
         JS_ASSERT(rt->gcLevel > 0);
         rt->gcLevel++;
         METER(if (rt->gcLevel > rt->gcStats.maxlevel)
@@ -1865,25 +1837,29 @@ js_GC(JSContext *cx, uintN gcflags)
     /*
      * If we're in one or more requests (possibly on more than one context)
      * running on the current thread, indicate, temporarily, that all these
-     * requests are inactive.  NB: if cx->thread is 0, then cx is not using
+     * requests are inactive.  If cx->thread is NULL, then cx is not using
      * the request model, and does not contribute to rt->requestCount.
      */
     requestDebit = 0;
     if (cx->thread) {
+        JSCList *head, *link;
+
         /*
-         * Check all contexts for any with the same thread-id.  XXX should we
-         * keep a sub-list of contexts having the same id?
+         * Check all contexts on cx->thread->contextList for active requests,
+         * counting each such context against requestDebit.
          */
-        iter = NULL;
-        while ((acx = js_ContextIterator(rt, JS_FALSE, &iter)) != NULL) {
-            if (acx->thread == cx->thread && acx->requestDepth)
+        head = &cx->thread->contextList;
+        for (link = head->next; link != head; link = link->next) {
+            acx = CX_FROM_THREAD_LINKS(link);
+            JS_ASSERT(acx->thread == cx->thread);
+            if (acx->requestDepth)
                 requestDebit++;
         }
     } else {
         /*
          * We assert, but check anyway, in case someone is misusing the API.
          * Avoiding the loop over all of rt's contexts is a win in the event
-         * that the GC runs only on request-less contexts with 0 thread-ids,
+         * that the GC runs only on request-less contexts with null threads,
          * in a special thread such as might be used by the UI/DOM/Layout
          * "mozilla" or "main" thread in Mozilla-the-browser.
          */
@@ -1917,7 +1893,8 @@ js_GC(JSContext *cx, uintN gcflags)
 
     /* No other thread is in GC, so indicate that we're now in GC. */
     rt->gcLevel = 1;
-    rt->gcThread = currentThread;
+    rt->gcThread = js_GetCurrentThread(rt);
+    JS_ASSERT(rt->gcThread);
 
     /* Wait for all other requests to finish. */
     while (rt->requestCount > 0)
@@ -2259,7 +2236,7 @@ restart:
     /* If we were invoked during a request, pay back the temporary debit. */
     if (requestDebit)
         rt->requestCount += requestDebit;
-    rt->gcThread = 0;
+    rt->gcThread = NULL;
     JS_NOTIFY_GC_DONE(rt);
     if (!(gcflags & GC_ALREADY_LOCKED))
         JS_UNLOCK_GC(rt);

@@ -59,6 +59,7 @@ REQUIRES	= xpcom \
 		  uconv \
 		  unicharutil \
 		  expat \
+		  xml \
 		  content \
 		  dom \
 		  pref \
@@ -69,6 +70,7 @@ REQUIRES	= xpcom \
 
 SHARED_LIBRARY_LIBS = \
 		$(DEPTH)/parser/expat/lib/$(LIB_PREFIX)mozexpat_s.$(LIB_SUFFIX) \
+		$(DEPTH)/parser/xml/src/$(LIB_PREFIX)saxp.$(LIB_SUFFIX) \
 		$(NULL)
 
 ifdef MOZ_PERF_METRICS
