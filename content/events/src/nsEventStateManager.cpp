@@ -44,6 +44,7 @@
 #include "nsCOMPtr.h"
 #include "nsEventStateManager.h"
 #include "nsEventListenerManager.h"
+#include "nsIMEStateManager.h"
 #include "nsIContent.h"
 #include "nsINodeInfo.h"
 #include "nsIDocument.h"
@@ -626,7 +627,7 @@ nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
           // "leak" this reference, but we take it back later
           SetFocusedContent(nsnull);
 
-          UpdateIMEState(aPresContext, currentFocus);
+          nsIMEStateManager::OnChangeFocus(mPresContext, currentFocus);
 
           nsEventStatus status = nsEventStatus_eIgnore;
           nsEvent focusevent(PR_TRUE, NS_FOCUS_CONTENT);
@@ -814,10 +815,13 @@ nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
           nsCOMPtr<nsIPresShell> shell = document->GetShellAt(0);
           NS_ASSERTION(shell, "Focus events should not be getting thru when this is null!");
           if (shell) {
+            nsPresContext* context = shell->GetPresContext();
+            nsIMEStateManager::OnActivate(context);
             if (focusedElement) {
               nsCOMPtr<nsIContent> focusContent = do_QueryInterface(focusedElement);
-              nsCOMPtr<nsPresContext> context = shell->GetPresContext();
               focusContent->SetFocus(context);
+            } else {
+              nsIMEStateManager::OnChangeFocus(context, nsnull);
             }
 
             // disable selection mousedown state on activation
@@ -852,6 +856,8 @@ nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
  case NS_DEACTIVATE:
     {
       EnsureDocument(aPresContext);
+
+      nsIMEStateManager::OnDeactivate(aPresContext);
 
       nsCOMPtr<nsPIDOMWindow> ourWindow(mDocument->GetWindow());
 
@@ -1633,12 +1639,6 @@ nsEventStateManager::DoScrollTextsize(nsIFrame *aTargetFrame,
     }
 }
 
-inline PRBool
-ShouldScrollRootView(nsPresContext* aPresContext)
-{
-  return (aPresContext->Type() == nsPresContext::eContext_PrintPreview);
-}
-
 static nsIFrame*
 GetParentFrameToScroll(nsPresContext* aPresContext, nsIFrame* aFrame)
 {
@@ -1659,38 +1659,6 @@ nsEventStateManager::DoScrollText(nsPresContext* aPresContext,
                                   PRBool aScrollHorizontal,
                                   PRBool aScrollPage)
 {
-  nsIScrollableView* scrollView = nsnull;
-  PRBool scrollRootView = ShouldScrollRootView(aPresContext);
-
-  if (scrollRootView) {
-    // Get root scroll view
-    nsIViewManager* vm = aPresContext->GetViewManager();
-    NS_ENSURE_TRUE(vm, NS_ERROR_FAILURE);
-    vm->GetRootScrollableView(&scrollView);
-    if (!scrollView) {
-      // We don't have root scrollable view in current document.
-      // Maybe, this is sub frame on Print Preview.
-      // Let's pass to parent document.
-      nsIFrame* newFrame = nsnull;
-      nsCOMPtr<nsPresContext> newPresContext = nsnull;
-      nsresult rv = GetParentScrollingView(aEvent, aPresContext, newFrame,
-                                           *getter_AddRefs(newPresContext));
-      NS_ENSURE_SUCCESS(rv, rv);
-      NS_ENSURE_TRUE(newFrame && newPresContext, NS_ERROR_FAILURE);
-      return DoScrollText(newPresContext, newFrame, aEvent, aNumLines,
-                          aScrollHorizontal, aScrollPage);
-    }
-    // find target frame that is root scrollable content
-    nsIFrame* targetFrame = aTargetFrame;
-    for ( ;targetFrame; targetFrame = targetFrame->GetParent()) {
-      nsCOMPtr<nsIScrollableViewProvider> svp = do_QueryInterface(targetFrame);
-      if (svp && scrollView == svp->GetScrollableView())
-        break;
-    }
-    NS_ENSURE_TRUE(targetFrame, NS_ERROR_FAILURE);
-    aTargetFrame = targetFrame;
-  }
-
   nsCOMPtr<nsIContent> targetContent = aTargetFrame->GetContent();
   if (!targetContent)
     GetFocusedContent(getter_AddRefs(targetContent));
@@ -1738,24 +1706,23 @@ nsEventStateManager::DoScrollText(nsPresContext* aPresContext,
       target->DispatchEvent(event, &defaultActionEnabled);
       if (!defaultActionEnabled)
         return NS_OK;
-      if (!scrollRootView) {
-        // Re-resolve |aTargetFrame| in case it was destroyed by the
-        // DOM event handler above, bug 257998.
-        aTargetFrame =
-          aPresContext->GetPresShell()->GetPrimaryFrameFor(targetContent);
-        if (!aTargetFrame) {
-          // Without a frame we can't do the normal ancestor search for a view
-          // to scroll. Don't fall through to the "passToParent" code at the end
-          // because that will likely scroll the wrong view (in an enclosing
-          // document).
-          return NS_OK;
-        }
+      // Re-resolve |aTargetFrame| in case it was destroyed by the
+      // DOM event handler above, bug 257998.
+      aTargetFrame =
+        aPresContext->GetPresShell()->GetPrimaryFrameFor(targetContent);
+      if (!aTargetFrame) {
+        // Without a frame we can't do the normal ancestor search for a view
+        // to scroll. Don't fall through to the "passToParent" code at the end
+        // because that will likely scroll the wrong view (in an enclosing
+        // document).
+        return NS_OK;
       }
     }
   }
 
+  nsIScrollableView* scrollView;
   nsIFrame* scrollFrame = aTargetFrame;
-  PRBool passToParent = !scrollRootView;
+  PRBool passToParent = PR_TRUE;
 
   for (; scrollFrame && passToParent;
        scrollFrame = GetParentFrameToScroll(aPresContext, scrollFrame)) {
@@ -1775,7 +1742,7 @@ nsEventStateManager::DoScrollText(nsPresContext* aPresContext,
         (aScrollHorizontal ? ss.mHorizontal : ss.mVertical)) {
       continue;
     }
-    
+
     // Check if the scrollable view can be scrolled any further.
     nscoord lineHeight;
     scrollView->GetLineHeight(&lineHeight);
@@ -1828,14 +1795,11 @@ nsEventStateManager::DoScrollText(nsPresContext* aPresContext,
     nsresult rv;
     nsIFrame* newFrame = nsnull;
     nsCOMPtr<nsPresContext> newPresContext;
-
     rv = GetParentScrollingView(aEvent, aPresContext, newFrame,
                                 *getter_AddRefs(newPresContext));
     if (NS_SUCCEEDED(rv) && newFrame)
       return DoScrollText(newPresContext, newFrame, aEvent, aNumLines,
                           aScrollHorizontal, aScrollPage);
-    else
-      return NS_ERROR_FAILURE;
   }
 
   return NS_OK;
@@ -1871,7 +1835,8 @@ nsEventStateManager::GetParentScrollingView(nsInputEvent *aEvent,
       break;
     }
   }
-  NS_ENSURE_TRUE(pPresShell, NS_ERROR_FAILURE);
+  if (!pPresShell)
+    return NS_ERROR_FAILURE;
 
   /* now find the content node in our parent docshell's document that
      corresponds to our docshell */
@@ -2318,9 +2283,17 @@ nsEventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 }
 
 NS_IMETHODIMP
+nsEventStateManager::NotifyDestroyPresContext(nsPresContext* aPresContext)
+{
+  nsIMEStateManager::OnDestroyPresContext(aPresContext);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsEventStateManager::SetPresContext(nsPresContext* aPresContext)
 {
   if (aPresContext == nsnull) {
+    // XXX should we move this block to |NotifyDestroyPresContext|?
     // A pres context is going away. Make sure we do cleanup.
     if (mPresContext == gLastFocusedPresContext) {
       gLastFocusedPresContext = nsnull;
@@ -3877,6 +3850,7 @@ nsEventStateManager::SetContentState(nsIContent *aContent, PRInt32 aState)
 
   if ((aState & NS_EVENT_STATE_FOCUS)) {
     EnsureDocument(mPresContext);
+    nsIMEStateManager::OnChangeFocus(mPresContext, aContent);
     if (aContent && (aContent == mCurrentFocus) && gLastFocusedDocument == mDocument) {
       // gLastFocusedDocument appears to always be correct, that is why
       // I'm not setting it here. This is to catch an edge case.
@@ -3898,7 +3872,6 @@ nsEventStateManager::SetContentState(nsIContent *aContent, PRInt32 aState)
       }
       notifyContent[2] = gLastFocusedContent;
       NS_IF_ADDREF(gLastFocusedContent);
-      UpdateIMEState(mPresContext, aContent);
       // only raise window if the the focus controller is active
       SendFocusBlur(mPresContext, aContent, fcActive);
       if (mCurrentFocus != aContent) {
@@ -4447,7 +4420,7 @@ nsEventStateManager::ContentRemoved(nsIContent* aContent)
     // Note that we don't use SetContentState() here because
     // we don't want to fire a blur.  Blurs should only be fired
     // in response to clicks or tabbing.
-    UpdateIMEState(mPresContext, nsnull);
+    nsIMEStateManager::OnRemoveContent(mPresContext, mCurrentFocus);
     SetFocusedContent(nsnull);
   }
 
@@ -5430,82 +5403,5 @@ nsEventStateManager::GetFocusControllerForDocument(nsIDocument* aDocument)
   nsCOMPtr<nsPIDOMWindow> windowPrivate = do_GetInterface(container);
 
   return windowPrivate ? windowPrivate->GetRootFocusController() : nsnull;
-}
-
-void
-nsEventStateManager::UpdateIMEState(nsPresContext* aPresContext,
-                                    nsIContent*    aContent)
-{
-  if (!aPresContext)
-    return;
-
-  // On Printing or Print Preview, we don't need IME.
-  if (aPresContext->Type() == nsPresContext::eContext_PrintPreview ||
-      aPresContext->Type() == nsPresContext::eContext_Print) {
-    SetIMEState(aPresContext, nsIContent::IME_STATUS_DISABLE);
-    return;
-  }
-
-  PRUint32 state = nsIContent::IME_STATUS_DISABLE;
-
-  PRBool isEditable = PR_FALSE;
-  nsCOMPtr<nsISupports> container = aPresContext->GetContainer();
-  nsCOMPtr<nsIEditorDocShell> editorDocShell(do_QueryInterface(container));
-  if (editorDocShell)
-    editorDocShell->GetEditable(&isEditable);
-
-  if (isEditable)
-    state = nsIContent::IME_STATUS_ENABLE;
-  else if (aContent)
-    state = aContent->GetDesiredIMEState();
-
-  if (state == nsIContent::IME_STATUS_NONE)
-    return;
-  SetIMEState(aPresContext, state);
-}
-
-void
-nsEventStateManager::SetIMEState(nsPresContext* aPresContext,
-                                 PRUint32       aState)
-{
-  if (!aPresContext)
-    return;
-
-  nsCOMPtr<nsIKBStateControl> kb;
-  nsresult rv = GetKBStateControl(aPresContext, getter_AddRefs(kb));
-  if (NS_FAILED(rv) || !kb)
-    return;
-
-  if (aState & nsIContent::IME_STATUS_MASK_ENABLED) {
-    PRBool enable = (aState & nsIContent::IME_STATUS_ENABLE);
-    kb->SetIMEEnabled(enable);
-  }
-  if (aState & nsIContent::IME_STATUS_MASK_OPENED) {
-    PRBool open = (aState & nsIContent::IME_STATUS_OPEN);
-    kb->SetIMEOpenState(open);
-  }
-}
-
-nsresult
-nsEventStateManager::GetKBStateControl(nsPresContext* aPresContext,
-                                       nsIKBStateControl** aResult)
-{
-  NS_ENSURE_ARG_POINTER(aPresContext);
-  NS_ENSURE_ARG_POINTER(aResult);
-
-  *aResult = nsnull;
-  nsIViewManager* vm = aPresContext->GetViewManager();
-  NS_ENSURE_TRUE(vm, NS_ERROR_FAILURE);
-  nsCOMPtr<nsIWidget> widget = nsnull;
-  nsresult rv = vm->GetWidget(getter_AddRefs(widget));
-  NS_ENSURE_SUCCESS(rv, rv);
-  NS_ENSURE_TRUE(widget, NS_ERROR_FAILURE);
-  nsCOMPtr<nsIKBStateControl> kb = do_QueryInterface(widget);
-  // Don't use NS_ENSURE_TRUE. Because nsIWidget is not having
-  // nsIKBStateControl always. e.g., GTK2, OS/2, BeOS...
-  if (!kb)
-    return NS_ERROR_FAILURE;
-  NS_ADDREF(*aResult = kb);
-  return NS_OK;
 }
 

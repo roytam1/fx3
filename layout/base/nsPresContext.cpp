@@ -157,7 +157,7 @@ static NS_DEFINE_CID(kSelectionImageService, NS_SELECTIONIMAGESERVICE_CID);
 nsPresContext::nsPresContext(nsPresContextType aType)
   : mType(aType), mTextZoom(1.0),
     mPageSize(-1, -1), mIsRootPaginatedDocument(PR_FALSE),
-    mCanPaginatedScroll(PR_TRUE),
+    mCanPaginatedScroll(PR_FALSE),
     mViewportStyleOverflow(NS_STYLE_OVERFLOW_AUTO, NS_STYLE_OVERFLOW_AUTO),
     mCompatibilityMode(eCompatibility_FullStandards),
     mImageAnimationModePref(imgIContainer::kNormalAnimMode),
@@ -227,7 +227,10 @@ nsPresContext::~nsPresContext()
   SetShell(nsnull);
 
   if (mEventManager) {
-    mEventManager->SetPresContext(nsnull);   // unclear if this is needed, but can't hurt
+    // unclear if these are needed, but can't hurt
+    mEventManager->NotifyDestroyPresContext(this);
+    mEventManager->SetPresContext(nsnull);
+
     NS_RELEASE(mEventManager);
   }
 

@@ -4775,11 +4775,7 @@ nsCSSFrameConstructor::ConstructRootFrame(nsIContent*     aDocElement,
   // - renders the document element's background. This ensures the background covers
   //   the entire canvas as specified by the CSS2 spec
 
-  PRBool isPaginated = presContext->IsPaginated();
-  PRBool isPrintPreview =
-    presContext->Type() == nsPresContext::eContext_PrintPreview;
-  PRBool isPageLayout =
-    presContext->Type() == nsPresContext::eContext_PageLayout;
+  PRBool isPaginated = presContext->IsRootPaginatedDocument();
 
   nsIFrame* rootFrame = nsnull;
   nsIAtom* rootPseudo;
@@ -4842,11 +4838,7 @@ nsCSSFrameConstructor::ConstructRootFrame(nsIContent*     aDocElement,
   }
 
   if (isPaginated) {
-    if (isPrintPreview || isPageLayout) {
-      isScrollable = presContext->HasPaginatedScrolling();
-    } else {
-      isScrollable = PR_FALSE; // we are printing
-    }
+    isScrollable = presContext->HasPaginatedScrolling();
   }
 
   // We no longer need to do overflow propagation here. It's taken care of
@@ -5274,7 +5266,7 @@ nsCSSFrameConstructor::ConstructSelectFrame(nsFrameConstructorState& aState,
       mPresShell->SetAnonymousContentFor(aContent, nsnull);
 
       InitializeSelectFrame(aState, listFrame, scrolledFrame, aContent,
-                            comboboxFrame, aStyleContext, PR_TRUE, aFrameItems);
+                            comboboxFrame, listStyle, PR_TRUE, aFrameItems);
 
         // Set flag so the events go to the listFrame not child frames.
         // XXX: We should replace this with a real widget manager similar
@@ -5385,7 +5377,7 @@ nsCSSFrameConstructor::InitializeSelectFrame(nsFrameConstructorState& aState,
       widgetData.mWindowType  = eWindowType_popup;
       widgetData.mBorderStyle = eBorderStyle_default;
 
-#ifdef XP_MACOSX
+#if defined(XP_MACOSX) || defined(XP_BEOS) 
       static NS_DEFINE_IID(kCPopUpCID,  NS_POPUP_CID);
       view->CreateWidget(kCPopUpCID, &widgetData, nsnull);
 #else

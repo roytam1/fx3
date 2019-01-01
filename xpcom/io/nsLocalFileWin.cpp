@@ -1665,7 +1665,7 @@ nsLocalFile::SetModDate(PRInt64 aLastModifiedTime, const char *filePath)
     st.wMilliseconds    = pret.tm_usec/1000;
 
     nsresult rv = NS_OK;
-    // is at least one of theese fails...
+    // if at least one of these fails...
     if (!(SystemTimeToFileTime(&st, &lft) != 0 &&
           LocalFileTimeToFileTime(&lft, &ft) != 0 &&
           SetFileTime(file, NULL, &ft, &ft) != 0))
