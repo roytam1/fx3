@@ -21,6 +21,7 @@
  *
  * Contributor(s):
  *   Boris Zbarsky <bzbarsky@mit.edu> (original author)
+ *   Benjamin Smedberg <benjamin@smedbergs.us>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -38,10 +39,12 @@
 
 #include "nsISupports.idl"
 
+interface nsIURI;
+
 /**
  * nsINetUtil provides various network-related utility methods.
  */
-[scriptable, uuid(f0c5dddb-4713-4603-af2d-bf671838996b)]
+[scriptable, uuid(4a1f4ab4-d527-4606-b0f7-53a27f20804c)]
 interface nsINetUtil : nsISupports
 {
   /**
@@ -57,4 +60,47 @@ interface nsINetUtil : nsISupports
   AUTF8String parseContentType(in AUTF8String aTypeHeader,
                                out AUTF8String aCharset,
                                out boolean aHadCharset);
+
+  /** Escape every character with its %XX-escaped equivalent */
+  const unsigned long ESCAPE_ALL = 0;
+
+  /** Leave alphanumeric characters intact and %XX-escape all others */
+  const unsigned long ESCAPE_XALPHAS = 1;
+
+  /** Leave alphanumeric characters intact, convert spaces to '+',
+      %XX-escape all others */
+  const unsigned long ESCAPE_XPALPHAS = 2;
+
+  /** Leave alphanumeric characters and forward slashes intact,
+      %XX-escape all others */
+  const unsigned long ESCAPE_URL_PATH = 3;
+
+  /**
+   * escape a string with %00-style escaping
+   */
+  ACString escapeString(in ACString aString, in unsigned long aEscapeType);
+
+  /**
+   * Test whether the given URI's handler has the given protocol flags.
+   *
+   * @param aURI the URI in question
+   * @param aFlags the flags we're testing for.
+   *
+   * @return whether the protocol handler for aURI has all the flags
+   *         in aFlags.
+   */
+  boolean protocolHasFlags(in nsIURI aURI, in unsigned long aFlag);
+
+  /**
+   * Test whether the protocol handler for this URI or that for any of
+   * its inner URIs has the given protocol flags.  This will QI aURI to
+   * nsINestedURI and walk the nested URI chain.
+   *
+   * @param aURI the URI in question
+   * @param aFlags the flags we're testing for.
+   *
+   * @return whether any of the protocol handlers involved have all the flags
+   *         in aFlags.
+   */
+  boolean URIChainHasFlags(in nsIURI aURI, in unsigned long aFlags);
 };

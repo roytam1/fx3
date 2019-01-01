@@ -226,6 +226,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsGopherHandler)
 #ifdef NECKO_PROTOCOL_viewsource
 #include "nsViewSourceHandler.h"
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsViewSourceHandler)
+NS_GENERIC_FACTORY_CONSTRUCTOR(nsViewSourceURI)
 #endif
 
 #ifdef NECKO_PROTOCOL_data
@@ -257,6 +258,12 @@ NS_GENERIC_AGGREGATED_CONSTRUCTOR(nsSimpleURI)
 
 #include "nsIDNService.h"
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsIDNService, Init)
+
+///////////////////////////////////////////////////////////////////////////////
+#ifdef XP_WIN
+#include "nsNotifyAddrListener.h"
+NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsNotifyAddrListener, Init)
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1126,7 +1133,20 @@ static const nsModuleComponentInfo gNetModuleInfo[] = {
       NS_VIEWSOURCEHANDLER_CID,
       NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "view-source",
       nsViewSourceHandlerConstructor
-    }
+    },
+    { "The ViewSource URI", 
+      NS_VIEWSOURCEURI_CID,
+      nsnull,
+      nsViewSourceURIConstructor
+    },
+#endif
+
+#ifdef XP_WIN
+    { NS_NETWORK_LINK_SERVICE_CLASSNAME,
+      NS_NETWORK_LINK_SERVICE_CID,
+      NS_NETWORK_LINK_SERVICE_CONTRACTID,
+      nsNotifyAddrListenerConstructor
+    },
 #endif
 };
 

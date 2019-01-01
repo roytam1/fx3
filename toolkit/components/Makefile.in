@@ -64,6 +64,11 @@ DIRS += \
 	viewconfig \
 	$(NULL)
 
+
+ifdef MOZ_FEEDS
+DIRS += feeds
+endif
+
 ifdef NS_PRINTING
 DIRS +=	printing
 endif

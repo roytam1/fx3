@@ -464,6 +464,8 @@ netwerk/test/Makefile
 netwerk/testserver/Makefile
 netwerk/resources/Makefile
 netwerk/locales/Makefile
+netwerk/system/Makefile
+netwerk/system/win32/Makefile
 uriloader/exthandler/Makefile
 intl/strres/public/Makefile
 intl/locale/idl/Makefile
@@ -880,7 +882,9 @@ extensions/typeaheadfind/Makefile
 
 MAKEFILES_metrics="
 extensions/metrics/Makefile
+extensions/metrics/public/Makefile
 extensions/metrics/src/Makefile
+extensions/metrics/test/Makefile
 "
 
 MAKEFILES_phoenix="

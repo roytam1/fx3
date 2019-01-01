@@ -44,7 +44,7 @@
 #include "nsIScriptObjectPrincipal.h"
 #include "nsIScriptContext.h"
 #include "nsIURL.h"
-#include "nsIJARURI.h"
+#include "nsINestedURI.h"
 #include "nspr.h"
 #include "nsJSPrincipals.h"
 #include "nsSystemPrincipal.h"
@@ -266,18 +266,19 @@ nsScriptSecurityManager::SecurityCompareURIs(nsIURI* aSourceURI,
         return NS_OK;
     }
 
-    // If either uri is a jar URI, get the base URI
-    nsCOMPtr<nsIJARURI> jarURI;
-    nsCOMPtr<nsIURI> sourceBaseURI(aSourceURI);
-    while((jarURI = do_QueryInterface(sourceBaseURI)))
+    if (!aSourceURI)
     {
-        jarURI->GetJARFile(getter_AddRefs(sourceBaseURI));
+        // Throw.  If we don't, we might in some cases consider a system
+        // principal as same-origin with an about:blank (see
+        // CheckSameOriginPrincipalInternal).  The fact that these methods are
+        // asymmetric is highly unfortunate.
+        return NS_ERROR_NOT_AVAILABLE;
     }
-    nsCOMPtr<nsIURI> targetBaseURI(aTargetURI);
-    while((jarURI = do_QueryInterface(targetBaseURI)))
-    {
-        jarURI->GetJARFile(getter_AddRefs(targetBaseURI));
-    }
+
+    // If either URI is a nested URI, get the base URI
+    nsCOMPtr<nsIURI> sourceBaseURI = NS_GetInnermostURI(aSourceURI);
+    
+    nsCOMPtr<nsIURI> targetBaseURI = NS_GetInnermostURI(aTargetURI);
 
     if (!sourceBaseURI || !targetBaseURI)
         return NS_ERROR_FAILURE;
@@ -895,8 +896,13 @@ nsScriptSecurityManager::CheckSameOriginPrincipalInternal(nsIPrincipal* aSubject
     // Allow access to about:blank, except from null principals (which
     // never have access to anything but themselves).  If SchemeIs
     // fails, just deny access -- better safe than sorry.
+    // XXXbz when this gets removed, also remove the asymmetry between
+    // aSourceURI and aTargetURI in SecurityCompareURIs.    
     PRBool nullSubject = PR_FALSE;
-    rv = subjectURI->SchemeIs(NS_NULLPRINCIPAL_SCHEME, &nullSubject);
+    // Subject URI could be null here.... 
+    if (subjectURI) {
+        rv = subjectURI->SchemeIs(NS_NULLPRINCIPAL_SCHEME, &nullSubject);
+    }
     if (NS_SUCCEEDED(rv) && !nullSubject) {
         nsXPIDLCString origin;
         rv = aObject->GetOrigin(getter_Copies(origin));
@@ -1184,38 +1190,18 @@ nsScriptSecurityManager::GetBaseURIScheme(nsIURI* aURI,
 
     nsresult rv;
 
+    // Get the innermost URI
+    nsCOMPtr<nsIURI> uri = NS_GetInnermostURI(aURI);
+
     //-- get the source scheme
-    rv = aURI->GetScheme(aScheme);
+    rv = uri->GetScheme(aScheme);
     if (NS_FAILED(rv)) return rv;
-
-    //-- If aURI is a view-source URI, drill down to the base URI
-    if (aScheme.EqualsLiteral("view-source"))
-    {
-        nsCAutoString path;
-        rv = aURI->GetPath(path);
-        if (NS_FAILED(rv)) return rv;
-        nsCOMPtr<nsIURI> innerURI;
-        rv = NS_NewURI(getter_AddRefs(innerURI), path, nsnull, nsnull,
-                       sIOService);
-        if (NS_FAILED(rv)) return rv;
-        return nsScriptSecurityManager::GetBaseURIScheme(innerURI, aScheme);
-    }
-
-    //-- If aURI is a jar URI, drill down again
-    nsCOMPtr<nsIJARURI> jarURI = do_QueryInterface(aURI);
-    if (jarURI)
-    {
-        nsCOMPtr<nsIURI> innerURI;
-        jarURI->GetJARFile(getter_AddRefs(innerURI));
-        if (!innerURI) return NS_ERROR_FAILURE;
-        return nsScriptSecurityManager::GetBaseURIScheme(innerURI, aScheme);
-    }
 
     //-- if aURI is an about uri, distinguish 'safe' and 'unsafe' about URIs
     if(aScheme.EqualsLiteral("about"))
     {
         nsCAutoString path;
-        rv = NS_GetAboutModuleName(aURI, path);
+        rv = NS_GetAboutModuleName(uri, path);
         NS_ENSURE_SUCCESS(rv, rv);
         if (path.EqualsLiteral("blank")   ||
             path.EqualsLiteral("mozilla") ||
@@ -1895,7 +1881,15 @@ NS_IMETHODIMP
 nsScriptSecurityManager::GetCodebasePrincipal(nsIURI *aURI,
                                               nsIPrincipal **result)
 {
-    nsresult rv;
+    PRBool noContext;
+    nsresult rv =
+        NS_URIChainHasFlags(aURI,
+                            nsIProtocolHandler::URI_HAS_NO_SECURITY_CONTEXT,
+                            &noContext);
+    if (NS_FAILED(rv) || noContext) {
+        return CallCreateInstance(NS_NULLPRINCIPAL_CONTRACTID, result);
+    }
+    
     nsCOMPtr<nsIPrincipal> principal;
     rv = CreateCodebasePrincipal(aURI, getter_AddRefs(principal));
     if (NS_FAILED(rv)) return rv;
@@ -2136,11 +2130,8 @@ nsScriptSecurityManager::GetObjectPrincipal(JSContext *aCx, JSObject *aObj,
 
 // static
 nsIPrincipal*
-nsScriptSecurityManager::doGetObjectPrincipal(JSContext *aCx, JSObject *aObj
-#ifdef DEBUG
-                                              , PRBool aAllowShortCircuit
-#endif
-                                              )
+nsScriptSecurityManager::doGetObjectPrincipal(JSContext *aCx, JSObject *aObj,
+                                              PRBool aAllowShortCircuit)
 {
     NS_ASSERTION(aCx && aObj, "Bad call to doGetObjectPrincipal()!");
     nsIPrincipal* result = nsnull;
@@ -2169,12 +2160,9 @@ nsScriptSecurityManager::doGetObjectPrincipal(JSContext *aCx, JSObject *aObj
 
             if (NS_LIKELY(xpcWrapper != nsnull))
             {
-#ifdef DEBUG
-                if (aAllowShortCircuit)
+                if (NS_UNLIKELY(aAllowShortCircuit))
                 {
-#endif
                     result = xpcWrapper->GetObjectPrincipal();
-#ifdef DEBUG
                 }
                 else
                 {
@@ -2185,7 +2173,6 @@ nsScriptSecurityManager::doGetObjectPrincipal(JSContext *aCx, JSObject *aObj
                         result = objPrin->GetPrincipal();
                     }                    
                 }
-#endif
             }
             else
             {
@@ -2653,8 +2640,7 @@ nsScriptSecurityManager::SetCanEnableCapability(const nsACString& certFingerprin
         if (NS_FAILED(rv)) return NS_ERROR_FAILURE;
         nsCOMPtr<nsIZipReader> systemCertZip = do_CreateInstance(kZipReaderCID, &rv);
         if (NS_FAILED(rv)) return NS_ERROR_FAILURE;
-        systemCertZip->Init(systemCertFile);
-        rv = systemCertZip->Open();
+        rv = systemCertZip->Open(systemCertFile);
         if (NS_SUCCEEDED(rv))
         {
             nsCOMPtr<nsIJAR> systemCertJar(do_QueryInterface(systemCertZip, &rv));

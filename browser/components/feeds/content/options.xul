@@ -3,6 +3,7 @@
 <?xml-stylesheet href="chrome://mozapps/content/preferences/preferences.css"?>
 <?xml-stylesheet href="chrome://browser/skin/preferences/preferences.css"?>
 <?xml-stylesheet href="chrome://global/skin/"?>
+<?xml-stylesheet href="chrome://browser/skin/feeds/subscribe.css"?>
 
 <!DOCTYPE dialog SYSTEM "chrome://browser/locale/feeds/options.dtd">
 
@@ -39,9 +40,15 @@
         <menupopup id="webServicePopup" 
                    onpopupshowing="SubscriptionOptions.populateWebHandlers(this);"/>
       </menulist>
-      <separator class="thin"/>
-      <radio id="readerBookmarks" value="bookmarks"
-             label="&readerBookmarks.label;" accesskey="&readerBookmarks.accesskey;"/>
+      <separator/>
+      <hbox>
+        <radio id="readerBookmarks" value="bookmarks"
+               label="&readerBookmarks.label;" accesskey="&readerBookmarks.accesskey;"/>
+        <separator flex="1"/>
+        <button class="plain link" url="&liveBookmarksInfo.url;"
+                label="&liveBookmarksInfo.label;" accesskey="&liveBookmarksInfo.accesskey;"
+                oncommand="SubscriptionOptions.whatAreLiveBookmarks(this);"/>
+      </hbox>
     </radiogroup>
     <separator/>
   </groupbox>

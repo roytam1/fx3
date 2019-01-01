@@ -47,14 +47,14 @@
  *
  * The nsIURL methods operate on the <jar-entry> part of the spec.
  */
-[scriptable, uuid(c7e410d3-85f2-11d3-9f63-006008a6efe9)]
+[scriptable, uuid(d2746619-1724-4f42-8ca8-dacaf1b269d6)]
 interface nsIJARURI : nsIURL {
 
     /**
      * Returns the root URI (the one for the actual JAR file) for this JAR
      * (e.g., http://www.big.com/blue.jar).
      */
-    attribute nsIURI JARFile;
+    readonly attribute nsIURI JARFile;
 
     /**
      * Returns the entry specified for this JAR URI (e.g., "ocean.html").  This

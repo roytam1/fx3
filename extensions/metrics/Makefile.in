@@ -50,6 +50,10 @@ XPI_PKGNAME		= metrics-$(MOZ_APP_VERSION)
 
 DIRS		= public src
 
+ifdef ENABLE_TESTS
+TOOL_DIRS += test
+endif
+
 PREF_JS_EXPORTS = $(srcdir)/metrics.js
 
 DIST_FILES = install.rdf

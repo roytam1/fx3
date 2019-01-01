@@ -4559,7 +4559,14 @@ nsContextMenu.prototype = {
     },
     // Open clicked-in frame in the same window.
     showOnlyThisFrame : function () {
-        window.loadURI(this.target.ownerDocument.location.href, null, null, false);
+        try {
+          const secMan = Components.classes["@mozilla.org/scriptsecuritymanager;1"]
+                         .getService(Components.interfaces.nsIScriptSecurityManager);
+          const nsIScriptSecMan = Components.interfaces.nsIScriptSecurityManager;
+          secMan.checkLoadURI(gBrowser.currentURI, makeURI(this.target.ownerDocument.location.href),
+                              nsIScriptSecMan.DISALLOW_SCRIPT);
+          window.loadURI(this.target.ownerDocument.location.href, null, null, false);
+        } catch(e) {}
     },
     // View Partial Source
     viewPartialSource : function ( context ) {
@@ -4599,12 +4606,30 @@ nsContextMenu.prototype = {
     // Change current window to the URL of the image.
     viewImage : function (e) {
         urlSecurityCheck( this.imageURL, this.docURL );
-        openUILink( this.imageURL, e );
+        try {
+          if (this.docURL != gBrowser.currentURI) {
+            const secMan = Components.classes["@mozilla.org/scriptsecuritymanager;1"]
+                           .getService(Components.interfaces.nsIScriptSecurityManager);
+            const nsIScriptSecMan = Components.interfaces.nsIScriptSecurityManager;
+            secMan.checkLoadURI(gBrowser.currentURI, makeURI(this.imageURL),
+                                nsIScriptSecMan.DISALLOW_SCRIPT);
+          }
+          openUILink( this.imageURL, e );
+        } catch(e) {}
     },
     // Change current window to the URL of the background image.
     viewBGImage : function (e) {
         urlSecurityCheck( this.bgImageURL, this.docURL );
-        openUILink( this.bgImageURL, e );
+        try {
+          if (this.docURL != gBrowser.currentURI) {
+            const secMan = Components.classes["@mozilla.org/scriptsecuritymanager;1"]
+                           .getService(Components.interfaces.nsIScriptSecurityManager);
+            const nsIScriptSecMan = Components.interfaces.nsIScriptSecurityManager;
+            secMan.checkLoadURI(gBrowser.currentURI, makeURI(this.bgImageURL),
+                                nsIScriptSecMan.DISALLOW_SCRIPT);
+          }
+          openUILink( this.bgImageURL, e );
+        } catch(e) {}
     },
     disableSetDesktopBackground: function() {
         // Disable the Set as Desktop Background menu item if we're still trying
@@ -6145,9 +6170,21 @@ var FeedHandler = {
     var feeds = harvestFeeds(feeds);
     if (feeds.length == 1) {
 #ifdef MOZ_PLACES
+#ifdef MOZ_FEEDS
+      // Just load the feed in the content area to either subscribe or show the
+      // preview UI
+      loadURI(feeds[0].href, null, null, false);
+#else
       PlacesCommandHook.addLiveBookmark(feeds[0].href);
+#endif
+#else
+#ifdef MOZ_FEEDS
+      // Just load the feed in the content area to either subscribe or show the
+      // preview UI
+      loadURI(feeds[0].href, null, null, false);
 #else
       this.addLiveBookmark(feeds[0].href);
+#endif
 #endif
       return false;
     }
@@ -6157,7 +6194,11 @@ var FeedHandler = {
       var feedInfo = feeds[i];
       var menuItem = document.createElement("menuitem");
       var baseTitle = feedInfo.title || feedInfo.href;
+#ifdef MOZ_FEEDS
+      var labelStr = gNavigatorBundle.getFormattedString("feedShowFeedNew", [baseTitle]);
+#else
       var labelStr = gNavigatorBundle.getFormattedString("feedShowFeed", [baseTitle]);
+#endif
       menuItem.setAttribute("label", labelStr);
       menuItem.setAttribute("feed", feedInfo.href);
       menuItem.setAttribute("tooltiptext", feedInfo.href);
@@ -6214,7 +6255,11 @@ var FeedHandler = {
     } else {
       feedButton.setAttribute("feeds", "true");
       feedButton.setAttribute("tooltiptext", 
+#ifdef MOZ_FEEDS
+                              gNavigatorBundle.getString("feedHasFeedsNew"));
+#else
                               gNavigatorBundle.getString("feedHasFeeds"));
+#endif
     }
   }, 
   
@@ -6276,7 +6321,11 @@ var FeedHandler = {
         if (feedButton) {
           feedButton.setAttribute("feeds", "true");
           feedButton.setAttribute("tooltiptext", 
+#ifdef MOZ_FEEDS
+                                  gNavigatorBundle.getString("feedHasFeedsNew"));
+#else
                                   gNavigatorBundle.getString("feedHasFeeds"));
+#endif
         }
       }
     }

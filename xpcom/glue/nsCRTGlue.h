@@ -71,4 +71,46 @@ NS_strspnp(const char *delims, const char *str);
 NS_COM_GLUE char*
 NS_strtok(const char *delims, char **str);
 
+/**
+ * "strlen" for PRUnichar strings
+ */
+NS_COM_GLUE PRUint32
+NS_strlen(const PRUnichar *aString);
+
+/**
+ * "strcmp" for PRUnichar strings
+ */
+NS_COM_GLUE int
+NS_strcmp(const PRUnichar *a, const PRUnichar *b);
+
+/**
+ * "strdup" for PRUnichar strings, uses the NS_Alloc allocator.
+ */
+NS_COM_GLUE PRUnichar*
+NS_strdup(const PRUnichar *aString);
+
+/**
+ * strndup for PRUnichar strings... this function will ensure that the
+ * new string is null-terminated. Uses the NS_Alloc allocator.
+ */
+NS_COM_GLUE PRUnichar*
+NS_strndup(const PRUnichar *aString, PRUint32 aLen);
+
+// The following case-conversion methods only deal in the ascii repertoire
+// A-Z and a-z
+
+NS_COM_GLUE char NS_ToUpper(char aChar);
+NS_COM_GLUE char NS_ToLower(char aChar);
+  
+NS_COM_GLUE PRBool NS_IsUpper(char aChar);
+NS_COM_GLUE PRBool NS_IsLower(char aChar);
+
+NS_COM_GLUE PRBool NS_IsAscii(PRUnichar aChar);
+NS_COM_GLUE PRBool NS_IsAscii(const PRUnichar* aString);
+NS_COM_GLUE PRBool NS_IsAsciiAlpha(PRUnichar aChar);
+NS_COM_GLUE PRBool NS_IsAsciiDigit(PRUnichar aChar);
+NS_COM_GLUE PRBool NS_IsAsciiWhitespace(PRUnichar aChar);
+NS_COM_GLUE PRBool NS_IsAscii(const char* aString);
+NS_COM_GLUE PRBool NS_IsAscii(const char* aString, PRUint32 aLength);
+
 #endif // nsCRTGlue_h__

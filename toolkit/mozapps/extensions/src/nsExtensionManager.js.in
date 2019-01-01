@@ -801,8 +801,7 @@ function getZipReaderForFile(zipFile) {
   try {
     var zipReader = Components.classes["@mozilla.org/libjar/zip-reader;1"]
                               .createInstance(Components.interfaces.nsIZipReader);
-    zipReader.init(zipFile);
-    zipReader.open();
+    zipReader.open(zipFile);
   }
   catch (e) {
     zipReader.close();
@@ -826,7 +825,6 @@ function extractRDFFileToTempDir(zipFile, fileName, suppressErrors) {
   var file = getFile(KEY_TEMPDIR, [getRandomFileName(fileName)]);
   try {
     var zipReader = getZipReaderForFile(zipFile);
-    zipReader.getEntry(fileName);
     zipReader.extract(fileName, file);
     zipReader.close();
   }
@@ -1520,9 +1518,9 @@ Installer.prototype = {
       
       // create directories first
       var entries = zipReader.findEntries("*/");
-      while (entries.hasMoreElements()) {
-        var entry = entries.getNext().QueryInterface(Components.interfaces.nsIZipEntry);
-        var target = installLocation.getItemFile(extensionID, entry.name);
+      while (entries.hasMore()) {
+        var entryName = entries.getNext();
+        var target = installLocation.getItemFile(extensionID, entryName);
         if (!target.exists()) {
           try {
             target.create(nsILocalFile.DIRECTORY_TYPE, PERMS_DIRECTORY);
@@ -1534,10 +1532,10 @@ Installer.prototype = {
         }
       }
 
-      entries = zipReader.findEntries("*");
-      while (entries.hasMoreElements()) {
-        entry = entries.getNext().QueryInterface(Components.interfaces.nsIZipEntry);
-        target = installLocation.getItemFile(extensionID, entry.name);
+      entries = zipReader.findEntries(null);
+      while (entries.hasMore()) {
+        var entryName = entries.getNext();
+        target = installLocation.getItemFile(extensionID, entryName);
         if (target.exists())
           continue;
 
@@ -1548,7 +1546,7 @@ Installer.prototype = {
           LOG("extractExtensionsFiles: failed to create target file for extraction " + 
               " file = " + target.path + ", exception = " + e + "\n");
         }
-        zipReader.extract(entry.name, target);
+        zipReader.extract(entryName, target);
       }
       zipReader.close();
     }
@@ -1574,7 +1572,6 @@ Installer.prototype = {
                        "preview.png", "icon.png"];
       for (var i = 0; i < rootFiles.length; ++i) {
         try {
-          var entry = zipReader.getEntry(rootFiles[i]);
           var target = installLocation.getItemFile(id, rootFiles[i]);
           zipReader.extract(rootFiles[i], target);
         }
@@ -1586,11 +1583,11 @@ Installer.prototype = {
       // new theme structure requires a chrome.manifest file
       if (manifestFile.exists()) {
         var entries = zipReader.findEntries(DIR_CHROME + "/*");
-        while (entries.hasMoreElements()) {
-          entry = entries.getNext().QueryInterface(Components.interfaces.nsIZipEntry);
-          if (entry.name.substr(entry.name.length - 1, 1) == "/")
+        while (entries.hasMore()) {
+          var entryName = entries.getNext();
+          if (entryName.charAt(entryName.length - 1) == "/")
             continue;
-          target = installLocation.getItemFile(id, entry.name);
+          target = installLocation.getItemFile(id, entryName);
           try {
             target.create(nsILocalFile.NORMAL_FILE_TYPE, PERMS_FILE);
           }
@@ -1598,13 +1595,12 @@ Installer.prototype = {
             LOG("extractThemeFiles: failed to create target file for extraction " + 
                 " file = " + target.path + ", exception = " + e + "\n");
           }
-          zipReader.extract(entry.name, target);
+          zipReader.extract(entryName, target);
         }
         zipReader.close();
       }
       else { // old theme structure requires only an install.rdf
         try {
-          var entry = zipReader.getEntry(FILE_CONTENTS_MANIFEST);
           var contentsManifestFile = installLocation.getItemFile(id, FILE_CONTENTS_MANIFEST);
           contentsManifestFile.create(nsILocalFile.NORMAL_FILE_TYPE, PERMS_FILE);
           zipReader.extract(FILE_CONTENTS_MANIFEST, contentsManifestFile);
@@ -2915,10 +2911,10 @@ ExtensionManager.prototype = {
                                   InstallLocations.get(KEY_APP_GLOBAL),
                                   installData.type);
     installer._installExtensionFiles(file);
-    if (installData.type == nsIUpdateItem.TYPE_EXTENSION)
-      installer.upgradeExtensionChrome();
-    else
+    if (installData.type == nsIUpdateItem.TYPE_THEME)
       installer.upgradeThemeChrome();
+    else
+      installer.upgradeExtensionChrome();
   },
 
   /**
@@ -3188,10 +3184,9 @@ ExtensionManager.prototype = {
 
             var zipReader = Components.classes["@mozilla.org/libjar/zip-reader;1"]
                                       .createInstance(Components.interfaces.nsIZipReader);
-            zipReader.init(entry);
+            zipReader.open(entry);
             var prettyName = "";
             try {
-              var jar = zipReader.QueryInterface(Components.interfaces.nsIJAR);
               var principal = { };
               var certPrincipal = zipReader.getCertificatePrincipal(null, principal);
               // XXXbz This string could be empty.  This needs better
@@ -3342,7 +3337,9 @@ ExtensionManager.prototype = {
     // If we have extensions that were installed before the new flat chrome
     // manifests, and are still valid, we need to manually create the flat
     // manifest files.
-    var extensions = this._getActiveItems(nsIUpdateItem.TYPE_EXTENSION);
+    var extensions = this._getActiveItems(nsIUpdateItem.TYPE_EXTENSION +
+                                          nsIUpdateItem.TYPE_LOCALE +
+                                          nsIUpdateItem.TYPE_PLUGIN);
     for (var i = 0; i < extensions.length; ++i) {
       var e = extensions[i];
       var itemLocation = e.location.getItemLocation(e.id);
@@ -3659,13 +3656,16 @@ ExtensionManager.prototype = {
     }
     ds.endUpdateBatch();
 
+    var allAppManaged = true;
     var ctr = getContainer(ds, ds._itemRoot);
     var elements = ctr.GetElements();
     while (elements.hasMoreElements()) {
       var itemResource = elements.getNext().QueryInterface(Components.interfaces.nsIRDFResource);
+      var id = stripPrefix(itemResource.Value, PREFIX_ITEM_URI);
+      if (allAppManaged && ds.getItemProperty(id, "appManaged") != "true")
+        allAppManaged = false;
       // appDisabled is determined by an item being compatible,
       // satisfying its dependencies, and not being blocklisted
-      var id = stripPrefix(itemResource.Value, PREFIX_ITEM_URI);
       if (ds.getItemProperty(id, "compatible") == "true" &&
           ds.getItemProperty(id, "blocklisted") == "false" &&
           ds.getItemProperty(id, "satisfiesDependencies") == "true") {
@@ -3678,8 +3678,10 @@ ExtensionManager.prototype = {
     // Update the manifests to reflect the items that were disabled / enabled.
     this._updateManifests(true);
 
-    // Always check for compatibility updates when upgrading
-    this._showMismatchWindow();
+    // Always check for compatibility updates when upgrading if we have add-ons
+    // that aren't managed by the application.
+    if (!allAppManaged)
+      this._showMismatchWindow();
     
     // Finish any pending upgrades from the compatibility update to avoid an
     // additional restart.
@@ -3720,27 +3722,45 @@ ExtensionManager.prototype = {
    * 5) migrates the app compatibility info from the old datasource.
    */
   _upgradeFromV10: function() {
-    // return early if the version 1.0 extensions datasource file doesn't exist.
+    var extensionsDS = getFile(KEY_PROFILEDIR, [FILE_EXTENSIONS]);
+    var dsExists = extensionsDS.exists();
+    // Toolkiit 1.7 profiles (Firefox 1.0, Thunderbird 1.0, etc.) have a default
+    // theme directory in the profile's extensions directory that will be
+    // disabled due to having a maxVersion that is incompatible with the
+    // toolkit 1.8 release of the app.
+    var profileDefaultTheme = getDirNoCreate(KEY_PROFILEDS, [DIR_EXTENSIONS,
+                                             stripPrefix(RDFURI_DEFAULT_THEME, PREFIX_ITEM_URI)]);
+    if (profileDefaultTheme && profileDefaultTheme.exists()) {
+      removeDirRecursive(profileDefaultTheme);
+      // Sunbird 0.3a1 didn't move the default theme into the app's extensions
+      // directory and we can't install it while uninstalling the one in the
+      // profile directory. If we have a toolkit 1.8 extensions datasource and
+      // a profile default theme deleting the toolkit 1.8 extensions datasource
+      // will fix this problem when the datasource is re-created.
+      if (dsExists)
+        extensionsDS.remove(false);
+    }
+
+    // return early if the toolkit 1.7 extensions datasource file doesn't exist.
     var oldExtensionsFile = getFile(KEY_PROFILEDIR, [DIR_EXTENSIONS, "Extensions.rdf"]);
     if (!oldExtensionsFile.exists())
       return;
 
-    // Version 1.0 profiles have a default theme directory in the profile's
-    // extensions directory that will be disabled due to having a maxVersion
-    // of 1.0 so we must remove it if it exists.
-    var profileDefaultTheme = getDirNoCreate(KEY_PROFILEDS, [DIR_EXTENSIONS,
-                                             stripPrefix(RDFURI_DEFAULT_THEME, PREFIX_ITEM_URI)]);
+    // Sunbird 0.2 used a different GUID for the default theme
+    profileDefaultTheme = getDirNoCreate(KEY_PROFILEDS, [DIR_EXTENSIONS,
+                                         "{8af2d0a7-e394-4de2-ae55-2dae532a7a9b}"]);
     if (profileDefaultTheme && profileDefaultTheme.exists())
       removeDirRecursive(profileDefaultTheme);
 
-    // Version 0.9 profiles may have DOMi 1.0 with just an install.rdf
+    // Firefox 0.9 profiles may have DOMi 1.0 with just an install.rdf
     var profileDOMi = getDirNoCreate(KEY_PROFILEDS, [DIR_EXTENSIONS,
                                      "{641d8d09-7dda-4850-8228-ac0ab65e2ac9}"]);
     if (profileDOMi && profileDOMi.exists())
       removeDirRecursive(profileDOMi);
 
-    var extensionsDS = getFile(KEY_PROFILEDIR, [FILE_EXTENSIONS]);
-    if (!extensionsDS.exists())
+    // return early to avoid migrating data twice if we already have a
+    // toolkit 1.8 extension datasource.
+    if (dsExists)
       return;
 
     // Prepare themes for installation
@@ -3934,7 +3954,9 @@ ExtensionManager.prototype = {
     //
     // To do this we obtain a list of active extensions and themes and write 
     // these to the extensions.ini file in the profile directory.
-    var validExtensions = this._getActiveItems(nsIUpdateItem.TYPE_EXTENSION);
+    var validExtensions = this._getActiveItems(nsIUpdateItem.TYPE_EXTENSION +
+                                               nsIUpdateItem.TYPE_LOCALE +
+                                               nsIUpdateItem.TYPE_PLUGIN);
     var validThemes     = this._getActiveItems(nsIUpdateItem.TYPE_THEME);
 
     var extensionsLocationsFile = getFile(KEY_PROFILEDIR, [FILE_EXTENSION_MANIFEST]);
@@ -4085,9 +4107,9 @@ ExtensionManager.prototype = {
       var requireABICompatibility = false;
       while (targetPlatforms.hasMoreElements()) {
         var targetPlatform = stringData(targetPlatforms.getNext());
-        var tokens = targetPlatform.split("_");
-        var os = tokens[0];
-        var abi = (tokens.length > 1) ? tokens[1] : null;
+        var os = targetPlatform.split("_")[0];
+        var index = targetPlatform.indexOf("_");
+        var abi = index != -1 ? targetPlatform.substr(index + 1) : null;
         if (os == gOSTarget) {
           foundMatchingOS = true;
           // The presence of any ABI part after our OS means ABI is important.
@@ -4279,9 +4301,9 @@ ExtensionManager.prototype = {
       var files = [];
       for (var i = 0; i < searchForEntries.length; ++i) {
         var entries = zipReader.findEntries(searchForEntries[i]);
-        while (entries.hasMoreElements()) {
-          var entry = entries.getNext().QueryInterface(Components.interfaces.nsIZipEntry);
-          var target = getFile(KEY_TEMPDIR, [entry.name]);
+        while (entries.hasMore()) {
+          var entryName = entries.getNext();
+          var target = getFile(KEY_TEMPDIR, [entryName]);
           try {
             target.createUnique(nsILocalFile.NORMAL_FILE_TYPE, PERMS_FILE);
           }
@@ -4289,7 +4311,7 @@ ExtensionManager.prototype = {
             LOG("installMultiXPI: failed to create target file for extraction " +
                 " file = " + target.path + ", exception = " + e + "\n");
           }
-          zipReader.extract(entry.name, target);
+          zipReader.extract(entryName, target);
           files.push(target);
         }
       }
@@ -7114,7 +7136,7 @@ ExtensionsDataSource.prototype = {
     }    
     
     // Assert properties with multiple values    
-    var manyProps = ["contributor"];
+    var manyProps = ["developer", "translator", "contributor"];
     for (var i = 0; i < manyProps.length; ++i) {
       var property = EM_R(manyProps[i]);
       var literals = installManifest.GetTargets(gInstallManifestRoot, property, true);
@@ -7949,6 +7971,20 @@ ExtensionsDataSource.prototype = {
       }
     }
     return values.length > 0 ? values : null;
+  },
+
+  /**
+   * Get the em:developer property (developers of the extension)
+   */
+  _rdfGets_developer: function(item, property) {
+    return this._getLocalizablePropertyValues(item, property); 
+  },
+
+  /**
+   * Get the em:translator property (translators of the extension)
+   */
+  _rdfGets_translator: function(item, property) {
+    return this._getLocalizablePropertyValues(item, property); 
   },
   
   /**

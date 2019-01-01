@@ -53,6 +53,7 @@ DIRS		= \
 		streamconv \
 		cache \
 		protocol \
+		system \
 		build \
 		resources \
 		locales \
