@@ -35,6 +35,11 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+/*
+ * A base class implementING nsIObjectLoadingContent for use by
+ * various content nodes that want to provide plugin/document/image
+ * loading functionality (eg <embed>, <object>, <applet>, etc).
+ */
 
 #ifndef NSOBJECTLOADINGCONTENT_H_
 #define NSOBJECTLOADINGCONTENT_H_

@@ -52,6 +52,8 @@
  * 05/03/2000   IBM Corp.       Observer events for reflow states
  */ 
 
+/* a presentation of a document, part 2 */
+
 #define PL_ARENA_CONST_ALIGN_MASK 3
 
 #include "nsIPresShell.h"
@@ -1678,6 +1680,7 @@ PresShell::Init(nsIDocument* aDocument,
     return NS_ERROR_NULL_POINTER;
   }
   if (mDocument) {
+    NS_WARNING("PresShell double init'ed");
     return NS_ERROR_ALREADY_INITIALIZED;
   }
 

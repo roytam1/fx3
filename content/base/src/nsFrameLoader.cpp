@@ -37,6 +37,11 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+/*
+ * Class for managing loading of a subframe (creation of the docshell,
+ * handling of loads in it, recursion-checking).
+ */
+
 #include "nsIDOMHTMLIFrameElement.h"
 #include "nsIDOMHTMLFrameElement.h"
 #include "nsIDOMWindow.h"
@@ -405,8 +410,8 @@ nsFrameLoader::EnsureDocShell()
       // enclosing chrome shell.
 
       chromeEventHandler = do_QueryInterface(mOwnerContent);
-      NS_WARN_IF_FALSE(chromeEventHandler,
-                       "This mContent should implement this.");
+      NS_ASSERTION(chromeEventHandler,
+                   "This mContent should implement this.");
     } else {
       nsCOMPtr<nsIDocShell> parentShell(do_QueryInterface(parentAsNode));
 

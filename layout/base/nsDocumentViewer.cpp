@@ -38,6 +38,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+/* container for a document and its presentation */
+
 #include "nscore.h"
 #include "nsCOMPtr.h"
 #include "nsCRT.h"
@@ -754,7 +756,7 @@ DocumentViewerImpl::InitPresentationStuff(PRBool aDoInitialReflow)
 
   // get the DOM event receiver
   nsCOMPtr<nsIDOMEventReceiver> erP(do_QueryInterface(mDocument));
-  NS_WARN_IF_FALSE(erP, "No event receiver in document!");
+  NS_ASSERTION(erP, "No event receiver in document!");
 
   if (erP) {
     rv = erP->AddEventListenerByIID(mFocusListener,
@@ -1296,7 +1298,7 @@ DocumentViewerImpl::Open(nsISupports *aState, nsISHEntry *aSHEntry)
   if (mFocusListener) {
     // get the DOM event receiver
     nsCOMPtr<nsIDOMEventReceiver> erP(do_QueryInterface(mDocument));
-    NS_WARN_IF_FALSE(erP, "No event receiver in document!");
+    NS_ASSERTION(erP, "No event receiver in document!");
 
     if (erP) {
       erP->AddEventListenerByIID(mFocusListener,
@@ -1358,7 +1360,7 @@ DocumentViewerImpl::Close(nsISHEntry *aSHEntry)
   if (mFocusListener) {
     // get the DOM event receiver
     nsCOMPtr<nsIDOMEventReceiver> erP(do_QueryInterface(mDocument));
-    NS_WARN_IF_FALSE(erP, "No event receiver in document!");
+    NS_ASSERTION(erP, "No event receiver in document!");
 
     if (erP) {
       erP->RemoveEventListenerByIID(mFocusListener,
@@ -1685,7 +1687,7 @@ DocumentViewerImpl::SetDOMDocument(nsIDOMDocument *aDocument)
     // Register the focus listener on the new document
 
     nsCOMPtr<nsIDOMEventReceiver> erP = do_QueryInterface(mDocument, &rv);
-    NS_WARN_IF_FALSE(erP, "No event receiver in document!");
+    NS_ASSERTION(erP, "No event receiver in document!");
 
     if (erP) {
       rv = erP->AddEventListenerByIID(mFocusListener,
@@ -3648,10 +3650,7 @@ DocumentViewerImpl::PrintPreviewNavigate(PRInt16 aType, PRInt32 aPageNum)
 NS_IMETHODIMP
 DocumentViewerImpl::GetGlobalPrintSettings(nsIPrintSettings * *aGlobalPrintSettings)
 {
-  NS_ENSURE_ARG_POINTER(aGlobalPrintSettings);
-
-  nsPrintEngine printEngine;
-  return printEngine.GetGlobalPrintSettings(aGlobalPrintSettings);
+  return nsPrintEngine::GetGlobalPrintSettings(aGlobalPrintSettings);
 }
 
 /* readonly attribute boolean doingPrint; */
@@ -4182,8 +4181,6 @@ DocumentViewerImpl::InstallNewPresentation()
   mViewManager->EnableRefresh(NS_VMREFRESH_DEFERRED);
 
   Show();
-
-  mPrintEngine->ShowDocList(PR_TRUE);
 #endif // NS_PRINTING && NS_PRINT_PREVIEW
 }
 

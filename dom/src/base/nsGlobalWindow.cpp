@@ -837,8 +837,8 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
                                PRBool aClearScopeHint,
                                PRBool aIsInternalCall)
 {
-  NS_WARN_IF_FALSE(mDocumentPrincipal == nsnull,
-                   "mDocumentPrincipal prematurely set!");
+  NS_ASSERTION(mDocumentPrincipal == nsnull,
+               "mDocumentPrincipal prematurely set!");
 #ifdef PR_LOGGING
   if (IsInnerWindow() && aDocument && gDOMLeakPRLog &&
       PR_LOG_TEST(gDOMLeakPRLog, PR_LOG_DEBUG)) {
@@ -3089,7 +3089,7 @@ nsGlobalWindow::MakeScriptDialogTitle(const nsAString &aInTitle,
   // right thing for javascript: and data: documents.
 
   nsresult rv = NS_OK;
-  NS_WARN_IF_FALSE(sSecMan, "Global Window has no security manager!");
+  NS_ASSERTION(sSecMan, "Global Window has no security manager!");
   if (sSecMan) {
     nsCOMPtr<nsIPrincipal> principal;
     rv = sSecMan->GetSubjectPrincipal(getter_AddRefs(principal));
@@ -5619,7 +5619,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
     NS_ASSERTION(sSecMan, "No Security Manager Found!");
     // Note that the opener script principal is not relevant for openDialog
     // callers, since those already have chrome privileges.  So we
-    // only want to do this wen aDoJSFixups is true.
+    // only want to do this when aDoJSFixups is true.
     if (aDoJSFixups && sSecMan) {
       nsCOMPtr<nsIPrincipal> principal;
       sSecMan->GetSubjectPrincipal(getter_AddRefs(principal));

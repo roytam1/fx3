@@ -15,7 +15,7 @@
  * The Original Code is mozilla.org code.
  *
  * The Initial Developer of the Original Code is
- * Netscape Communiactions Corporation.
+ * Netscape Communications Corporation.
  * Portions created by the Initial Developer are Copyright (C) 2002
  * the Initial Developer. All Rights Reserved.
  *
@@ -36,6 +36,10 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+/*
+ * This file was part of an abortive attempt at DOM3 Load/Save; it's not built.
+ */
+
 #ifndef nsDOMBuilder_h__
 #define nsDOMBuilder_h__
 
@@ -45,10 +49,6 @@
 #include "nsIDOMDOMBuilderFilter.h"
 #include "nsIDOMDOMImplementation.h"
 #include "nsCOMPtr.h"
-
-/**
- * This class implements the DOMBuilder from DOM3 Load/Save
- */
 
 class nsDOMBuilder : public nsIDOMDOMBuilder
 {

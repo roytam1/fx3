@@ -14,7 +14,7 @@
  *
  * The Original Code is Novell code.
  *
- * The Initial Developer of the Novell Code is Novell Corporation.
+ * The Initial Developer of the Original Code is Novell Corporation.
  * Portions created by Novell are Copyright (C) 2005 Novell. All Rights Reserved.
  *
  * Contributor(s):
@@ -33,6 +33,11 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK *****
+ */
+
+/*
+ * structures that represent things to be painted (ordered in z-order),
+ * used during painting and hit testing
  */
 
 #include "nsDisplayList.h"
