@@ -622,7 +622,7 @@ ifneq (,$(DIRS)$(TOOL_DIRS))
 	done
 endif
 
-export:: $(SUBMAKEFILES) $(MAKE_DIRS)
+export:: $(SUBMAKEFILES) $(MAKE_DIRS) $(if $(EXPORTS)$(XPIDLSRCS)$(SDK_HEADERS)$(SDK_XPIDLSRCS),$(PUBLIC)) $(if $(SDK_HEADERS)$(SDK_XPIDLSRCS),$(SDK_PUBLIC)) $(if $(XPIDLSRCS),$(IDL_DIR)) $(if $(SDK_XPIDLSRCS),$(SDK_IDL_DIR))
 	+$(LOOP_OVER_DIRS)
 	+$(LOOP_OVER_TOOL_DIRS)
 
@@ -1571,7 +1571,7 @@ ifndef NO_INSTALL
 	  $(PERL) $(MOZILLA_DIR)/config/preprocessor.pl $(XULPPFLAGS) $(DEFINES) $(ACDEFINES) \
 	    $(JAR_MANIFEST) | \
 	  $(PERL) -I$(MOZILLA_DIR)/config $(MOZILLA_DIR)/config/make-jars.pl \
-	    -d $(MAKE_JARS_TARGET) -j $(DESTDIR)$(mozappdir)/chrome \
+	    -d $(MAKE_JARS_TARGET)/chrome -j $(DESTDIR)$(mozappdir)/chrome \
 	    $(MAKE_JARS_FLAGS) -- "$(XULPPFLAGS) $(DEFINES) $(ACDEFINES)"; \
 	fi
 endif
