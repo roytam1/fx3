@@ -38,6 +38,7 @@
 
 #include "nsCocoaWindow.h"
 
+#include "nsCOMPtr.h"
 #include "nsIServiceManager.h"    // for drag and drop
 #include "nsWidgetsCID.h"
 #include "nsIDragService.h"
@@ -48,7 +49,12 @@
 #include "nsGUIEvent.h"
 #include "nsMacResources.h"
 #include "nsIRollupListener.h"
-#import  "nsChildView.h"
+#include  "nsChildView.h"
+#include "nsIAppShell.h"
+#include "nsIAppShellService.h"
+#include "nsIBaseWindow.h"
+#include "nsIInterfaceRequestorUtils.h"
+#include "nsIXULWindow.h"
 
 #include "nsIEventQueueService.h"
 
@@ -59,7 +65,27 @@ static NS_DEFINE_CID(kCDragServiceCID,  NS_DRAGSERVICE_CID);
 extern nsIRollupListener * gRollupListener;
 extern nsIWidget         * gRollupWidget;
 
+#define NS_APPSHELLSERVICE_CONTRACTID "@mozilla.org/appshell/appShellService;1"
+
+// call getHiddenWindowNativeMenu, don't use this directly
+static nsIMenuBar* gHiddenWindowMenuBar = nsnull;
+
 NS_IMPL_ISUPPORTS_INHERITED0(nsCocoaWindow, Inherited)
+
+
+// get the highest point on any screen
+static float HighestPointOnAnyScreen()
+{
+  float highestScreenPoint = 0.0;
+  NSArray* allScreens = [NSScreen screens];
+  for (unsigned int i = 0; i < [allScreens count]; i++) {
+    NSRect currScreenFrame = [[allScreens objectAtIndex:i] frame];
+    float currScreenHighestPoint = currScreenFrame.origin.y + currScreenFrame.size.height;
+    if (currScreenHighestPoint > highestScreenPoint)
+      highestScreenPoint = currScreenHighestPoint;
+  }
+  return highestScreenPoint;
+}
 
 
 /*
@@ -71,23 +97,29 @@ NS_IMPL_ISUPPORTS_INHERITED0(nsCocoaWindow, Inherited)
  */
 static NSRect geckoRectToCocoaRect(const nsRect &geckoRect)
 {
-  // first we get the highest point on all screens
-  float highestScreenPoint = 0.0;
-  NSArray* allScreens = [NSScreen screens];
-  for (unsigned int i = 0; i < [allScreens count]; i++) {
-    NSRect currScreenFrame = [[allScreens objectAtIndex:i] frame];
-    float currScreenHighestPoint = currScreenFrame.origin.y + currScreenFrame.size.height;
-    if (currScreenHighestPoint > highestScreenPoint)
-      highestScreenPoint = currScreenHighestPoint;
-  }
-
   // We only need to change the Y coordinate by starting with the screen
   // height, subtracting the gecko Y coordinate, and subtracting the
   // height.
   return NSMakeRect(geckoRect.x,
-                    highestScreenPoint - geckoRect.y - geckoRect.height,
+                    HighestPointOnAnyScreen() - geckoRect.y - geckoRect.height,
                     geckoRect.width,
                     geckoRect.height);
+}
+
+
+/*
+ * See explanation for geckoRectToCocoaRect, guess what this does...
+ */
+static nsRect cocoaRectToGeckoRect(const NSRect &cocoaRect)
+{
+  // We only need to change the Y coordinate by starting with the screen
+  // height, subtracting the gecko Y coordinate, and subtracting the
+  // height.
+  
+  return nsRect((nscoord)cocoaRect.origin.x,
+                (nscoord)(HighestPointOnAnyScreen() - (cocoaRect.origin.y + cocoaRect.size.height)),
+                (nscoord)cocoaRect.size.width,
+                (nscoord)cocoaRect.size.height);
 }
 
 
@@ -118,6 +150,48 @@ nsCocoaWindow::~nsCocoaWindow()
     [mWindow autorelease];
     [mDelegate autorelease];
   }
+}
+
+
+static nsIMenuBar* GetHiddenWindowMenuBar()
+{
+  if (gHiddenWindowMenuBar)
+    return gHiddenWindowMenuBar;
+  
+  nsCOMPtr<nsIAppShellService> appShell(do_GetService(NS_APPSHELLSERVICE_CONTRACTID));
+  if (!appShell) {
+    NS_WARNING("Couldn't get AppShellService in order to get hidden window ref");
+    return NULL;
+  }
+  
+  nsCOMPtr<nsIXULWindow> hiddenWindow;
+  appShell->GetHiddenWindow(getter_AddRefs(hiddenWindow));
+  if (!hiddenWindow) {
+    NS_WARNING("Couldn't get hidden window from appshell");
+    return NULL;
+  }
+  
+  nsCOMPtr<nsIBaseWindow> baseHiddenWindow;
+  baseHiddenWindow = do_GetInterface(hiddenWindow);
+  if (!baseHiddenWindow) {
+    NS_WARNING("Couldn't get nsIBaseWindow from hidden window (nsIXULWindow)");
+    return NULL;
+  }
+  
+  nsCOMPtr<nsIWidget> hiddenWindowWidget;
+  if (NS_FAILED(baseHiddenWindow->GetMainWidget(getter_AddRefs(hiddenWindowWidget)))) {
+    NS_WARNING("Couldn't get nsIWidget from hidden window (nsIBaseWindow)");
+    return NULL;
+  }
+  
+  nsIWidget* hiddenWindowWidgetNoCOMPtr = hiddenWindowWidget;
+  nsIMenuBar* geckoMenuBar = NS_STATIC_CAST(nsCocoaWindow*, hiddenWindowWidgetNoCOMPtr)->GetMenuBar();  
+  
+  if (geckoMenuBar) {
+    gHiddenWindowMenuBar = geckoMenuBar;
+  }
+  
+  return gHiddenWindowMenuBar;
 }
 
 
@@ -376,14 +450,16 @@ nsCocoaWindow::IsVisible(PRBool & aState)
 //-------------------------------------------------------------------------
 NS_IMETHODIMP nsCocoaWindow::Show(PRBool bState)
 {
-    if (bState)
-        [mWindow orderFront:NULL];
-    else
-        [mWindow orderOut:NULL];
-    
-    mVisible = bState;
-
-    return NS_OK;
+  if (bState) {
+    [mWindow orderFront:NULL];
+  }
+  else {
+    [mWindow orderOut:NULL];
+  }
+  
+  mVisible = bState;
+  
+  return NS_OK;
 }
 
 
@@ -522,9 +598,17 @@ NS_IMETHODIMP nsCocoaWindow::Resize(PRInt32 aWidth, PRInt32 aHeight, PRBool aRep
   return NS_OK;
 }
 
-
+// We return the origin for the entire window (title bar and all) but
+// the size of the content area. I have no idea why it was originally done
+// this way, but it matches Carbon and makes things work nicely.
 NS_IMETHODIMP nsCocoaWindow::GetScreenBounds(nsRect &aRect)
 {
+  nsRect windowFrame = cocoaRectToGeckoRect([mWindow frame]);
+  aRect.x = windowFrame.x;
+  aRect.y = windowFrame.y;
+  aRect.width = mBounds.width;
+  aRect.height = mBounds.height;
+  // printf("GetScreenBounds: output: %d,%d,%d,%d\n", aRect.x, aRect.y, aRect.width, aRect.height);
   return NS_OK;
 }
 
@@ -708,8 +792,10 @@ NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener * aListener,
 - (void)windowDidBecomeMain:(NSNotification *)aNotification
 {
   nsIMenuBar* myMenuBar = mGeckoWindow->GetMenuBar();
-  if (myMenuBar)
+  if (myMenuBar) {
+    // printf("painting window menu bar due to window becoming main\n");
     myMenuBar->Paint();
+  }
   
   nsGUIEvent guiEvent(PR_TRUE, NS_GOTFOCUS, mGeckoWindow);
   guiEvent.time = PR_IntervalNow();
@@ -723,6 +809,12 @@ NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener * aListener,
   // roll up any popups
   if (gRollupListener != nsnull && gRollupWidget != nsnull)
     gRollupListener->Rollup();
+  
+  nsCOMPtr<nsIMenuBar> hiddenWindowMenuBar = GetHiddenWindowMenuBar();
+  if (hiddenWindowMenuBar) {
+    // printf("painting hidden window menu bar due to nsCocoaWindow::Show(false)\n");
+    hiddenWindowMenuBar->Paint();
+  }
   
   // tell Gecko that we lost focus
   nsGUIEvent guiEvent(PR_TRUE, NS_LOSTFOCUS, mGeckoWindow);
