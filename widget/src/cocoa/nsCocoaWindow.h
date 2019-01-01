@@ -52,7 +52,9 @@ class nsCocoaWindow;
   nsCocoaWindow* mGeckoWindow; // [WEAK] (it owns us)
 }
 - (id)initWithGeckoWindow:(nsCocoaWindow*)geckoWind;
-- (void)windowDidResize:(NSNotification *)aNotification;
+- (void)windowDidResize:(NSNotification*)aNotification;
+- (void)sendGotFocusAndActivate;
+- (void)sendLostFocusAndDeactivate;
 @end
 
 
@@ -155,11 +157,6 @@ public:
 
     // nsIKBStateControl interface
     NS_IMETHOD ResetInputState();
-
-    void MoveToGlobalPoint(PRInt32 aX, PRInt32 aY);
-
-    void IsActive(PRBool* aActive);
-    void SetIsActive(PRBool aActive);
 
 protected:
   

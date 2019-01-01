@@ -1968,6 +1968,7 @@ PK11_ListPublicKeysInSlot(PK11SlotInfo *slot, char *nickname)
     keys = SECKEY_NewPublicKeyList();
     if (keys == NULL) {
 	PORT_Free(key_ids);
+	return NULL;
     }
 
     for (i=0; i < objCount ; i++) {
@@ -2013,6 +2014,7 @@ PK11_ListPrivKeysInSlot(PK11SlotInfo *slot, char *nickname, void *wincx)
     keys = SECKEY_NewPrivateKeyList();
     if (keys == NULL) {
 	PORT_Free(key_ids);
+	return NULL;
     }
 
     for (i=0; i < objCount ; i++) {

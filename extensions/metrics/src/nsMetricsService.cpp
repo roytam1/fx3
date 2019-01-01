@@ -38,6 +38,7 @@
 
 #include "nsMetricsService.h"
 #include "nsMetricsEventItem.h"
+#include "nsIMetricsCollector.h"
 #include "nsStringUtils.h"
 #include "nsXPCOM.h"
 #include "nsServiceManagerUtils.h"
@@ -53,8 +54,6 @@
 #include "nsIPrefBranch.h"
 #include "nsIObserver.h"
 #include "nsILocalFile.h"
-#include "nsLoadCollector.h"
-#include "nsWindowCollector.h"
 #include "nsIPropertyBag.h"
 #include "nsIProperty.h"
 #include "nsIVariant.h"
@@ -78,9 +77,12 @@
 #ifndef MOZILLA_1_8_BRANCH
 #include "nsIClassInfoImpl.h"
 #endif
-#include "nsIUUIDGenerator.h"
 #include "nsDocShellCID.h"
 #include "nsMemory.h"
+#include "nsIBadCertListener.h"
+#include "nsIInterfaceRequestor.h"
+#include "nsIX509Cert.h"
+#include "nsAutoPtr.h"
 
 // We need to suppress inclusion of nsString.h
 #define nsString_h___
@@ -126,22 +128,35 @@ CompressBZ2(nsIInputStream *src, PRFileDesc *outFd)
     return NS_ERROR_OUT_OF_MEMORY;
 
   nsresult rv = NS_OK;
+  int action = BZ_RUN;
   for (;;) {
-    if (strm.avail_in == 0) {
+    PRUint32 bytesRead = 0;
+    if (action == BZ_RUN && strm.avail_in == 0) {
       // fill inbuf
-      PRUint32 n;
-      rv = src->Read(inbuf, sizeof(inbuf), &n);
+      rv = src->Read(inbuf, sizeof(inbuf), &bytesRead);
       if (NS_FAILED(rv))
         break;
       strm.next_in = inbuf;
-      strm.avail_in = (int) n;
+      strm.avail_in = (int) bytesRead;
     }
 
     strm.next_out = outbuf;
     strm.avail_out = sizeof(outbuf);
 
-    ret = BZ2_bzCompress(&strm, 0);
-    if (ret != BZ_OK && ret != BZ_STREAM_END) {
+    ret = BZ2_bzCompress(&strm, action);
+    if (action == BZ_RUN) {
+      if (ret != BZ_RUN_OK) {
+        MS_LOG(("BZ2_bzCompress/RUN failed: %d", ret));
+        rv = NS_ERROR_UNEXPECTED;
+        break;
+      }
+
+      if (bytesRead < sizeof(inbuf)) {
+        // We're done now, tell libbz2 to finish
+        action = BZ_FINISH;
+      }
+    } else if (ret != BZ_FINISH_OK && ret != BZ_STREAM_END) {
+      MS_LOG(("BZ2_bzCompress/FINISH failed: %d", ret));
       rv = NS_ERROR_UNEXPECTED;
       break;
     }
@@ -149,6 +164,7 @@ CompressBZ2(nsIInputStream *src, PRFileDesc *outFd)
     if (strm.avail_out < sizeof(outbuf)) {
       PRInt32 n = sizeof(outbuf) - strm.avail_out;
       if (PR_Write(outFd, outbuf, n) != n) {
+        MS_LOG(("Failed to write compressed file"));
         rv = NS_ERROR_UNEXPECTED;
         break;
       }
@@ -166,6 +182,95 @@ CompressBZ2(nsIInputStream *src, PRFileDesc *outFd)
 
 //-----------------------------------------------------------------------------
 
+class nsMetricsService::BadCertListener : public nsIBadCertListener,
+                                          public nsIInterfaceRequestor
+{
+ public:
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSIBADCERTLISTENER
+  NS_DECL_NSIINTERFACEREQUESTOR
+
+  BadCertListener() { }
+
+ private:
+  ~BadCertListener() { }
+};
+
+// This object has to implement threadsafe addref and release, but this is
+// only because the GetInterface call happens on the socket transport thread.
+// The actual notifications are proxied to the main thread.
+NS_IMPL_THREADSAFE_ISUPPORTS2(nsMetricsService::BadCertListener,
+                              nsIBadCertListener, nsIInterfaceRequestor)
+
+NS_IMETHODIMP
+nsMetricsService::BadCertListener::ConfirmUnknownIssuer(
+    nsIInterfaceRequestor *socketInfo, nsIX509Cert *cert,
+    PRInt16 *certAddType, PRBool *result)
+{
+  *result = PR_FALSE;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMetricsService::BadCertListener::ConfirmMismatchDomain(
+    nsIInterfaceRequestor *socketInfo, const nsACString &targetURL,
+    nsIX509Cert *cert, PRBool *result)
+{
+  *result = PR_FALSE;
+
+  nsCOMPtr<nsIPrefBranch> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID);
+  NS_ENSURE_STATE(prefs);
+
+  nsCString certHostOverride;
+  prefs->GetCharPref("metrics.upload.cert-host-override",
+                     getter_Copies(certHostOverride));
+
+  if (!certHostOverride.IsEmpty()) {
+    // Accept the given alternate hostname (CN) for the certificate
+    nsString certHost;
+    cert->GetCommonName(certHost);
+    if (certHostOverride.Equals(NS_ConvertUTF16toUTF8(certHost))) {
+      *result = PR_TRUE;
+    }
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMetricsService::BadCertListener::ConfirmCertExpired(
+    nsIInterfaceRequestor *socketInfo, nsIX509Cert *cert, PRBool *result)
+{
+  *result = PR_FALSE;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMetricsService::BadCertListener::NotifyCrlNextupdate(
+    nsIInterfaceRequestor *socketInfo,
+    const nsACString &targetURL, nsIX509Cert *cert)
+{
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMetricsService::BadCertListener::GetInterface(const nsIID &uuid,
+                                                void **result)
+{
+  NS_ENSURE_ARG_POINTER(result);
+
+  if (uuid.Equals(NS_GET_IID(nsIBadCertListener))) {
+    *result = NS_STATIC_CAST(nsIBadCertListener *, this);
+    NS_ADDREF_THIS();
+    return NS_OK;
+  }
+
+  *result = nsnull;
+  return NS_ERROR_NO_INTERFACE;
+}
+
+//-----------------------------------------------------------------------------
+
 nsMetricsService::nsMetricsService()  
     : mEventCount(0),
       mSuspendCount(0),
@@ -176,9 +281,19 @@ nsMetricsService::nsMetricsService()
   sMetricsService = this;
 }
 
+/* static */ PLDHashOperator PR_CALLBACK
+nsMetricsService::DetachCollector(const nsAString &key,
+                                  nsIMetricsCollector *value, void *userData)
+{
+  value->OnDetach();
+  return PL_DHASH_NEXT;
+}
+
 nsMetricsService::~nsMetricsService()
 {
   NS_ASSERTION(sMetricsService == this, ">1 MetricsService object created");
+
+  mCollectorMap.EnumerateRead(DetachCollector, nsnull);
   sMetricsService = nsnull;
 }
 
@@ -554,18 +669,92 @@ nsMetricsService::OnStopRequest(nsIRequest *request, nsISupports *context,
   return NS_OK;
 }
 
+struct DisabledCollectorsClosure
+{
+  DisabledCollectorsClosure(const nsTArray<nsString> &enabled)
+      : enabledCollectors(enabled) { }
+
+  // Collectors which are enabled in the new config
+  const nsTArray<nsString> &enabledCollectors;
+
+  // Collector instances which should no longer be enabled
+  nsTArray< nsCOMPtr<nsIMetricsCollector> > disabledCollectors;
+};
+
+/* static */ PLDHashOperator PR_CALLBACK
+nsMetricsService::PruneDisabledCollectors(const nsAString &key,
+                                          nsCOMPtr<nsIMetricsCollector> &value,
+                                          void *userData)
+{
+  DisabledCollectorsClosure *dc =
+    NS_STATIC_CAST(DisabledCollectorsClosure *, userData);
+
+  // The frozen string API doesn't expose operator==, so we can't use
+  // IndexOf() here.
+  for (PRUint32 i = 0; i < dc->enabledCollectors.Length(); ++i) {
+    if (dc->enabledCollectors[i].Equals(key)) {
+      // The collector is enabled, continue
+      return PL_DHASH_NEXT;
+    }
+  }
+
+  // We didn't find the collector |key| in the list of enabled collectors,
+  // so move it from the hash table to the disabledCollectors list.
+  MS_LOG(("Disabling collector %s", NS_ConvertUTF16toUTF8(key).get()));
+  dc->disabledCollectors.AppendElement(value);
+  return PL_DHASH_REMOVE;
+}
+
+/* static */ PLDHashOperator PR_CALLBACK
+nsMetricsService::NotifyNewLog(const nsAString &key,
+                               nsIMetricsCollector *value, void *userData)
+{
+  value->OnNewLog();
+  return PL_DHASH_NEXT;
+}
+
 nsresult
 nsMetricsService::EnableCollectors()
 {
   // Start and stop collectors based on the current config.
-  nsresult rv;
-  rv = nsLoadCollector::SetEnabled(
-      IsEventEnabled(NS_LITERAL_STRING("document")));
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsTArray<nsString> enabledCollectors;
+  mConfig.GetEvents(enabledCollectors);
 
-  rv = nsWindowCollector::SetEnabled(
-      IsEventEnabled(NS_LITERAL_STRING("window")));
-  NS_ENSURE_SUCCESS(rv, rv);
+  // We need to find two sets of collectors:
+  //  (1) collectors which are running but not in |collectors|.
+  //      We'll call onDetach() on them and let them be released.
+  //  (2) collectors which are in |collectors| but not running.
+  //      We need to instantiate these collectors.
+
+  DisabledCollectorsClosure dc(enabledCollectors);
+  mCollectorMap.Enumerate(PruneDisabledCollectors, &dc);
+
+  // Notify this set of collectors that they're going away, and release them.
+  PRUint32 i;
+  for (i = 0; i < dc.disabledCollectors.Length(); ++i) {
+    dc.disabledCollectors[i]->OnDetach();
+  }
+  dc.disabledCollectors.Clear();
+
+  // Now instantiate any newly-enabled collectors.
+  for (i = 0; i < enabledCollectors.Length(); ++i) {
+    const nsString &name = enabledCollectors[i];
+    if (!mCollectorMap.GetWeak(name)) {
+      nsCString contractID("@mozilla.org/metrics/collector;1?name=");
+      contractID.Append(NS_ConvertUTF16toUTF8(name));
+
+      nsCOMPtr<nsIMetricsCollector> coll = do_GetService(contractID.get());
+      if (coll) {
+        MS_LOG(("Created collector %s", contractID.get()));
+        mCollectorMap.Put(name, coll);
+      } else {
+        MS_LOG(("Couldn't instantiate collector %s", contractID.get()));
+      }
+    }
+  }
+
+  // Finally, notify all collectors that we've restarted the log.
+  mCollectorMap.EnumerateRead(NotifyNewLog, nsnull);
 
   return NS_OK;
 }
@@ -609,20 +798,30 @@ nsMetricsService::Observe(nsISupports *subject, const char *topic,
 {
   if (strcmp(topic, kQuitApplicationTopic) == 0) {
     Flush();
-    nsLoadCollector::SetEnabled(PR_FALSE);
-    nsWindowCollector::SetEnabled(PR_FALSE);
+
+    // We don't detach the collectors here, to allow them to log events
+    // as we're shutting down.  The collectors will be detached and released
+    // when the MetricsService goes away.
   } else if (strcmp(topic, "profile-after-change") == 0) {
     nsresult rv = ProfileStartup();
     NS_ENSURE_SUCCESS(rv, rv);
   } else if (strcmp(topic, NS_WEBNAVIGATION_DESTROY) == 0 ||
              strcmp(topic, NS_CHROME_WEBNAVIGATION_DESTROY) == 0) {
-    // We handle dispatching to the window collector, if it's enabled,
-    // to avoid having an observer ordering dependency.
-    nsWindowCollector *wc = nsWindowCollector::GetInstance();
-    if (wc) {
-      wc->Observe(subject, topic, data);
+
+    // Dispatch our notification before removing the window from the map.
+    nsCOMPtr<nsIObserverService> obsSvc =
+      do_GetService("@mozilla.org/observer-service;1");
+    NS_ENSURE_STATE(obsSvc);
+
+    const char *newTopic;
+    if (strcmp(topic, NS_WEBNAVIGATION_DESTROY) == 0) {
+      newTopic = NS_METRICS_WEBNAVIGATION_DESTROY;
+    } else {
+      newTopic = NS_METRICS_CHROME_WEBNAVIGATION_DESTROY;
     }
-    
+
+    obsSvc->NotifyObservers(subject, newTopic, data);
+
     // Remove the window from our map.
     mWindowMap.Remove(subject);
   }
@@ -660,8 +859,12 @@ nsMetricsService::ProfileStartup()
   rv = prefs->SetIntPref(kSessionIDPref, sessionID);
   NS_ENSURE_SUCCESS(rv, rv);
   
-  // Set up the window id map
+  mCryptoHash = do_CreateInstance("@mozilla.org/security/hash;1");
+  NS_ENSURE_TRUE(mCryptoHash, NS_ERROR_FAILURE);
+
+  // Set up our hashtables
   NS_ENSURE_TRUE(mWindowMap.Init(32), NS_ERROR_OUT_OF_MEMORY);
+  NS_ENSURE_TRUE(mCollectorMap.Init(16), NS_ERROR_OUT_OF_MEMORY);
 
   // Create an XML document to serve as the owner document for elements.
   mDocument = do_CreateInstance("@mozilla.org/xml/xml-document;1");
@@ -674,7 +877,7 @@ nsMetricsService::ProfileStartup()
   // Start up the collectors
   rv = EnableCollectors();
   NS_ENSURE_SUCCESS(rv, rv);
-  
+
   RegisterUploadTimer();
 
   // If we didn't load a config, immediately upload our empty log.
@@ -853,6 +1056,11 @@ nsMetricsService::UploadData()
   ios->NewChannel(spec, nsnull, nsnull, getter_AddRefs(channel));
   NS_ENSURE_STATE(channel); 
 
+  nsCOMPtr<nsIInterfaceRequestor> certListener = new BadCertListener();
+  NS_ENSURE_TRUE(certListener, NS_ERROR_OUT_OF_MEMORY);
+
+  channel->SetNotificationCallbacks(certListener);
+
   nsCOMPtr<nsIUploadChannel> uploadChannel = do_QueryInterface(channel);
   NS_ENSURE_STATE(uploadChannel); 
 
@@ -1021,13 +1229,6 @@ nsMetricsService::GetConfigFile(nsIFile **result)
 nsresult
 nsMetricsService::GenerateClientID(nsCString &clientID)
 {
-  nsCOMPtr<nsICryptoHash> hasher =
-    do_CreateInstance("@mozilla.org/security/hash;1");
-  NS_ENSURE_STATE(hasher);
-
-  nsresult rv = hasher->Init(nsICryptoHash::MD5);
-  NS_ENSURE_SUCCESS(rv, rv);
-
   // Feed some data into the hasher...
 
   struct {
@@ -1038,10 +1239,21 @@ nsMetricsService::GenerateClientID(nsCString &clientID)
   input.a = PR_Now();
   PR_GetRandomNoise(input.b, sizeof(input.b));
 
-  rv = hasher->Update((const PRUint8 *) &input, sizeof(input));
+  return HashBytes(
+      NS_REINTERPRET_CAST(const PRUint8 *, &input), sizeof(input), clientID);
+}
+
+nsresult
+nsMetricsService::HashBytes(const PRUint8 *bytes, PRUint32 length,
+                            nsACString &result)
+{
+  nsresult rv = mCryptoHash->Init(nsICryptoHash::MD5);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  return hasher->Finish(PR_TRUE, clientID);
+  rv = mCryptoHash->Update(bytes, length);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return mCryptoHash->Finish(PR_TRUE, result);
 }
 
 PRBool
@@ -1061,17 +1273,59 @@ nsMetricsService::GetWindowID(nsIDOMWindow *window)
     return PR_UINT32_MAX;
   }
 
+  return sMetricsService->GetWindowIDInternal(window);
+}
+
+NS_IMETHODIMP
+nsMetricsService::GetWindowID(nsIDOMWindow *window, PRUint32 *id)
+{
+  *id = GetWindowIDInternal(window);
+  return NS_OK;
+}
+
+PRUint32
+nsMetricsService::GetWindowIDInternal(nsIDOMWindow *window)
+{
   PRUint32 id;
-  if (!sMetricsService->mWindowMap.Get(window, &id)) {
-    id = sMetricsService->mNextWindowID++;
-    sMetricsService->mWindowMap.Put(window, id);
+  if (!mWindowMap.Get(window, &id)) {
+    id = mNextWindowID++;
+    mWindowMap.Put(window, id);
   }
 
   return id;
+}
+
+nsresult
+nsMetricsService::Hash(const nsAString &str, nsCString &hashed)
+{
+  if (str.IsEmpty()) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  NS_ConvertUTF16toUTF8 utf8(str);
+  return HashBytes(
+      NS_REINTERPRET_CAST(const PRUint8 *, utf8.get()), utf8.Length(), hashed);
 }
 
 /* static */ nsresult
 nsMetricsUtils::NewPropertyBag(nsIWritablePropertyBag2 **result)
 {
   return CallCreateInstance("@mozilla.org/hash-property-bag;1", result);
+}
+
+/* static */ nsresult
+nsMetricsUtils::AddChildItem(nsIMetricsEventItem *parent,
+                             const nsAString &childName,
+                             nsIPropertyBag *childProperties)
+{
+  nsCOMPtr<nsIMetricsEventItem> item;
+  nsMetricsService::get()->CreateEventItem(childName, getter_AddRefs(item));
+  NS_ENSURE_STATE(item);
+
+  item->SetProperties(childProperties);
+
+  nsresult rv = parent->AppendChild(item);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return NS_OK;
 }

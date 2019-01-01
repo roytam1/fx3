@@ -4406,19 +4406,8 @@ nsTextFrame::GetPointFromOffset(nsPresContext* aPresContext,
       width += ts.mSpaceWidth + ts.mWordSpacing + ts.mLetterSpacing;
     }
   }
-#ifdef IBMBIDI
-  if (NS_GET_EMBEDDING_LEVEL(this) & 1) {
-    if (width > mRect.width)
-      outPoint->x = 0;
-    else
-      outPoint->x = mRect.width - width;
-  }
-  else
-#endif // IBMBIDI
-  //XXX callers need to safeguard themselves against empty frames, I noted that
-  //the caret can be locked when leftarrow'ing in: <span>...</span>\n<br>line
-  if (width > mRect.width)
-    outPoint->x = mRect.width;
+  if (NS_GET_EMBEDDING_LEVEL(this) & 1)
+    outPoint->x = mRect.width - width;
   else
     outPoint->x = width;
   outPoint->y = 0;
@@ -6343,14 +6332,16 @@ nsTextFrame::ComputeWordFragmentDimensions(nsPresContext* aPresContext,
                                       PRBool aCanBreakBefore)
 {
   nsTextTransformer tx(aPresContext);
-  tx.Init(aNextFrame, aContent, 0);
+  PRInt32 nextFrameStart, nextFrameEnd;
+  aNextFrame->GetOffsets(nextFrameStart, nextFrameEnd);
+  tx.Init(aNextFrame, aContent, nextFrameStart);
+  if (nextFrameEnd == 0) // uninitialized
+    nextFrameEnd = tx.GetContentLength();
   PRBool isWhitespace, wasTransformed;
   PRInt32 wordLen, contentLen;
   nsTextDimensions dimensions;
 #ifdef IBMBIDI
   if (aNextFrame->GetStateBits() & NS_FRAME_IS_BIDI) {
-    PRInt32 nextFrameStart, nextFrameEnd;
-    aNextFrame->GetOffsets(nextFrameStart, nextFrameEnd);
     wordLen = nextFrameEnd;
   } else {
     wordLen = -1;
@@ -6378,7 +6369,7 @@ nsTextFrame::ComputeWordFragmentDimensions(nsPresContext* aPresContext,
     *aMoreSize = wordLen + aRunningWordLen - aWordBufSize; 
     return dimensions; // 0
   }
-  if (contentLen < tx.GetContentLength())
+  if (nextFrameStart + contentLen < nextFrameEnd)
     *aMoreSize = -1;
 
   // Convert any spaces in the current word back to nbsp's. This keeps

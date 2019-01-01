@@ -62,7 +62,18 @@ REQUIRES	= xpcom \
 		  xmlextras \
 		  libbz2 \
 		  caps \
+		  xulapp \
+		  extensions \
+		  rdf \
+		  plugin \
 		  $(NULL)
+
+# nsIScreenManager has moved to widget on the trunk
+ifdef MOZILLA_1_8_BRANCH
+REQUIRES	+= gfx
+else
+REQUIRES	+= widget
+endif
 
 CPPSRCS		= \
 		nsLoadCollector.cpp \
@@ -70,6 +81,7 @@ CPPSRCS		= \
 		nsMetricsEventItem.cpp \
 		nsMetricsModule.cpp \
 		nsMetricsService.cpp \
+		nsProfileCollector.cpp \
 		nsWindowCollector.cpp \
 		nsStringUtils.cpp \
 		$(NULL)
@@ -79,5 +91,13 @@ SHARED_LIBRARY_LIBS += $(DIST)/lib/$(LIB_PREFIX)bz2.$(LIB_SUFFIX)
 EXTRA_DSO_LDOPTS = $(XPCOM_GLUE_LDOPTS) \
 		   $(NSPR_LIBS) \
 		   $(NULL)
+
+# Link against the static CRT
+ifeq ($(OS_ARCH)_$(GNU_CC), WINNT_)
+USE_STATIC_LIBS = 1
+EXTRA_DSO_LDOPTS += -NODEFAULTLIB:MSVCRT \
+		    -NODEFAULTLIB:MSVCRTD \
+		    $(NULL)
+endif
 
 include $(topsrcdir)/config/rules.mk

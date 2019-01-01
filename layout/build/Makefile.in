@@ -202,6 +202,10 @@ endif
 ifdef MOZ_ENABLE_GTK2
 EXTRA_DSO_LDOPTS += $(MOZ_GTK2_LIBS) \
 		    $(NULL)
+ifdef MOZ_ENABLE_CAIRO_GFX
+EXTRA_DSO_LDOPTS += -lXrender \
+		    $(NULL)
+endif
 endif
 
 ifndef MOZ_ENABLE_CAIRO_GFX
@@ -216,12 +220,6 @@ ifndef MOZ_TREE_CAIRO
 # In an in-tree cairo build, cairo is part of libthebes
 # otherwise, we need to link it separately.
 EXTRA_DSO_LDOPTS += $(MOZ_CAIRO_LIBS)
-endif
-endif
-
-ifeq (WINNT,$(OS_ARCH))
-ifdef GNU_CXX
-OS_LIBS += $(call EXPAND_LIBNAME,gdi32)
 endif
 endif
 

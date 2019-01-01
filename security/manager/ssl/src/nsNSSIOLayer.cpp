@@ -724,6 +724,7 @@ nsHandleSSLError(nsNSSSocketInfo *socketInfo, PRInt32 err)
     params[0] = hostNameU.get();
     nssComponent->PIPBundleFormatStringFromName("PeersCertBadSignature", 
                                                 params, 1, formattedString);
+    break;
 
   //A generic error handler for peer cert
   case SEC_ERROR_UNKNOWN_CERT:
@@ -1132,8 +1133,13 @@ nsSSLIOLayerPoll(PRFileDesc *fd, PRInt16 in_flags, PRInt16 *out_flags)
 {
   nsNSSShutDownPreventionLock locker;
 
-  if (out_flags)
-    *out_flags = 0;
+  if (!out_flags)
+  {
+    NS_WARNING("nsSSLIOLayerPoll called with null out_flags");
+    return 0;
+  }
+
+  *out_flags = 0;
 
   if (!fd)
   {

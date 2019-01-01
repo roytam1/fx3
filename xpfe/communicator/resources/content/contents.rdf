@@ -22,7 +22,6 @@
     <RDF:li resource="chrome://communicator/content/contentAreaContextOverlay.xul"/>
     <RDF:li resource="chrome://communicator/content/pref/preftree.xul"/>
     <RDF:li resource="chrome://navigator/content/navigatorOverlay.xul"/>
-    <RDF:li resource="chrome://messenger/content/mailWindowOverlay.xul"/>
   </RDF:Seq>
 
   <RDF:Seq about="chrome://communicator/content/contentAreaContextOverlay.xul">
@@ -36,10 +35,6 @@
   <RDF:Seq about="chrome://navigator/content/navigatorOverlay.xul">
     <RDF:li>chrome://communicator/content/permissions/permissionsNavigatorOverlay.xul</RDF:li>
     <RDF:li>chrome://communicator/content/permissions/cookieTasksOverlay.xul</RDF:li>
-  </RDF:Seq>
-
-  <RDF:Seq about="chrome://messenger/content/mailWindowOverlay.xul">
-    <RDF:li>chrome://communicator/content/permissions/imageContextOverlay.xul</RDF:li>
   </RDF:Seq>
 
 </RDF:RDF>

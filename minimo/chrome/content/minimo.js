@@ -365,8 +365,18 @@ function MiniNavStartup()
     try {
       gPref = Components.classes["@mozilla.org/preferences-service;1"]
         .getService(nsIPrefBranch);
+
+      var page = null;
+      try {
+        page = gPref.getCharPref("browser.startup.homepage.override");
+      } 
+      catch(e) {page=null;}
+
+      if (page == null)
+        page = gPref.getCharPref("browser.startup.homepage");
+
+      gPref.clearUserPref("browser.startup.homepage.override");
       
-      var page = gPref.getCharPref("browser.startup.homepage");
       var bookmarkstore = gPref.getCharPref("browser.bookmark.store");
       
       if ( page.split("|").length > 1 ) {
@@ -427,6 +437,14 @@ function MiniNavStartup()
 
   gMinimoBundle = document.getElementById("minimo_properties");
 
+  /*
+   * Check to see if we should set ourselves as the default
+   * app.  no annoying dialog -- just do it if the pref is
+   * set.
+   */
+  var device = Components.classes["@mozilla.org/device/support;1"].getService(nsIDeviceSupport);
+  if (!device.isDefaultBrowser() && device.shouldCheckDefaultBrowser)
+    device.setDefaultBrowser();
 }
 
 function HomebarHandler(e) {
@@ -639,7 +657,7 @@ function MiniNavShutdown()
 
 function loadURI(uri)
 {
-  gBrowser.webNavigation.loadURI(uri, nsIWebNavigation.LOAD_FLAGS_NONE, null, null, null);
+  gBrowser.webNavigation.loadURI(uri, nsIWebNavigation.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP, null, null, null);
 }
 
 function BrowserHome()
@@ -823,11 +841,11 @@ function urlbar() {
 
 /* Reset the text size */ 
 function BrowserResetZoomPlus() {
-  gBrowser.selectedBrowser.markupDocumentViewer.textZoom+= .25;
+  gBrowser.selectedBrowser.markupDocumentViewer.textZoom+= .1;
 }
 
 function BrowserResetZoomMinus() {
-  gBrowser.selectedBrowser.markupDocumentViewer.textZoom-= .25;
+  gBrowser.selectedBrowser.markupDocumentViewer.textZoom-= .1;
 }
 
 
@@ -1448,7 +1466,7 @@ function MenuDisableEscapeKeys() {
 
 function MenuHandleMenuEscape(e) {
   /* This applies because our <key /> handlers would not work when Menu popups are active */ 
-  if( gShowingMenuCurrent &&  e.keyCode==e.DOM_VK_F9 ) {
+  if( gShowingMenuCurrent &&  e.keyCode==e.DOM_VK_F20 ) {
     BrowserMenuSpin();
   }
 }

@@ -2615,6 +2615,23 @@ ProcessPseudoFrame(nsPseudoFrameData& aPseudoData,
 }
 
 static nsresult 
+ProcessPseudoRowGroupFrame(nsPseudoFrameData& aPseudoData,
+                           nsIFrame*&         aParent)
+{
+  nsresult rv = NS_OK;
+
+  aParent = aPseudoData.mFrame;
+  nsTableRowGroupFrame* rgFrame = nsTableFrame::GetRowGroupFrame(aParent);
+  nsFrameItems* items = &aPseudoData.mChildList;
+  if (items && items->childList) {
+    rv = rgFrame->SetInitialChildList(nsnull, items->childList);
+    if (NS_FAILED(rv)) return rv;
+  }
+  aPseudoData.Reset();
+  return rv;
+}
+
+static nsresult 
 ProcessPseudoTableFrame(nsPseudoFrames& aPseudoFrames,
                         nsIFrame*&      aParent)
 {
@@ -2692,21 +2709,23 @@ ProcessPseudoFrames(nsFrameConstructorState& aState,
       if (nsLayoutAtoms::tableRowFrame == aHighestType) return rv;
     }
     if (pseudoFrames.mRowGroup.mFrame) {
-      rv = ProcessPseudoFrame(pseudoFrames.mRowGroup, aHighestFrame);
+      rv = ProcessPseudoRowGroupFrame(pseudoFrames.mRowGroup, aHighestFrame);
       if (nsLayoutAtoms::tableRowGroupFrame == aHighestType) return rv;
     }
   }
   else if (nsLayoutAtoms::tableRowGroupFrame == pseudoFrames.mLowestType) {
-    rv = ProcessPseudoFrame(pseudoFrames.mRowGroup, aHighestFrame);
+    rv = ProcessPseudoRowGroupFrame(pseudoFrames.mRowGroup, aHighestFrame);
     if (nsLayoutAtoms::tableRowGroupFrame == aHighestType) return rv;
     if (pseudoFrames.mColGroup.mFrame) {
       nsIFrame* colGroupHigh;
       rv = ProcessPseudoFrame(pseudoFrames.mColGroup, colGroupHigh);
-      if (aHighestFrame) {
-        // table frames are special they can have two types of pseudo frames
-        // that need to be processed in one pass, we suffer here from having
-        // the colgroup and the rowgroup on the same childlist
-        // we sort this out inside nsTableFrame
+      if (aHighestFrame &&
+          nsLayoutAtoms::tableRowGroupFrame == aHighestFrame->GetType() &&
+          !pseudoFrames.mTableInner.mFrame) {
+        // table frames are special they can have two types of pseudo frames as
+        // children that need to be processed in one pass, we only need to link
+        // them if the parent is not a pseudo where the link is already done
+        // We sort this later out inside nsTableFrame.
         colGroupHigh->SetNextSibling(aHighestFrame); 
       }
       aHighestFrame = colGroupHigh;
@@ -2730,18 +2749,19 @@ ProcessPseudoFrames(nsFrameConstructorState& aState,
     if (nsLayoutAtoms::tableRowFrame == aHighestType) return rv;
 
     if (pseudoFrames.mRowGroup.mFrame) {
-      rv = ProcessPseudoFrame(pseudoFrames.mRowGroup, aHighestFrame);
+      rv = ProcessPseudoRowGroupFrame(pseudoFrames.mRowGroup, aHighestFrame);
       if (nsLayoutAtoms::tableRowGroupFrame == aHighestType) return rv;
     }
     if (pseudoFrames.mColGroup.mFrame) {
       nsIFrame* colGroupHigh;
       rv = ProcessPseudoFrame(pseudoFrames.mColGroup, colGroupHigh);
       if (aHighestFrame &&
-          nsLayoutAtoms::tableRowGroupFrame == aHighestFrame->GetType() ) {
-        // table frames are special they can have two types of pseudo frames
-        // that need to be processed in one pass, we suffer here from having
-        // the colgroup and the rowgroup on the same childlist
-        // we sort this out inside nsTableFrame
+          nsLayoutAtoms::tableRowGroupFrame == aHighestFrame->GetType() &&
+          !pseudoFrames.mTableInner.mFrame) {
+        // table frames are special they can have two types of pseudo frames as
+        // children that need to be processed in one pass, we only need to link
+        // them if the parent is not a pseudo where the link is already done
+        // We sort this later out inside nsTableFrame.
         colGroupHigh->SetNextSibling(aHighestFrame); 
       }
       aHighestFrame = colGroupHigh;
@@ -2765,17 +2785,19 @@ ProcessPseudoFrames(nsFrameConstructorState& aState,
       if (nsLayoutAtoms::tableRowFrame == aHighestType) return rv;
     }
     if (pseudoFrames.mRowGroup.mFrame) {
-      rv = ProcessPseudoFrame(pseudoFrames.mRowGroup, aHighestFrame);
+      rv = ProcessPseudoRowGroupFrame(pseudoFrames.mRowGroup, aHighestFrame);
       if (nsLayoutAtoms::tableRowGroupFrame == aHighestType) return rv;
     }
     if (pseudoFrames.mColGroup.mFrame) {
       nsIFrame* colGroupHigh;
       rv = ProcessPseudoFrame(pseudoFrames.mColGroup, colGroupHigh);
-      if (aHighestFrame && nsLayoutAtoms::tableRowGroupFrame == aHighestFrame->GetType() ) {
-        // table frames are special they can have two types of pseudo frames
-        // that need to be processed in one pass, we suffer here from having
-        // the colgroup and the rowgroup on the same childlist
-        // we sort this out inside nsTableFrame
+      if (aHighestFrame &&
+          nsLayoutAtoms::tableRowGroupFrame == aHighestFrame->GetType() &&
+          !pseudoFrames.mTableInner.mFrame) {
+        // table frames are special they can have two types of pseudo frames as
+        // children that need to be processed in one pass, we only need to link
+        // them if the parent is not a pseudo where the link is already done
+        // We sort this later out inside nsTableFrame.
         colGroupHigh->SetNextSibling(aHighestFrame); 
       }
       aHighestFrame = colGroupHigh;
@@ -3015,8 +3037,10 @@ nsCSSFrameConstructor::CreatePseudoRowFrame(nsTableCreator&          aTableCreat
 {
   nsresult rv = NS_OK;
 
-  nsIFrame* parentFrame = (aState.mPseudoFrames.mRowGroup.mFrame) 
-                          ? aState.mPseudoFrames.mRowGroup.mFrame : aParentFrameIn;
+  nsIFrame* parentFrame = aParentFrameIn;
+  if (aState.mPseudoFrames.mRowGroup.mFrame) {
+    parentFrame = (nsIFrame*) nsTableFrame::GetRowGroupFrame(aState.mPseudoFrames.mRowGroup.mFrame);
+  }
   if (!parentFrame) return rv;
 
   nsStyleContext *parentStyle;
@@ -6406,9 +6430,8 @@ nsCSSFrameConstructor::ConstructXULFrame(nsFrameConstructorState& aState,
         newFrame = NS_NewMenuPopupFrame(mPresShell, aStyleContext);
 
         if (aTag == nsXULAtoms::tooltip) {
-          nsAutoString defaultTooltip;
-          aContent->GetAttr(kNameSpaceID_None, nsXULAtoms::_default, defaultTooltip);
-          if (defaultTooltip.LowerCaseEqualsLiteral("true")) {
+          if (aContent->AttrValueIs(kNameSpaceID_None, nsXULAtoms::_default,
+                                    nsXULAtoms::_true, eIgnoreCase)) {
             // Locate the root frame and tell it about the tooltip.
             nsIFrame* rootFrame = aState.mFrameManager->GetRootFrame();
             if (rootFrame)
@@ -6584,10 +6607,9 @@ nsCSSFrameConstructor::ConstructXULFrame(nsFrameConstructorState& aState,
 
 #ifdef MOZ_XUL
   // register tooltip support if needed
-  nsAutoString value;
   if (aTag == nsXULAtoms::treechildren || // trees always need titletips
-      aContent->GetAttr(kNameSpaceID_None, nsXULAtoms::tooltiptext, value) ||
-      aContent->GetAttr(kNameSpaceID_None, nsXULAtoms::tooltip, value))
+      aContent->HasAttr(kNameSpaceID_None, nsXULAtoms::tooltiptext) ||
+      aContent->HasAttr(kNameSpaceID_None, nsXULAtoms::tooltip))
   {
     nsIFrame* rootFrame = aState.mFrameManager->GetRootFrame();
     if (rootFrame)
@@ -11260,11 +11282,16 @@ nsCSSFrameConstructor::FindFrameWithContent(nsFrameManager*  aFrameManager,
     // Search for the frame in each child list that aParentFrame supports
     nsIAtom* listName = nsnull;
     PRInt32 listIndex = 0;
+    PRBool searchAgain;
+
     do {
 #ifdef NOISY_FINDFRAME
       FFWC_doLoop++;
 #endif
-      nsIFrame* kidFrame=nsnull;
+      nsIFrame* kidFrame = nsnull;
+
+      searchAgain = PR_FALSE;
+
       // if we were given an hint, try to use it here to find a good
       // previous frame to start our search (|kidFrame|).
       if (aHint) {
@@ -11356,17 +11383,20 @@ nsCSSFrameConstructor::FindFrameWithContent(nsFrameManager*  aFrameManager,
       }
 
       if (aHint) {
-        // If we get here, and we had a hint, then we didn't find a
-        // frame. The hint may have been a floated or absolutely
-        // positioned frame, in which case we'd be off in the weeds
-        // looking through something other than primary frame
-        // list. Reboot the search from scratch, without the hint, but
-        // using the null child list again.
+        // If we get here, and we had a hint, then we didn't find a frame.
+        // The hint may have been a frame whose location in the frame tree
+        // doesn't match the location of its corresponding element in the
+        // DOM tree, e.g. a floated or absolutely positioned frame, or e.g.
+        // a <col> frame, in which case we'd be off in the weeds looking
+        // through something other than the primary frame list.
+        // Reboot the search from scratch, without the hint, but using the
+        // null child list again.
         aHint = nsnull;
+        searchAgain = PR_TRUE;
       } else {
         listName = aParentFrame->GetAdditionalChildListName(listIndex++);
       }
-    } while(listName);
+    } while(listName || searchAgain);
 
     // We didn't find a matching frame. If aFrame has a next-in-flow,
     // then continue looking there

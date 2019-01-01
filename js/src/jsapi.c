@@ -1107,9 +1107,9 @@ js_InitFunctionAndObjectClasses(JSContext *cx, JSObject *obj)
     /* Record Function and Object in cx->resolvingTable, if we are resolving. */
     table = cx->resolvingTable;
     resolving = (table && table->entryCount);
+    rt = cx->runtime;
+    key.obj = obj;
     if (resolving) {
-        rt = cx->runtime;
-        key.obj = obj;
         key.id = ATOM_TO_JSID(rt->atomState.classAtoms[JSProto_Function]);
         entry = (JSResolvingEntry *)
                 JS_DHashTableOperate(table, &key, JS_DHASH_ADD);
@@ -1127,6 +1127,19 @@ js_InitFunctionAndObjectClasses(JSContext *cx, JSObject *obj)
         JS_ASSERT(!entry->key.obj && entry->flags == 0);
         entry->key = key;
         entry->flags = JSRESFLAG_LOOKUP;
+    } else {
+        key.id = ATOM_TO_JSID(rt->atomState.classAtoms[JSProto_Object]);
+        if (!js_StartResolving(cx, &key, JSRESFLAG_LOOKUP, &entry))
+            return NULL;
+
+        key.id = ATOM_TO_JSID(rt->atomState.classAtoms[JSProto_Function]);
+        if (!js_StartResolving(cx, &key, JSRESFLAG_LOOKUP, &entry)) {
+            key.id = ATOM_TO_JSID(rt->atomState.classAtoms[JSProto_Object]);
+            JS_DHashTableOperate(table, &key, JS_DHASH_REMOVE);
+            return NULL;
+        }
+
+        table = cx->resolvingTable;
     }
 
     /* Initialize the function class first so constructors can be made. */
@@ -1148,8 +1161,14 @@ js_InitFunctionAndObjectClasses(JSContext *cx, JSObject *obj)
 
 out:
     /* If resolving, remove the other entry (Object or Function) from table. */
-    if (resolving)
+    JS_DHashTableOperate(table, &key, JS_DHASH_REMOVE);
+    if (!resolving) {
+        /* If not resolving, remove the first entry added above, for Object. */
+        JS_ASSERT(key.id ==                                                   \
+                  ATOM_TO_JSID(rt->atomState.classAtoms[JSProto_Function]));
+        key.id = ATOM_TO_JSID(rt->atomState.classAtoms[JSProto_Object]);
         JS_DHashTableOperate(table, &key, JS_DHASH_REMOVE);
+    }
     return fun_proto;
 }
 
@@ -1866,13 +1885,56 @@ JS_MaybeGC(JSContext *cx)
     rt = cx->runtime;
     bytes = rt->gcBytes;
     lastBytes = rt->gcLastBytes;
-    if ((bytes > 8192 && bytes > lastBytes + lastBytes / 2) ||
+
+    /*
+     * We run the GC if we used all available free GC cells and had to
+     * allocate extra 1/5 of GC arenas since the last run of GC, or if
+     * we have malloc'd more bytes through JS_malloc than we were told
+     * to allocate by JS_NewRuntime.
+     *
+     * The reason for
+     *   bytes > 6/5 lastBytes
+     * condition is the following. Bug 312238 changed bytes and lastBytes
+     * to mean the total amount of memory that the GC uses now and right
+     * after the last GC.
+     *
+     * Before the bug the variables meant the size of allocated GC things
+     * now and right after the last GC. That size did not include the
+     * memory taken by free GC cells and the condition was
+     *   bytes > 3/2 lastBytes.
+     * That is, we run the GC if we have half again as many bytes of
+     * GC-things as the last time we GC'd. To be compatible we need to
+     * express that condition through the new meaning of bytes and
+     * lastBytes.
+     *
+     * We write the original condition as
+     *   B*(1-F) > 3/2 Bl*(1-Fl)
+     * where B is the total memory size allocated by GC and F is the free
+     * cell density currently and Sl and Fl are the size and the density
+     * right after GC. The density by definition is memory taken by free
+     * cells divided by total amount of memory. In other words, B and Bl
+     * are bytes and lastBytes with the new meaning and B*(1-F) and
+     * Bl*(1-Fl) are bytes and lastBytes with the original meaning.
+     *
+     * Our task is to exclude F and Fl from the last statement. According
+     * the stats from bug 331770 Fl is about 20-30% for GC allocations
+     * that contribute to S and Sl for a typical run of the browser. It
+     * means that the original condition implied that we did not run GC
+     * unless we exhausted the pool of free cells. Indeed if we still
+     * have free cells, then B == Bl since we did not yet allocated any
+     * new arenas and the condition means
+     *   1 - F > 3/2 (1-Fl) or 3/2Fl > 1/2 + F
+     * That implies 3/2 Fl > 1/2 or Fl > 1/3. That can not be fulfilled
+     * for the state described by the stats. So we can write the original
+     * condition as:
+     *   F == 0 && B > 3/2 Bl(1-Fl)
+     * Again using the stats we see that Fl is about 20% when the browser
+     * starts up and when we are far from hitting rt->gcMaxBytes. With
+     * this F we have
+     * F == 0 && B > 3/2 Bl(1-0.8) or just B > 6/5 Bl.
+     */
+    if ((bytes > 8192 && bytes > lastBytes + lastBytes / 5) ||
         rt->gcMallocBytes > rt->gcMaxMallocBytes) {
-        /*
-         * Run the GC if we have half again as many bytes of GC-things as
-         * the last time we GC'd, or if we have malloc'd more bytes through
-         * JS_malloc than we were told to allocate by JS_NewRuntime.
-         */
         JS_GC(cx);
     }
 #endif

@@ -455,7 +455,9 @@ nsGenericDOMDataNode::AppendData(const nsAString& aData)
   // mozAutoDocUpdate updateBatch(document, UPDATE_CONTENT_MODEL, PR_TRUE);
 
   PRBool haveMutationListeners =
-    document && nsGenericElement::HasMutationListeners(this, NS_EVENT_BITS_MUTATION_CHARACTERDATAMODIFIED);
+    nsContentUtils::HasMutationListeners(this,
+      document,
+      NS_EVENT_BITS_MUTATION_CHARACTERDATAMODIFIED);
 
   nsCOMPtr<nsIAtom> oldValue;
   if (haveMutationListeners) {
@@ -722,7 +724,7 @@ nsGenericDOMDataNode::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
     nodeInfoManager = aParent->NodeInfo()->NodeInfoManager();
   }
 
-  if (oldOwnerDocument) {
+  if (oldOwnerDocument && oldOwnerDocument != newOwnerDocument) {
     if (newOwnerDocument && CouldHaveProperties()) {
       // Copy UserData to the new document.
       oldOwnerDocument->CopyUserData(this, newOwnerDocument);
@@ -1080,7 +1082,9 @@ nsGenericDOMDataNode::SetText(const PRUnichar* aBuffer,
   mozAutoDocUpdate updateBatch(document, UPDATE_CONTENT_MODEL, aNotify);
 
   PRBool haveMutationListeners =
-    document && nsGenericElement::HasMutationListeners(this, NS_EVENT_BITS_MUTATION_CHARACTERDATAMODIFIED);
+    nsContentUtils::HasMutationListeners(this,
+      document,
+      NS_EVENT_BITS_MUTATION_CHARACTERDATAMODIFIED);
 
   nsCOMPtr<nsIAtom> oldValue;
   if (haveMutationListeners) {

@@ -132,6 +132,10 @@ GARBAGE	+= \
 	$(INTL_UNICHARUTIL_UTIL_LCPPSRCS) \
 	$(wildcard *.$(OBJ_SUFFIX)) \
 	$(NULL)
+else
+ifdef NS_TRACE_MALLOC
+EXTRA_DSO_LIBS += tracemalloc
+endif
 endif
 
 include $(topsrcdir)/config/rules.mk
@@ -190,6 +194,10 @@ ifneq (,$(MOZ_DEBUG)$(NS_TRACE_MALLOC))
 EXTRA_DSO_LDOPTS += $(call EXPAND_LIBNAME,imagehlp)
 endif
 endif # WINNT
+
+ifdef MOZ_JPROF
+EXTRA_DSO_LDOPTS += -ljprof
+endif
 
 ifdef MOZ_JAVAXPCOM
 dlldeps-javaxpcom.cpp: $(topsrcdir)/extensions/java/xpcom/src/dlldeps-javaxpcom.cpp

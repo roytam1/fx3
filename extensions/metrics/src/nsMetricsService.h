@@ -52,11 +52,14 @@
 #include "prlog.h"
 #include "nsIWritablePropertyBag2.h"
 #include "nsDataHashtable.h"
+#include "nsInterfaceHashtable.h"
 
 class nsILocalFile;
 class nsIDOMWindow;
 class nsIDOMDocument;
 class nsIDOMNode;
+class nsICryptoHash;
+class nsIMetricsCollector;
 
 #ifdef PR_LOGGING
 // Shared log for the metrics service and collectors.
@@ -107,12 +110,27 @@ public:
                           bag);
   }
 
-  // Get the window id for the given DOMWindow.  If a window id has not
-  // yet been assigned for the window, the next id will be used.
+  // Creates an EventItem in the default metrics namespace.
+  nsresult CreateEventItem(const nsAString &name, nsIMetricsEventItem **item)
+  {
+    return CreateEventItem(NS_LITERAL_STRING(NS_METRICS_NAMESPACE),
+                           name, item);
+  }
+
+  // More convenient non-scriptable version of GetWindowID().
   static PRUint32 GetWindowID(nsIDOMWindow *window);
 
   // VC6 needs this to be public :-(
   nsresult Init();
+
+  // Returns the window id map (readonly)
+  const nsDataHashtable<nsVoidPtrHashKey, PRUint32>& WindowMap() const
+  {
+    return mWindowMap;
+  }
+
+  // Creates a one-way hash of the given string
+  nsresult Hash(const nsAString &str, nsCString &hashed);
 
 private:
   nsMetricsService();
@@ -160,7 +178,29 @@ private:
   // Called to persist mEventCount.  Returns "true" if succeeded.
   PRBool PersistEventCount();
 
+  // Hashes a byte buffer of the given length
+  nsresult HashBytes(const PRUint8 *bytes, PRUint32 length,
+                     nsACString &result);
+
+  // Does the real work of GetWindowID().
+  PRUint32 GetWindowIDInternal(nsIDOMWindow *window);
+
+  static PLDHashOperator PR_CALLBACK
+  PruneDisabledCollectors(const nsAString &key,
+                          nsCOMPtr<nsIMetricsCollector> &value,
+                          void *userData);
+
+  static PLDHashOperator PR_CALLBACK
+  DetachCollector(const nsAString &key,
+                  nsIMetricsCollector *value, void *userData);
+
+  static PLDHashOperator PR_CALLBACK
+  NotifyNewLog(const nsAString &key,
+               nsIMetricsCollector *value, void *userData);
+
 private:
+  class BadCertListener;
+
   // Pointer to the metrics service singleton
   static nsMetricsService* sMetricsService;
 
@@ -171,11 +211,18 @@ private:
 
   // XML document containing events to be flushed.
   nsCOMPtr<nsIDOMDocument> mDocument;
+
   // Root element of the XML document
   nsCOMPtr<nsIDOMNode> mRoot;
 
+  // MD5 hashing object for collectors to use
+  nsCOMPtr<nsICryptoHash> mCryptoHash;
+
   // Window to incrementing-id map.  The keys are nsIDOMWindow*.
   nsDataHashtable<nsVoidPtrHashKey, PRUint32> mWindowMap;
+
+  // All of the active observers, keyed by name.
+  nsInterfaceHashtable<nsStringHashKey, nsIMetricsCollector> mCollectorMap;
 
   PRInt32 mEventCount;
   PRInt32 mSuspendCount;
@@ -190,6 +237,11 @@ class nsMetricsUtils
 public:
   // Creates a new nsIWritablePropertyBag2 instance.
   static nsresult NewPropertyBag(nsIWritablePropertyBag2 **result);
+
+  // Creates a new item with the given properties, and appends it to the parent
+  static nsresult AddChildItem(nsIMetricsEventItem *parent,
+                               const nsAString &childName,
+                               nsIPropertyBag *childProperties);
 };
 
 #endif  // nsMetricsService_h__

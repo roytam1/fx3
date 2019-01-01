@@ -3479,11 +3479,17 @@ BOOL nsWindow::OnKeyDown(UINT aVirtualKeyCode, UINT aScanCode, LPARAM aKeyData)
            msg.wParam, msg.wParam, msg.lParam);
 #endif
     return OnChar(msg.wParam, extraFlags);
+  } else if (!mIsControlDown && !mIsAltDown &&
+             KeyboardLayout::IsPrintableCharKey(aVirtualKeyCode)) {
+    // If this is simple KeyDown event but next message is not WM_CHAR,
+    // this event may not input text, so we should ignore this event.
+    // See bug 314130.
+    return PR_FALSE;
   }
 
   if (gKbdLayout.IsDeadKey ())
     return PR_FALSE;
-           
+
   PRUint8 shiftStates [5];
   PRUint16 uniChars [5];
   PRUint32 numOfUniChars = 0;
@@ -4359,16 +4365,16 @@ PRBool nsWindow::ProcessMessage(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT 
       
       if (VK_TSOFT1 == HIWORD(lParam) && (0 != (MOD_KEYUP & LOWORD(lParam))))
       {
-        keybd_event(VK_F9, 0, 0, 0);
-        keybd_event(VK_F9, 0, KEYEVENTF_KEYUP, 0);
+        keybd_event(VK_F20, 0, 0, 0);
+        keybd_event(VK_F20, 0, KEYEVENTF_KEYUP, 0);
         result = 0;
         break;
       }
       
       if (VK_TSOFT2 == HIWORD(lParam) && (0 != (MOD_KEYUP & LOWORD(lParam))))
       {
-        keybd_event(VK_F10, 0, 0, 0);
-        keybd_event(VK_F10, 0, KEYEVENTF_KEYUP, 0);
+        keybd_event(VK_F21, 0, 0, 0);
+        keybd_event(VK_F22, 0, KEYEVENTF_KEYUP, 0);
         result = 0;
         break;
       }

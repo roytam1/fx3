@@ -51,6 +51,8 @@
 
 <!ENTITY  hidden.label                  "Do not show this extension in the extension manager.">
 <!ENTITY  locked.label                  "Prevent the uninstall of this extension (it can still be disabled).">
+<!ENTITY  aboutconfig.label             "Do not allow access to about:config">
+
 
 <!ENTITY  customizePartOne.label        "Customize the Browser - Part One">
 
@@ -146,7 +148,6 @@
 <!ENTITY  customizePrefs.label          "Customize Preferences">
 <!ENTITY  customizePrefs.description    "Use the buttons below to add default preferences.">
 <!ENTITY  prefs.label                   "Preferences">
-<!ENTITY  prefs.description             "Note these preferences are stored exactly as written, so put quotes around string preferences.">
 
 <!ENTITY  prefName.label                "Preference Name:">
 <!ENTITY  prefValue.label               "Value: ">
@@ -183,6 +184,11 @@
                                          that will be deploying Firefox inside their organization.</html:b>">
 
 <!ENTITY  certs.label                   "Certificates">
+<!ENTITY  cert.label                   "Certificate">
+
+<!ENTITY cert.trustSSL "Trust this CA to identify web sites.">
+<!ENTITY cert.trustEmail "Trust this CA to identify email users.">
+<!ENTITY cert.trustObjSign "Trust this CA to identify software developers.">
 
 <!ENTITY  customizeBundles.label          "Customize Extensions/Themes">
 <!ENTITY  customizeBundles.description    "Use the buttons below to select extensions and themes to be installed with your CCK.">

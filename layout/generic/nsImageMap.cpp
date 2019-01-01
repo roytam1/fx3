@@ -862,30 +862,37 @@ nsImageMap::UpdateAreas()
 nsresult
 nsImageMap::AddArea(nsIContent* aArea)
 {
-  nsAutoString shape, coords;
-  aArea->GetAttr(kNameSpaceID_None, nsHTMLAtoms::shape, shape);
+  nsAutoString coords;
+  static nsIContent::AttrValuesArray strings[] =
+    {&nsHTMLAtoms::_empty, &nsHTMLAtoms::rect, &nsHTMLAtoms::rectangle,
+     &nsHTMLAtoms::poly, &nsHTMLAtoms::polygon, &nsHTMLAtoms::circle,
+     &nsHTMLAtoms::circ, &nsHTMLAtoms::_default, nsnull};
+
   aArea->GetAttr(kNameSpaceID_None, nsHTMLAtoms::coords, coords);
 
   Area* area;
-  if (shape.IsEmpty() ||
-      shape.LowerCaseEqualsLiteral("rect") ||
-      shape.LowerCaseEqualsLiteral("rectangle")) {
-    area = new RectArea(aArea);
-  }
-  else if (shape.LowerCaseEqualsLiteral("poly") ||
-           shape.LowerCaseEqualsLiteral("polygon")) {
-    area = new PolyArea(aArea);
-  }
-  else if (shape.LowerCaseEqualsLiteral("circle") ||
-           shape.LowerCaseEqualsLiteral("circ")) {
-    area = new CircleArea(aArea);
-  }
-  else if (shape.LowerCaseEqualsLiteral("default")) {
-    area = new DefaultArea(aArea);
-  }
-  else {
-    // Unknown area type; bail
-    return NS_OK;
+  switch (aArea->FindAttrValueIn(kNameSpaceID_None, nsHTMLAtoms::shape,
+                                 strings, eIgnoreCase)) {
+    case nsIContent::ATTR_MISSING:
+    case 0:
+    case 1:
+    case 2:
+      area = new RectArea(aArea);
+      break;
+    case 3:
+    case 4:
+      area = new PolyArea(aArea);
+      break;
+    case 5:
+    case 6:
+      area = new CircleArea(aArea);
+      break;
+    case 7:
+      area = new DefaultArea(aArea);
+      break;
+    default:
+      // Unknown area type; bail
+      return NS_OK;
   }
   if (!area)
     return NS_ERROR_OUT_OF_MEMORY;
@@ -920,27 +927,6 @@ nsImageMap::IsInside(nscoord aX, nscoord aY,
     }
   }
 
-  return PR_FALSE;
-}
-
-PRBool
-nsImageMap::IsInside(nscoord aX, nscoord aY) const
-{
-  PRInt32 i, n = mAreas.Count();
-  for (i = 0; i < n; i++) {
-    Area* area = (Area*) mAreas.ElementAt(i);
-    if (area->IsInside(aX, aY)) {
-      nsAutoString href;
-      area->GetHREF(href);
-      if (!href.IsEmpty()) {
-        return PR_TRUE;
-      }
-      else {
-        //We need to return here so we don't hit an overlapping map area
-        return PR_FALSE;
-      }
-    }
-  }
   return PR_FALSE;
 }
 

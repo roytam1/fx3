@@ -452,10 +452,15 @@ nsCocoaWindow::IsVisible(PRBool & aState)
 NS_IMETHODIMP nsCocoaWindow::Show(PRBool bState)
 {
   if (bState) {
-    [mWindow orderFront:NULL];
+    if (mWindowType == eWindowType_popup) {
+      [mWindow orderFront:nil];
+    }
+    else {
+      [mWindow makeKeyAndOrderFront:nil];
+    }
   }
   else {
-    [mWindow orderOut:NULL];
+    [mWindow orderOut:nil];
   }
   
   mVisible = bState;
@@ -547,22 +552,6 @@ void nsCocoaWindow::CalculateAndSetZoomedSize()
 {
   
 } // CalculateAndSetZoomedSize
-
-
-//-------------------------------------------------------------------------
-//
-// Resize this window to a point given in global (screen) coordinates. This
-// differs from simple Move(): that method makes JavaScript place windows
-// like other browsers: it puts the top-left corner of the outer edge of the
-// window border at the given coordinates, offset from the menubar.
-// MoveToGlobalPoint expects the top-left corner of the portrect, which
-// is inside the border, and is not offset by the menubar height.
-//
-//-------------------------------------------------------------------------
-void nsCocoaWindow::MoveToGlobalPoint(PRInt32 aX, PRInt32 aY)
-{
-
-}
 
 
 NS_IMETHODIMP nsCocoaWindow::Resize(PRInt32 aX, PRInt32 aY, PRInt32 aWidth, PRInt32 aHeight, PRBool aRepaint)
@@ -661,18 +650,6 @@ NS_IMETHODIMP nsCocoaWindow::ResetInputState()
 {
 // return mMacEventHandler->ResetInputState();
   return NS_OK;
-}
-
-
-void nsCocoaWindow::SetIsActive(PRBool aActive)
-{
-// mIsActive = aActive;
-}
-
-
-void nsCocoaWindow::IsActive(PRBool* aActive)
-{
-// *aActive = mIsActive;
 }
 
 
@@ -813,11 +790,6 @@ NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener * aListener,
     // printf("painting window menu bar due to window becoming main\n");
     myMenuBar->Paint();
   }
-  
-  nsGUIEvent guiEvent(PR_TRUE, NS_GOTFOCUS, mGeckoWindow);
-  guiEvent.time = PR_IntervalNow();
-  nsEventStatus status = nsEventStatus_eIgnore;
-  mGeckoWindow->DispatchEvent(&guiEvent, status);
 }
 
 
@@ -829,15 +801,9 @@ NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener * aListener,
   
   nsCOMPtr<nsIMenuBar> hiddenWindowMenuBar = GetHiddenWindowMenuBar();
   if (hiddenWindowMenuBar) {
-    // printf("painting hidden window menu bar due to nsCocoaWindow::Show(false)\n");
+    // printf("painting hidden window menu bar due to window losing main status\n");
     hiddenWindowMenuBar->Paint();
   }
-  
-  // tell Gecko that we lost focus
-  nsGUIEvent guiEvent(PR_TRUE, NS_LOSTFOCUS, mGeckoWindow);
-  guiEvent.time = PR_IntervalNow();
-  nsEventStatus status = nsEventStatus_eIgnore;
-  mGeckoWindow->DispatchEvent(&guiEvent, status);
 }
 
 
@@ -860,7 +826,7 @@ NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener * aListener,
 }
 
 
--(void)windowWillClose:(NSNotification *)aNotification
+- (void)windowWillClose:(NSNotification *)aNotification
 {
   // roll up any popups
   if (gRollupListener != nsnull && gRollupWidget != nsnull)
@@ -873,6 +839,40 @@ NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener * aListener,
   // roll up any popups
   if (gRollupListener != nsnull && gRollupWidget != nsnull)
     gRollupListener->Rollup();
+}
+
+
+- (void)sendGotFocusAndActivate
+{
+  if (!mGeckoWindow)
+    return;
+  
+  nsEventStatus status = nsEventStatus_eIgnore;
+  
+  nsGUIEvent focusGuiEvent(PR_TRUE, NS_GOTFOCUS, mGeckoWindow);
+  focusGuiEvent.time = PR_IntervalNow();
+  mGeckoWindow->DispatchEvent(&focusGuiEvent, status);
+  
+  nsGUIEvent activateGuiEvent(PR_TRUE, NS_ACTIVATE, mGeckoWindow);
+  activateGuiEvent.time = PR_IntervalNow();
+  mGeckoWindow->DispatchEvent(&activateGuiEvent, status);
+}
+
+
+- (void)sendLostFocusAndDeactivate
+{
+  if (!mGeckoWindow)
+    return;
+  
+  nsEventStatus status = nsEventStatus_eIgnore;
+  
+  nsGUIEvent deactivateGuiEvent(PR_TRUE, NS_DEACTIVATE, mGeckoWindow);
+  deactivateGuiEvent.time = PR_IntervalNow();
+  mGeckoWindow->DispatchEvent(&deactivateGuiEvent, status);
+  
+  nsGUIEvent lostfocusGuiEvent(PR_TRUE, NS_LOSTFOCUS, mGeckoWindow);
+  lostfocusGuiEvent.time = PR_IntervalNow();
+  mGeckoWindow->DispatchEvent(&lostfocusGuiEvent, status);
 }
 
 

@@ -180,7 +180,11 @@ typedef enum { SSLAppOpRead = 0,
 #define NUM_MIXERS                      9
 
 /* Mask of the 25 named curves we support. */
+#ifdef NSS_ECC_ONLY_SUITE_B
+#define SSL3_SUPPORTED_CURVES_MASK 0x3800000	/* only 3 curves, suite B*/
+#else
 #define SSL3_SUPPORTED_CURVES_MASK 0x3fffffe
+#endif
 
 #ifndef BPB
 #define BPB 8 /* Bits Per Byte */
@@ -940,6 +944,7 @@ struct sslSocketStr {
     unsigned long    lastWriteBlocked;   
     unsigned long    recvdCloseNotify;    /* received SSL EOF. */
     unsigned long    TCPconnected;       
+    unsigned long    appDataBuffered;
 
     /* version of the protocol to use */
     SSL3ProtocolVersion version;
@@ -1130,9 +1135,8 @@ extern sslSocket * ssl_DupSocket(sslSocket *old);
 extern void        ssl_PrintBuf(sslSocket *ss, const char *msg, const void *cp, int len);
 extern void        ssl_DumpMsg(sslSocket *ss, unsigned char *bp, unsigned len);
 
-extern int         ssl_SendSavedWriteData(sslSocket *ss, sslBuffer *buf,
-				          sslSendFunc fp);
-extern SECStatus ssl_SaveWriteData(sslSocket *ss, sslBuffer *buf, 
+extern int         ssl_SendSavedWriteData(sslSocket *ss);
+extern SECStatus ssl_SaveWriteData(sslSocket *ss, 
                                    const void* p, unsigned int l);
 extern SECStatus ssl2_BeginClientHandshake(sslSocket *ss);
 extern SECStatus ssl2_BeginServerHandshake(sslSocket *ss);
@@ -1268,7 +1272,6 @@ int ssl3_GatherCompleteHandshake(sslSocket *ss, int flags);
 extern SECStatus ssl3_CreateRSAStepDownKeys(sslSocket *ss);
 
 #ifdef NSS_ENABLE_ECC
-extern SECStatus ssl3_CreateECDHEphemeralKeys(sslSocket *ss);
 extern void      ssl3_FilterECCipherSuitesByServerCerts(sslSocket *ss);
 extern PRBool    ssl3_IsECCEnabled(sslSocket *ss);
 #endif /* NSS_ENABLE_ECC */

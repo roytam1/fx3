@@ -289,7 +289,8 @@ struct BroadcastListener {
     // don't bother initializing members to 0.
 
 nsXULDocument::nsXULDocument(void)
-    : mResolutionPhase(nsForwardReference::eStart),
+    : nsXMLDocument("application/vnd.mozilla.xul+xml"),
+      mResolutionPhase(nsForwardReference::eStart),
       mState(eState_Master)
 {
 
@@ -446,6 +447,9 @@ nsXULDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
                                  nsIStreamListener **aDocListener,
                                  PRBool aReset, nsIContentSink* aSink)
 {
+    // NOTE: If this ever starts calling nsDocument::StartDocumentLoad
+    // we'll possibly need to reset our content type afterwards.
+    
     mDocumentLoadGroup = do_GetWeakReference(aLoadGroup);
 
     mDocumentTitle.SetIsVoid(PR_TRUE);
@@ -2155,7 +2159,10 @@ nsXULDocument::ApplyPersistentAttributes()
             continue;
 
         nsAutoString id;
-        nsXULContentUtils::MakeElementID(this, NS_ConvertASCIItoUTF16(uri), id);
+        nsXULContentUtils::MakeElementID(this, nsDependentCString(uri), id);
+
+        if (id.IsEmpty())
+            continue;
 
         // This will clear the array if there are no elements.
         GetElementsForID(id, elements);
@@ -3726,10 +3733,6 @@ nsXULDocument::OverlayForwardReference::Merge(nsIContent* aTargetNode,
             // node in the document with the same id as currContent that
             // also has aTargetNode as its parent.
 
-            nsAutoString documentParentID;
-            aTargetNode->GetAttr(kNameSpaceID_None, nsXULAtoms::id,
-                                 documentParentID);
-
             nsCOMPtr<nsIDOMNode> nodeParent;
             rv = nodeInDocument->GetParentNode(getter_AddRefs(nodeParent));
             if (NS_FAILED(rv)) return rv;
@@ -3737,7 +3740,8 @@ nsXULDocument::OverlayForwardReference::Merge(nsIContent* aTargetNode,
 
             nsAutoString parentID;
             elementParent->GetAttribute(NS_LITERAL_STRING("id"), parentID);
-            if (parentID.Equals(documentParentID)) {
+            if (aTargetNode->AttrValueIs(kNameSpaceID_None, nsXULAtoms::id,
+                                         parentID, eCaseMatters)) {
                 // The element matches. "Go Deep!"
                 nsCOMPtr<nsIContent> childDocumentContent(do_QueryInterface(nodeInDocument));
                 rv = Merge(childDocumentContent, currContent, aNotify);
