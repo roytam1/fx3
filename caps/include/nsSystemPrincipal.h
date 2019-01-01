@@ -53,6 +53,8 @@
 class nsSystemPrincipal : public nsIPrincipal
 {
 public:
+    // Our refcount is managed by mJSPrincipals.  Use this macro to avoid
+    // an extra refcount member.
     NS_DECL_ISUPPORTS_INHERITED
     NS_DECL_NSIPRINCIPAL
     NS_DECL_NSISERIALIZABLE

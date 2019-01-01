@@ -1,4 +1,4 @@
-//* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -204,11 +204,12 @@ function asQuery(node)    { return QI_node(node, Ci.nsINavHistoryQueryResultNode
 /** 
  * A View Configuration
  */
-function ViewConfig(peerDropTypes, childDropTypes, excludeItems, expandQueries,
-                    peerDropIndex) {
+function ViewConfig(peerDropTypes, childDropTypes, excludeItems, excludeQueries, 
+                    expandQueries, peerDropIndex) {
   this.peerDropTypes = peerDropTypes;
   this.childDropTypes = childDropTypes;
   this.excludeItems = excludeItems;
+  this.excludeQueries = excludeQueries;
   this.expandQueries = expandQueries;
   this.peerDropIndex = peerDropIndex;
 }
@@ -229,7 +230,7 @@ var ViewConfigurator = {
   rules: { 
     "folder=1": new ViewConfig([TYPE_X_MOZ_PLACE_CONTAINER], 
                                ViewConfig.GENERIC_DROP_TYPES,
-                               true, false, 4)
+                               true, false, false, 4)
   },
   
   /**
@@ -253,6 +254,7 @@ var ViewConfigurator = {
       view.peerDropTypes = rules.peerDropTypes;
       view.childDropTypes = rules.childDropTypes;
       view.excludeItems = rules.excludeItems;
+      view.excludeQueries = rules.excludeQueries;
       view.expandQueries = rules.expandQueries;
       view.peerDropIndex = rules.peerDropIndex;
     }
@@ -617,7 +619,18 @@ var PlacesController = {
       return asContainer(node).remoteContainerType != "";
     return false;
   },
-  
+
+ /**
+  * Determines whether a ResultNode is a remote container registered by the livemark service.
+  * @param node
+  *          A NavHistory Result Node
+  * @returns true if the node is a livemark container item
+  */
+  nodeIsLivemarkContainer: function PC_nodeIsLivemarkContainer(node) {
+    return (this.nodeIsRemoteContainer(node) &&
+            asContainer(node).remoteContainerType == "@mozilla.org/browser/livemark-service;1");
+  },
+
   /**
    * Updates undo/redo commands. 
    */
@@ -950,23 +963,25 @@ var PlacesController = {
       if (selectedNode.uri.indexOf("livemark%2F") != -1) {
         isLivemarkItem = true;
         command.setAttribute("label", strings.getString("livemarkReloadAll"));
-      }
-      else if (this.nodeIsURI(selectedNode)) {
-        var uri = this._uri(selectedNode.uri);
-        isLivemarkItem = 
-          this.annotations.hasAnnotation(uri, "livemark/bookmarkFeedURI");
-        if (isLivemarkItem && selectedNode.parent)
-          var name = selectedNode.parent.title;
-        if (!isLivemarkItem && this.nodeIsFolder(selectedNode)) {
-          var folderId = asFolder(selectedNode).folderId;
-          uri = this.bookmarks.getFolderURI(folderId);
-          isLivemarkItem = this.annotations.hasAnnotation(uri, "livemark/feedURI");
-          name = selectedNode.title;
         }
-        command.setAttribute("label", 
-          strings.getFormattedString("livemarkReloadOne", [name]));
-      }
+        else {
+          var name;
+          if (this.nodeIsLivemarkContainer(selectedNode)) {
+            isLivemarkItem = true;
+            name = selectedNode.title;
+          }
+          else if (this.nodeIsURI(selectedNode)) {
+            var uri = this._uri(selectedNode.uri);
+            isLivemarkItem = this.annotations.hasAnnotation(uri, "livemark/bookmarkFeedURI");
+            if (isLivemarkItem)
+              name = selectedNode.parent.title;
+          }
+
+          if (isLivemarkItem)
+            command.setAttribute("label", strings.getFormattedString("livemarkReloadOne", [name]));
+        }
     }
+    
     if (!isLivemarkItem)
       command.setAttribute("label", strings.getString("livemarkReload"));
       
@@ -1191,6 +1206,19 @@ var PlacesController = {
   },
 
   /**
+   * Show an "Add Bookmarks" dialog to allow the adding of a folder full
+   * of bookmarks corresponding to the objects in the uriList.  This will
+   * be called most often as the result of a "Bookmark All Tabs..." command.
+   *
+   * @param uriList  List of nsIURI objects representing the locations
+   *                 to be bookmarked.
+   */
+  showAddMultiBookmarkUI: function PC_showAddMultiBookmarkUI(uriList) {
+    NS_ASSERT(uriList.length, "showAddMultiBookmarkUI expects a list of nsIURI objects");
+    this._showBookmarkDialog(uriList, "addmulti");
+  },
+
+  /**
    * Opens the bookmark properties panel for a given URI.
    *
    * @param   uri an nsIURI object for which the properties are to be shown
@@ -1216,17 +1244,12 @@ var PlacesController = {
    * This is an implementation function, and shouldn't be called directly;
    * rather, use the specific variant above that corresponds to your situation.
    *
-   * @param identifier   the URI or folder ID to show the dialog for
+   * @param identifier   the URI or folder ID or URI list to show
+   *                     properties for
    * @param action "add" or "edit", see _determineVariant in 
    *               bookmarkProperties.js
    */
   _showBookmarkDialog: function PC__showBookmarkDialog(identifier, action) {
-    // The identifier parameter can be either an integer (for folders) or
-    // a nsIURI object (for bookmarks/history items); if it isn't a number
-    // here, we're going to make sure it's a URI object rather than a string.
-    if (typeof(identifier) != "number")
-      this._assertURINotString(identifier);
-
     window.openDialog("chrome://browser/content/places/bookmarkProperties.xul",
                       "", "width=600,height=400,chrome,dependent,modal,resizable",
                       identifier, this, action);
@@ -1240,6 +1263,35 @@ var PlacesController = {
    */
   changeBookmarkURI: function PC_changeBookmarkProperties(oldURI, newURI) {
     this.bookmarks.changeBookmarkURI(oldURI, newURI);
+  },
+  
+  /**
+   *
+   * Reloads the livemarks associated with the selection.  For the "Subscriptions"
+   * folder, reloads all livemarks; for a livemark folder, reloads its children;
+   * for a single livemark, reloads its siblings (the children of its parent).
+   */
+  reloadSelectedLivemarks: function PC_reloadSelectedLivemarks() {
+    var selectedNode = this._activeView.selectedNode;
+    if (this._activeView.hasSingleSelection) {
+      if (selectedNode.uri.indexOf("livemark%2F") != -1) {
+        this.livemarks.reloadAllLivemarks();
+      }
+      else {
+        var folder = null;
+        if (this.nodeIsLivemarkContainer(selectedNode)) {
+          folder = asFolder(selectedNode);
+        }
+        else if (this.nodeIsURI(selectedNode)) {
+          var uri = this._uri(selectedNode.uri);
+          var isLivemarkItem = this.annotations.hasAnnotation(uri, "livemark/bookmarkFeedURI");
+          if (isLivemarkItem)
+            folder = asFolder(selectedNode.parent);
+        }
+        if (folder)
+          this.livemarks.reloadLivemarkFolder(folder.folderId);
+      }
+    }
   },
 
   /**
@@ -1282,7 +1334,7 @@ var PlacesController = {
     if (node) {
       var browser = this._getBrowserWindow();
       if (browser) 
-        browser.openNewWindowWith(node.uri, null, null);
+        browser.openNewWindowWith(node.uri, null, null, false);
       else
         this._openBrowserWith(node.uri);
     }
@@ -1296,7 +1348,7 @@ var PlacesController = {
     if (node) {
       var browser = this._getBrowserWindow();
       if (browser)
-        browser.loadURI(node.uri, null, null);
+        browser.loadURI(node.uri, null, null, false);
       else
         this._openBrowserWith(node.uri);
     }
@@ -2174,7 +2226,7 @@ PlacesAggregateTransaction.prototype = {
   undoTransaction: function() {
     this.LOG("== UN" + this._name + " (UNAggregate) ============");
     this.bookmarks.beginUpdateBatch();
-    for (var i = this._transactions.length; i >= 0; --i) {
+    for (var i = this._transactions.length - 1; i >= 0; --i) {
       var txn = this._transactions[i];
       if (this.container > -1) 
         txn.container = this.container;

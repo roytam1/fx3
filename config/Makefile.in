@@ -191,5 +191,3 @@ ifdef MKDEPEND_DIR
 clean clobber realclean clobber_all::
 	cd $(MKDEPEND_DIR); $(MAKE) $@
 endif
-
-
