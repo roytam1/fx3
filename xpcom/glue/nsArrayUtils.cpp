@@ -1,3 +1,4 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -11,15 +12,15 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is Mozilla Communicator client code.
+ * The Original Code is XPCOM Array implementation.
  *
  * The Initial Developer of the Original Code is
- * Netscape Communications Corporation.
- * Portions created by the Initial Developer are Copyright (C) 1998
+ * Netscape Communications Corp.
+ * Portions created by the Initial Developer are Copyright (C) 2002
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Joe Hewitt <hewitt@netscape.com> (Original Author)
+ *   Alec Flett <alecf@netscape.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,45 +36,20 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#ifndef __nsAutoCompleteResultBase__
-#define __nsAutoCompleteResultBase__
+#include "nsArrayUtils.h"
 
-#include "nsIAutoCompleteResult.h"
-#include "nsIAutoCompleteResultTypes.h"
-#include "nsString.h"
-#include "nsIMutableArray.h"
-#include "mdb.h"
+//
+// do_QueryElementAt helper stuff
+//
+nsresult
+nsQueryArrayElementAt::operator()(const nsIID& aIID, void** aResult) const
+  {
+    nsresult status = mArray
+        ? mArray->QueryElementAt(mIndex, aIID, aResult)
+        : NS_ERROR_NULL_POINTER;
 
-class nsAutoCompleteMdbResult : public nsIAutoCompleteMdbResult2
-{
-public:
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIAUTOCOMPLETERESULT
+    if (mErrorPtr)
+      *mErrorPtr = status;
 
-  nsAutoCompleteMdbResult();
-  virtual ~nsAutoCompleteMdbResult();
-
-  NS_DECL_NSIAUTOCOMPLETEBASERESULT
-  NS_DECL_NSIAUTOCOMPLETEMDBRESULT
-  NS_DECL_NSIAUTOCOMPLETEMDBRESULT2
-
-protected:
-  nsCOMArray<nsIMdbRow> mResults;
-
-  nsAutoString mSearchString;
-  nsAutoString mErrorDescription;
-  PRInt32 mDefaultIndex;
-  PRUint32 mSearchResult;
-  
-  nsIMdbEnv *mEnv;
-  nsIMdbTable *mTable;
-  
-  mdb_scope mValueToken;
-  PRInt16   mValueType;
-  mdb_scope mCommentToken;
-  PRInt16   mCommentType;
-
-  PRPackedBool mReverseByteOrder;
-};
-
-#endif // __nsAutoCompleteResultBase__
+    return status;
+  }

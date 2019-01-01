@@ -39,7 +39,7 @@
 #define __nsDialogParamBlock_h
 
 #include "nsIDialogParamBlock.h"
-#include "nsIArray.h"
+#include "nsIMutableArray.h"
 #include "nsCOMPtr.h"
 
 // {4E4AAE11-8901-46cc-8217-DAD7C5415873}

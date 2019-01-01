@@ -1,3 +1,4 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -11,15 +12,15 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is Java XPCOM Bindings.
+ * The Original Code is XPCOM Array implementation.
  *
  * The Initial Developer of the Original Code is
- * IBM Corporation.
- * Portions created by the Initial Developer are Copyright (C) 2004
- * IBM Corporation. All Rights Reserved.
+ * Netscape Communications Corp.
+ * Portions created by the Initial Developer are Copyright (C) 2002
+ * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Javier Pedemonte (jhpedemonte@gmail.com)
+ *   Alec Flett <alecf@netscape.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,10 +36,38 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nsISupports.idl"
+#ifndef nsArrayUtils_h__
+#define nsArrayUtils_h__
 
-[scriptable, uuid(9e70a320-be02-11d1-8031-006008159b5a)]
-interface IFoo : nsISupports
-{
-  readonly attribute long id;
-};
+#include "nsCOMPtr.h"
+#include "nsIArray.h"
+
+// helper class for do_QueryElementAt
+class NS_COM_GLUE nsQueryArrayElementAt : public nsCOMPtr_helper
+  {
+    public:
+      nsQueryArrayElementAt(nsIArray* aArray, PRUint32 aIndex,
+                            nsresult* aErrorPtr)
+          : mArray(aArray),
+            mIndex(aIndex),
+            mErrorPtr(aErrorPtr)
+        {
+          // nothing else to do here
+        }
+
+      virtual nsresult NS_FASTCALL operator()(const nsIID& aIID, void**) const;
+
+    private:
+      nsIArray*  mArray;
+      PRUint32   mIndex;
+      nsresult*  mErrorPtr;
+  };
+
+inline
+const nsQueryArrayElementAt
+do_QueryElementAt(nsIArray* aArray, PRUint32 aIndex, nsresult* aErrorPtr = 0)
+  {
+    return nsQueryArrayElementAt(aArray, aIndex, aErrorPtr);
+  }
+
+#endif // nsArrayUtils_h__
