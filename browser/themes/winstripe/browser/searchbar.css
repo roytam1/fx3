@@ -1,5 +1,5 @@
 .searchbar-textbox {
-  width: 12em;
+  width: 15em;
 }
 
 .searchbar-dropmarker {
@@ -8,7 +8,7 @@
 }
 
 .searchbar-engine-image {
-  margin: 0px;
+  margin: 0px 0px 0px 2px;
   list-style-image: url("chrome://browser/skin/Search-bar.png");
 }
 
@@ -16,4 +16,79 @@
   -moz-margin-start: 12px;
   margin-top: 8px;
   list-style-image: url("chrome://browser/skin/search-arrow.gif");
+}
+
+.search-go-button-container {
+  border-left: 1px solid ThreeDShadow;
+}
+
+.search-go-button {
+  list-style-image: url("chrome://browser/skin/Search.png");
+  -moz-image-region: rect(0px 16px 16px 0px);
+  padding: 0px;
+  -moz-appearance: none;
+  border: 1px solid ThreeDFace;
+}
+
+.search-go-button:hover {
+  border-top: 1px solid ThreeDHighlight;
+  border-left: 1px solid ThreeDHighlight;
+  border-right: 1px solid ThreeDShadow;
+  border-bottom: 1px solid ThreeDShadow;
+}
+
+.search-go-button:hover > .toolbarbutton-menubutton-button {
+  -moz-border-right-colors: ThreeDHighlight ThreeDShadow;
+}
+
+.search-go-button:hover:active,
+.search-go-button[open="true"] {
+  border-top: 1px solid ThreeDShadow;
+  border-left: 1px solid ThreeDShadow;
+  border-right: 1px solid ThreeDShadow;
+  border-bottom: 1px solid ThreeDShadow;
+}
+
+.search-go-button > .toolbarbutton-menubutton-button {
+  padding: 1px !important;
+  border: none;
+  border-right: 2px solid ThreeDFace;
+  -moz-appearance: none;
+}
+
+.search-go-button > .toolbarbutton-menubutton-button > .toolbarbutton-icon {
+  margin-right: 0px !important;
+}
+
+.search-go-button > .toolbarbutton-menubutton-button > .toolbarbutton-text {
+  display: none;
+}
+
+.search-go-button-container {
+  background-color: ThreeDFace;
+}
+
+.search-go-button > .toolbarbutton-menubutton-dropmarker {
+  padding-top: 0px;
+  padding-bottom: 0px;
+}
+
+.search-go-button[addengines="true"] {
+  list-style-image: url("chrome://browser/skin/Search-add-engines.png");
+}
+
+.search-go-button:hover {
+  -moz-image-region: rect(0px 32px 16px 16px);
+}
+
+.search-go-button:hover:active {
+  -moz-image-region: rect(0px, 32px, 16px, 16px);
+}
+
+.search-go-button[disabled="true"]{
+  -moz-image-region: rect(0px, 48px, 16px, 32px);
+}
+
+.searchbar-engine-menuitem[selected="true"] > .menu-iconic-text {
+  font-weight: bold;
 }

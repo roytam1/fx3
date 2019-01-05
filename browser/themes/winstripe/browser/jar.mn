@@ -13,6 +13,8 @@ classic.jar:
         skin/classic/browser/searchbar.css
         skin/classic/browser/search-arrow.gif
         skin/classic/browser/Search-bar.png
+        skin/classic/browser/Search.png
+        skin/classic/browser/Search-add-engines.png
         skin/classic/browser/Secure.png
         skin/classic/browser/Security-broken.png
         skin/classic/browser/Throbber.gif
@@ -21,7 +23,7 @@ classic.jar:
         skin/classic/browser/Toolbar.png
         skin/classic/browser/Toolbar-small.png
 #ifdef MOZ_FEEDS
-        skin/classic/browser/feeds/light.gif                    (feeds/light.gif)
+        skin/classic/browser/feeds/feedIcon.png                 (feeds/feedIcon.png)
         skin/classic/browser/feeds/subscribe.css                (feeds/subscribe.css)
 #endif
 #ifdef MOZ_PLACES
@@ -40,6 +42,14 @@ classic.jar:
         skin/classic/browser/bookmarks/addBookmark.css          (bookmarks/addBookmark.css)
         skin/classic/browser/bookmarks/bookmarksManager.css     (bookmarks/bookmarksManager.css)
         skin/classic/browser/bookmarks/Bookmarks-toolbar.png    (bookmarks/Bookmarks-toolbar.png)
+#endif
+#ifdef MOZ_SAFE_BROWSING
+  skin/classic/browser/safebrowsing/browser-protection.css      (safebrowsing/browser-protection.css)
+  skin/classic/browser/safebrowsing/close16x16.png              (safebrowsing/close16x16.png)
+  skin/classic/browser/safebrowsing/dim.png                     (safebrowsing/dim.png)
+  skin/classic/browser/safebrowsing/tail.png                    (safebrowsing/tail.png)
+  skin/classic/browser/safebrowsing/warning16x16.png            (safebrowsing/warning16x16.png)
+  skin/classic/browser/safebrowsing/warning24x24.png            (safebrowsing/warning24x24.png)
 #endif
         skin/classic/browser/preferences/Options.png            (preferences/Options.png)
         skin/classic/browser/preferences/preferences.css        (preferences/preferences.css)

@@ -45,6 +45,8 @@
 
 #include "nsDataHashtable.h"
 
+class nsIDOMWindow;
+
 class nsUICommandCollector : public nsIObserver,
                              public nsIDOMEventListener,
                              public nsIMetricsCollector
@@ -57,7 +59,7 @@ class nsUICommandCollector : public nsIObserver,
   NS_DECL_NSIMETRICSCOLLECTOR
   
   static PLDHashOperator PR_CALLBACK RemoveCommandEventListener(
-    const void* key, PRUint32 windowID, void* userArg);
+    const nsIDOMWindow* key, PRUint32 windowID, void* userArg);
 
   nsUICommandCollector();
 

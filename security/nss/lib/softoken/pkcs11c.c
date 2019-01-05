@@ -73,6 +73,7 @@
 
 #include "pcert.h"
 #include "ssl3prot.h" 	/* for SSL3_RANDOM_LENGTH */
+#include "prprf.h"
 
 #define __PASTE(x,y)    x##y
 
@@ -3770,6 +3771,16 @@ ecgn_done:
 	sftk_FreeObject(publicKey);
 	NSC_DestroyObject(hSession,privateKey->handle);
 	sftk_FreeObject(privateKey);
+	if (sftk_audit_enabled) {
+	    char msg[128];
+	    PR_snprintf(msg,sizeof msg,
+			"C_GenerateKeyPair(hSession=%lu, "
+			"pMechanism->mechanism=0x%08lX)=0x%08lX "
+			"self-test: pair-wise consistency test failed",
+			(PRUint32)hSession,(PRUint32)pMechanism->mechanism,
+			(PRUint32)crv);
+	    sftk_LogAuditMessage(NSS_AUDIT_ERROR, msg);
+	}
 	return crv;
     }
 
@@ -5251,7 +5262,6 @@ key_and_mac_derive_fail:
       }
 
     case CKM_CONCATENATE_BASE_AND_DATA:
-
 	crv = sftk_DeriveSensitiveCheck(sourceKey,key);
 	if (crv != CKR_OK) break;
 
@@ -5276,7 +5286,6 @@ key_and_mac_derive_fail:
 	PORT_ZFree(buf,tmpKeySize);
 	break;
     case CKM_CONCATENATE_DATA_AND_BASE:
-
 	crv = sftk_DeriveSensitiveCheck(sourceKey,key);
 	if (crv != CKR_OK) break;
 
@@ -5301,7 +5310,6 @@ key_and_mac_derive_fail:
 	PORT_ZFree(buf,tmpKeySize);
 	break;
     case CKM_XOR_BASE_AND_DATA:
-
 	crv = sftk_DeriveSensitiveCheck(sourceKey,key);
 	if (crv != CKR_OK) break;
 
@@ -5548,6 +5556,7 @@ key_and_mac_derive_fail:
 	    secret = secret_hash;
 	    secretlen = 20;
 	}
+
 	/*
 	 * if keySize is supplied, then we are generating a key of a specific 
 	 * length. This is done by taking the least significant 'keySize' 

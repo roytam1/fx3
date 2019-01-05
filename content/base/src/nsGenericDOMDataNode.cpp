@@ -593,12 +593,12 @@ nsGenericDOMDataNode::ToCString(nsAString& aBuf, PRInt32 aOffset,
 
     while (cp < end) {
       PRUnichar ch = *cp++;
-      if (ch == '\r') {
-        aBuf.AppendLiteral("\\r");
-      } else if (ch == '\n') {
-        aBuf.AppendLiteral("\\n");
-      } else if (ch == '\t') {
-        aBuf.AppendLiteral("\\t");
+      if (ch == '&') {
+        aBuf.AppendLiteral("&amp;");
+      } else if (ch == '<') {
+        aBuf.AppendLiteral("&lt;");
+      } else if (ch == '>') {
+        aBuf.AppendLiteral("&gt;");
       } else if ((ch < ' ') || (ch >= 127)) {
         char buf[10];
         PR_snprintf(buf, sizeof(buf), "\\u%04x", ch);
@@ -613,12 +613,12 @@ nsGenericDOMDataNode::ToCString(nsAString& aBuf, PRInt32 aOffset,
 
     while (cp < end) {
       PRUnichar ch = *cp++;
-      if (ch == '\r') {
-        aBuf.AppendLiteral("\\r");
-      } else if (ch == '\n') {
-        aBuf.AppendLiteral("\\n");
-      } else if (ch == '\t') {
-        aBuf.AppendLiteral("\\t");
+      if (ch == '&') {
+        aBuf.AppendLiteral("&amp;");
+      } else if (ch == '<') {
+        aBuf.AppendLiteral("&lt;");
+      } else if (ch == '>') {
+        aBuf.AppendLiteral("&gt;");
       } else if ((ch < ' ') || (ch >= 127)) {
         char buf[10];
         PR_snprintf(buf, sizeof(buf), "\\u%04x", ch);
@@ -675,7 +675,7 @@ nsGenericDOMDataNode::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   //  NS_PRECONDITION(!aParent || aDocument == aParent->GetCurrentDoc(),
   //                  "aDocument must be current doc of aParent");
   NS_PRECONDITION(!aParent ||
-                  (aParent->IsContentOfType(eXUL) && aDocument == nsnull) ||
+                  (aParent->IsNodeOfType(eXUL) && aDocument == nsnull) ||
                   aDocument == aParent->GetCurrentDoc(),
                   "aDocument must be current doc of aParent");
   NS_PRECONDITION(!GetCurrentDoc() && !IsInDoc(),
@@ -959,10 +959,11 @@ nsGenericDOMDataNode::GetBindingParent() const
 }
 
 PRBool
-nsGenericDOMDataNode::IsContentOfType(PRUint32 aFlags) const
+nsGenericDOMDataNode::IsNodeOfType(PRUint32 aFlags) const
 {
-  return PR_FALSE;
+  return !(aFlags & ~eCONTENT);
 }
+
 
 #ifdef DEBUG
 void

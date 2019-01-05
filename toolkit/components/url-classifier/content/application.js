@@ -34,6 +34,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+// TODO: We don't use this class very much.  Try to use native nsIFile instead
+//       and remove this file.
 
 /**
  * A simple helper class that enables us to get or create the
@@ -42,7 +44,6 @@
 function PROT_ApplicationDirectory() {
   this.debugZone = "appdir";
   this.appDir_ = G_File.getProfileFile();
-  this.appDir_.append(PROT_GlobalStore.getAppDirectoryName());
   G_Debug(this, "Application directory is " + this.appDir_.path);
 }
 

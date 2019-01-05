@@ -155,7 +155,6 @@ static NS_DEFINE_CID(kDOMEventGroupCID, NS_DOMEVENTGROUP_CID);
 static PRLogModuleInfo* gDocumentLeakPRLog;
 #endif
 
-static NS_DEFINE_CID(kCharsetAliasCID, NS_CHARSETALIAS_CID);
 static NS_DEFINE_CID(kDateTimeFormatCID, NS_DATETIMEFORMAT_CID);
 
 void
@@ -1315,7 +1314,7 @@ nsDocument::SetDocumentCharacterSet(const nsACString& aCharSetID)
     mCharacterSet = aCharSetID;
 
 #ifdef DEBUG
-    nsCOMPtr<nsICharsetAlias> calias(do_GetService(kCharsetAliasCID));
+    nsCOMPtr<nsICharsetAlias> calias(do_GetService(NS_CHARSETALIAS_CONTRACTID));
     if (calias) {
       nsCAutoString canonicalName;
       calias->GetPreferred(aCharSetID, canonicalName);
@@ -1468,7 +1467,7 @@ nsDocument::TryChannelCharset(nsIChannel *aChannel,
     nsCAutoString charsetVal;
     nsresult rv = aChannel->GetContentCharset(charsetVal);
     if (NS_SUCCEEDED(rv)) {
-      nsCOMPtr<nsICharsetAlias> calias(do_GetService(kCharsetAliasCID));
+      nsCOMPtr<nsICharsetAlias> calias(do_GetService(NS_CHARSETALIAS_CONTRACTID));
       if (calias) {
         nsCAutoString preferred;
         rv = calias->GetPreferred(charsetVal,
@@ -1691,6 +1690,12 @@ nsDocument::FindContentForSubDocument(nsIDocument *aDocument) const
   return data.mResult;
 }
 
+PRBool
+nsDocument::IsNodeOfType(PRUint32 aFlags) const
+{
+    return !(aFlags & ~eDOCUMENT);
+}
+
 nsIContent *
 nsDocument::GetChildAt(PRUint32 aIndex) const
 {
@@ -1713,7 +1718,7 @@ nsresult
 nsDocument::InsertChildAt(nsIContent* aKid, PRUint32 aIndex,
                           PRBool aNotify)
 {
-  if (aKid->IsContentOfType(nsIContent::eELEMENT)) {
+  if (aKid->IsNodeOfType(nsINode::eELEMENT)) {
     if (mRootContent) {
       NS_ERROR("Inserting element child when we already have one");
       return NS_ERROR_DOM_HIERARCHY_REQUEST_ERR;
@@ -1764,7 +1769,7 @@ nsDocument::RemoveChildAt(PRUint32 aIndex, PRBool aNotify)
   nsresult rv = NS_OK;
   if (oldKid) {
     if (oldKid == mRootContent) {
-      NS_ASSERTION(oldKid->IsContentOfType(nsIContent::eELEMENT),
+      NS_ASSERTION(oldKid->IsNodeOfType(nsINode::eELEMENT),
                    "Non-element root content?");
       // Destroy the link map up front and null out mRootContent before we mess
       // with the child list.  Hopefully no one in doRemoveChildAt will compare
@@ -1803,7 +1808,7 @@ nsDocument::VerifyRootContentState()
     nsIContent* kid = GetChildAt(i);
     NS_ASSERTION(kid, "Must have kid here");
 
-    if (kid->IsContentOfType(nsIContent::eELEMENT)) {
+    if (kid->IsNodeOfType(nsINode::eELEMENT)) {
       NS_ASSERTION(!elementChild, "Multiple element kids?");
       elementChild = kid;
     }

@@ -39,6 +39,7 @@
 #include <stdarg.h>
 #include <windef.h>
 #include <winbase.h>
+#include <wingdi.h>
 #include <winuser.h>
 #include <winsock2.h>
 #include <iprtrmib.h>
@@ -71,7 +72,7 @@ typedef enum {
     IpPrefixOriginManual,
     IpPrefixOriginWellKnown,
     IpPrefixOriginDhcp,
-    IpPrefixOriginRouterAdvertisement,
+    IpPrefixOriginRouterAdvertisement
 } IP_PREFIX_ORIGIN;
 
 typedef enum {
@@ -80,7 +81,7 @@ typedef enum {
     IpSuffixOriginWellKnown,
     IpSuffixOriginDhcp,
     IpSuffixOriginLinkLayerAddress,
-    IpSuffixOriginRandom,
+    IpSuffixOriginRandom
 } IP_SUFFIX_ORIGIN;
 
 typedef enum {
@@ -88,17 +89,17 @@ typedef enum {
     IpDadStateTentative,
     IpDadStateDuplicate,
     IpDadStateDeprecated,
-    IpDadStatePreferred,
+    IpDadStatePreferred
 } IP_DAD_STATE;
 
 typedef struct _IP_ADAPTER_UNICAST_ADDRESS {
     union {
         ULONGLONG Alignment;
-        struct { 
+        struct {
             ULONG Length;
             DWORD Flags;
-        };
-    };
+        } s;
+    } u;
     struct _IP_ADAPTER_UNICAST_ADDRESS *Next;
     SOCKET_ADDRESS Address;
 
@@ -114,11 +115,11 @@ typedef struct _IP_ADAPTER_UNICAST_ADDRESS {
 typedef struct _IP_ADAPTER_ANYCAST_ADDRESS {
     union {
         ULONGLONG Alignment;
-        struct { 
+        struct {
             ULONG Length;
             DWORD Flags;
-        };
-    };
+        } s;
+    } u;
     struct _IP_ADAPTER_ANYCAST_ADDRESS *Next;
     SOCKET_ADDRESS Address;
 } IP_ADAPTER_ANYCAST_ADDRESS, *PIP_ADAPTER_ANYCAST_ADDRESS;
@@ -129,8 +130,8 @@ typedef struct _IP_ADAPTER_MULTICAST_ADDRESS {
         struct {
             ULONG Length;
             DWORD Flags;
-        };
-    };
+        } s;
+    } u;
     struct _IP_ADAPTER_MULTICAST_ADDRESS *Next;
     SOCKET_ADDRESS Address;
 } IP_ADAPTER_MULTICAST_ADDRESS, *PIP_ADAPTER_MULTICAST_ADDRESS;
@@ -141,8 +142,8 @@ typedef struct _IP_ADAPTER_DNS_SERVER_ADDRESS {
         struct {
             ULONG Length;
             DWORD Reserved;
-        };
-    };
+        } s;
+    } u;
     struct _IP_ADAPTER_DNS_SERVER_ADDRESS *Next;
     SOCKET_ADDRESS Address;
 } IP_ADAPTER_DNS_SERVER_ADDRESS, *PIP_ADAPTER_DNS_SERVER_ADDRESS;
@@ -163,8 +164,8 @@ typedef struct _IP_ADAPTER_ADDRESSES {
         struct {
             ULONG Length;
             DWORD IfIndex;
-        };
-    };
+        } s;
+    } u;
     struct _IP_ADAPTER_ADDRESSES *Next;
     PCHAR AdapterName;
     PIP_ADAPTER_UNICAST_ADDRESS FirstUnicastAddress;
@@ -271,7 +272,7 @@ NS_IMPL_THREADSAFE_ISUPPORTS3(nsNotifyAddrListener,
                               nsIObserver)
 
 nsNotifyAddrListener::nsNotifyAddrListener()
-    : mLinkUp(PR_FALSE)
+    : mLinkUp(PR_TRUE)  // assume true by default
     , mStatusKnown(PR_FALSE)
     , mThread(0)
     , mShutdownEvent(nsnull)
@@ -346,7 +347,12 @@ nsNotifyAddrListener::Observe(nsISupports *subject,
 nsresult
 nsNotifyAddrListener::Init(void)
 {
-    CheckLinkStatus();
+    // XXX this call is very expensive (~650 milliseconds), so we
+    //     don't want to call it synchronously.  Instead, we just
+    //     start up assuming we have a network link, but we'll
+    //     report that the status isn't known.
+    //
+    // CheckLinkStatus();
 
     // only start a thread on Windows 2000 or later
     if (mOSVerInfo.dwPlatformId != VER_PLATFORM_WIN32_NT ||

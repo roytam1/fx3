@@ -4312,7 +4312,7 @@ MOZ_CALENDAR=
 MOZ_DBGRINFO_MODULES=
 MOZ_ENABLE_CANVAS=1
 MOZ_EXTENSIONS_ALL=" cookie wallet xml-rpc help p3p venkman inspector irc typeaheadfind spellcheck gnomevfs sroaming xmlterm datetime finger cview layout-debug tasks sql xforms permissions schema-validation reporter safe-browsing"
-MOZ_FEEDS=
+MOZ_FEEDS=1
 MOZ_IMG_DECODERS_DEFAULT="png gif jpeg bmp xbm icon"
 MOZ_IMG_ENCODERS_DEFAULT="png jpeg"
 MOZ_IPCD=
@@ -4348,7 +4348,6 @@ MOZ_PYTHON_PREFIX=
 MOZ_PYTHON_VER=
 MOZ_PYTHON_VER_DOTTED=
 MOZ_REFLOW_PERF=
-MOZ_REORDER=
 MOZ_SAFE_BROWSING=
 MOZ_SINGLE_PROFILE=
 MOZ_STATIC_MAIL_BUILD=
@@ -5769,13 +5768,14 @@ if test -n "$MOZ_PLACES"; then
     MOZ_MORKREADER=1
 fi
 
+
 dnl ========================================================
-dnl = Enable feeds (new feed handling/processing - Firefox)
+dnl = Disable feeds (new feed handling/processing) - Firefox
 dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(feeds,
-[  --enable-feeds        Enable in-page feed handling and processing (Firefox)],
-    MOZ_FEEDS=1,
-    MOZ_FEEDS= )
+MOZ_ARG_DISABLE_BOOL(feeds,
+[  --disable-feeds        Disable in-page feed handling and processing],
+    MOZ_FEEDS=,
+    MOZ_FEEDS=1 )
 if test -n "$MOZ_FEEDS"; then
     AC_DEFINE(MOZ_FEEDS)
 fi
@@ -6017,21 +6017,6 @@ if test "$NS_DISABLE_LOGGING"; then
     AC_DEFINE(NS_DISABLE_LOGGING)
 else
     AC_DEFINE(MOZ_LOGGING)
-fi
-
-dnl ========================================================
-dnl = Enable function reordering. Off by default
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(reorder,
-[  --enable-reorder        Enable function reordering (requires GNU ld) ],
-    _ENABLE_REORDER=1,
-    _ENABLE_REORDER= )
-if test -n "$_ENABLE_REORDER"; then
-    if test -z "$GNU_LD"; then
-        AC_MSG_WARN([Reordering only works with GNU ld. Not reordering.])
-    else
-        MOZ_REORDER=1
-    fi
 fi
 
 dnl ========================================================
@@ -7433,7 +7418,6 @@ AC_SUBST(MOZ_OS2_USE_DECLSPEC)
 
 AC_SUBST(MOZ_POST_DSO_LIB_COMMAND)
 AC_SUBST(MOZ_POST_PROGRAM_COMMAND)
-AC_SUBST(MOZ_REORDER)
 AC_SUBST(MOZ_TIMELINE)
 AC_SUBST(WINCE)
 AC_SUBST(TARGET_DEVICE)
@@ -7455,7 +7439,6 @@ AC_SUBST(MOZ_MILESTONE_RELEASE)
 dnl win32 options
 AC_SUBST(MOZ_PROFILE)
 AC_SUBST(MOZ_DEBUG_SYMBOLS)
-AC_SUBST(MOZ_COVERAGE)
 AC_SUBST(MOZ_MAPINFO)
 AC_SUBST(MOZ_BROWSE_INFO)
 AC_SUBST(MOZ_TOOLS_DIR)

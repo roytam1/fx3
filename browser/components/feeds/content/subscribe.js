@@ -39,9 +39,9 @@ const Cc = Components.classes;
 const Ci = Components.interfaces;
 const Cr = Components.results;
 
-const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+const HTML_NS = "http://www.w3.org/1999/xhtml";
 const TYPE_MAYBE_FEED = "application/vnd.mozilla.maybe.feed";
-const URI_BUNDLE = "chrome://browser/content/feeds/subscribe.properties";
+const URI_BUNDLE = "chrome://browser/locale/feeds/subscribe.properties";
 
 const PREF_SELECTED_APP = "browser.feeds.handlers.application";
 const PREF_SELECTED_WEB = "browser.feeds.handlers.webservice";
@@ -74,6 +74,33 @@ var SubscribeHandler = {
     element.appendChild(document.createTextNode(text));
   },
   
+  /**
+   * Safely sets the href attribute on an anchor tag, providing the URI 
+   * specified can be loaded according to rules. 
+   * @param   element
+   *          The element to set a URI attribute on
+   * @param   attribute
+   *          The attribute of the element to set the URI to, e.g. href or src
+   * @param   uri
+   *          The URI spec to set as the href
+   */
+  _safeSetURIAttribute: 
+  function SH__safeSetURIAttribute(element, attribute, uri) {
+    var secman = 
+        Cc["@mozilla.org/scriptsecuritymanager;1"].
+        getService(Ci.nsIScriptSecurityManager);    
+    const flags = Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT_OR_DATA;
+    try {
+      secman.checkLoadURIStr(document.documentURI, uri, flags);
+      // checkLoadURIStr will throw if the link URI should not be loaded per 
+      // the rules specified in |flags|, so we'll never "linkify" the link...
+      element.setAttribute(attribute, uri);
+    }
+    catch (e) {
+      // Not allowed to load this link because secman.checkLoadURIStr threw
+    }
+  },
+  
   get _bundle() {
     var sbs = 
         Cc["@mozilla.org/intl/stringbundle;1"].
@@ -90,7 +117,7 @@ var SubscribeHandler = {
   },
   
   init: function SH_init() {
-    LOG("window.location.href = " + window.location.href);
+    LOG("Subscribe Preview: feed uri = " + window.location.href);
     
     var feedService = 
         Cc["@mozilla.org/browser/feeds/result-service;1"].
@@ -104,13 +131,13 @@ var SubscribeHandler = {
       var result = feedService.getFeedResult(feedURI);
     }
     catch (e) {
-      LOG("feed not available?!");
+      LOG("Subscribe Preview: feed not available?!");
     }
     
     if (result.bozo) {
-      LOG("feed result is bozo?!");
+      LOG("Subscribe Preview: feed result is bozo?!");
     }
-    
+      
     // Set up the displayed handler
     this._initSelectedHandler();
     var prefs =   
@@ -119,7 +146,20 @@ var SubscribeHandler = {
     prefs.addObserver(PREF_SELECTED_HANDLER, this, false);
     prefs.addObserver(PREF_SELECTED_APP, this, false);
     
-    var container = result.doc;
+    try {
+      var container = result.doc;
+      container.title;
+    }
+    catch (e) {
+      LOG("Subscribe Preview: An error occurred in parsing! Fortunately, you can still subscribe...");
+      var feedError = document.getElementById("feedError");
+      feedError.removeAttribute("style");
+      var feedBody = document.getElementById("feedBody");
+      feedBody.setAttribute("style", "display:none;");
+      this._setContentText("errorCode", e);
+      return;
+    }
+    
     this._setContentText("feedTitleText", container.title);
     this._setContentText("feedSubtitleText", 
                          this._getPropertyAsString(container, "description"));
@@ -130,7 +170,8 @@ var SubscribeHandler = {
       
       // Set up the title image (supplied by the feed)
       var feedTitleImage = document.getElementById("feedTitleImage");
-      feedTitleImage.setAttribute("src", parts.getPropertyAsAString("url"));
+      this._safeSetURIAttribute(feedTitleImage, "src", 
+                                parts.getPropertyAsAString("url"));
       
       // Set up the title image link
       var feedTitleLink = document.getElementById("feedTitleLink");
@@ -139,7 +180,8 @@ var SubscribeHandler = {
         this._getFormattedString("linkTitleTextFormat", 
                                  [parts.getPropertyAsAString("title")]);
       feedTitleLink.setAttribute("title", titleText);
-      feedTitleLink.setAttribute("href", parts.getPropertyAsAString("link"));
+      this._safeSetURIAttribute(feedTitleLink, "href", 
+                                parts.getPropertyAsAString("link"));
 
       // Fix the margin on the main title, so that the image doesn't run over
       // the underline
@@ -148,21 +190,38 @@ var SubscribeHandler = {
       feedTitleText.style.marginRight = titleImageWidth + "px";
     }
     catch (e) {
-      LOG("E: " + e);
+      LOG("Failed to set Title Image (this is benign): " + e);
     }
+    
+    // XXXben - do something with this. parameterize?
+    const MAX_CHARS = 600;
     
     // Build the actual feed content
     var feedContent = document.getElementById("feedContent");
     var feed = container.QueryInterface(Ci.nsIFeed);
+    
     for (var i = 0; i < feed.items.length; ++i) {
       var entry = feed.items.queryElementAt(i, Ci.nsIFeedEntry);
-      var title = document.createElementNS(XUL_NS, "label");
-      title.value = entry.summary(true, 100);
-      title.className = "feedEntryTitle";
-      var body = document.createElementNS(XUL_NS, "description");
-      body.appendChild(document.createTextNode(entry.content(true)));
-      body.className = "feedEntryContent";
+      entry.QueryInterface(Ci.nsIFeedContainer);
+      var a = document.createElementNS(HTML_NS, "a");
+      a.appendChild(document.createTextNode(entry.title));
+      
+      // Entries are not required to have links, so entry.link can be null.
+      if (entry.link)
+        this._safeSetURIAttribute(a, "href", entry.link.spec);
+
+      var title = document.createElementNS(HTML_NS, "h3");
+      title.appendChild(a);
       feedContent.appendChild(title);
+      
+      var body = document.createElementNS(HTML_NS, "p");
+      var summary = entry.summary(true)
+      if (summary && summary.length > MAX_CHARS)
+        summary = summary.substring(0, MAX_CHARS) + "...";
+      
+      // XXXben - Change to use innerHTML
+      body.appendChild(document.createTextNode(summary));
+      body.className = "feedEntryContent";
       feedContent.appendChild(body);
     }    
   },
@@ -245,7 +304,7 @@ var SubscribeHandler = {
                                     "url(\"" + iconURI + "\")", "");
     }
     catch (e) {
-      LOG("EEEE: " + e);
+      LOG("Failed to set Handler: " + e);
       // No selected handlers yet! Make the user choose...
       chosen.setAttribute("hidden", "true");
       unchosen.removeAttribute("hidden");

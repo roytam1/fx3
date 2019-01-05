@@ -60,6 +60,7 @@ DIRS += \
 ifndef MOZ_SUITE
 # XXX Suite doesn't want these just yet
 DIRS += \
+	feeds \
 	typeaheadfind \
 	viewconfig \
 	$(NULL)
@@ -109,6 +110,10 @@ DIRS +=	downloads
 endif
 endif # MOZ_SUITE
 
+ifdef MOZ_URL_CLASSIFIER
+DIRS += url-classifier
+endif
+
 DIRS += \
 	commandlines \
 	startup \
@@ -118,10 +123,6 @@ DIRS += \
 EXTRA_PP_COMPONENTS = nsDefaultCLH.js
 
 endif # MOZ_XUL_APP
-
-ifdef MOZ_URL_CLASSIFIER
-DIRS += url-classifier
-endif
 
 ifdef MOZ_SUITE
 DIRS += autocomplete/public

@@ -84,6 +84,7 @@
 #include "nsCRT.h"
 #include "nsXBLEventHandler.h"
 #include "nsHTMLAtoms.h"
+#include "nsEventDispatcher.h"
 
 static NS_DEFINE_CID(kDOMScriptObjectFactoryCID,
                      NS_DOM_SCRIPT_OBJECT_FACTORY_CID);
@@ -229,6 +230,8 @@ nsXBLPrototypeHandler::ExecuteHandler(nsIDOMEventReceiver* aReceiver,
   // See if our event receiver is a content node (and not us).
   PRBool isXULKey = (mType & NS_HANDLER_TYPE_XUL);
   PRBool isXBLCommand = (mType & NS_HANDLER_TYPE_XBL_COMMAND);
+  NS_ASSERTION(!(isXULKey && isXBLCommand),
+               "can't be both a key and xbl command handler");
 
   // XUL handlers and commands shouldn't be triggered by non-trusted
   // events.
@@ -243,14 +246,10 @@ nsXBLPrototypeHandler::ExecuteHandler(nsIDOMEventReceiver* aReceiver,
       return NS_OK;
   }
     
-  PRBool isReceiverCommandElement = PR_FALSE;
-  nsCOMPtr<nsIContent> content(do_QueryInterface(aReceiver));
-  if (isXULKey && content && content.get() != mHandlerElement)
-    isReceiverCommandElement = PR_TRUE;
+  if (isXBLCommand) {
+    // This is a special-case optimization to make command handling fast.
+    // It isn't really a part of XBL, but it helps speed things up.
 
-  // This is a special-case optimization to make command handling fast.
-  // It isn't really a part of XBL, but it helps speed things up.
-  if (isXBLCommand && !isReceiverCommandElement) {
     // See if preventDefault has been set.  If so, don't execute.
     PRBool preventDefault = PR_FALSE;
     nsCOMPtr<nsIDOMNSUIEvent> nsUIEvent(do_QueryInterface(aEvent));
@@ -319,13 +318,13 @@ nsXBLPrototypeHandler::ExecuteHandler(nsIDOMEventReceiver* aReceiver,
       nsCOMPtr<nsIContent> focusedContent = do_QueryInterface(focusedElement);
       nsIContent *content = focusedContent;
 
-      // if the focused element is a link then we do want space to
-      // scroll down. focused element may be an element in a link,
+      // if the focused element is a link then we do want space to 
+     // scroll down. focused element may be an element in a link,
       // we need to check the parent node too.
       if (focusedContent) {
         while (content) {
           if (content->Tag() == nsHTMLAtoms::a &&
-              content->IsContentOfType(nsIContent::eHTML)) {
+              content->IsNodeOfType(nsINode::eHTML)) {
             isLink = PR_TRUE;
             break;
           }
@@ -357,6 +356,40 @@ nsXBLPrototypeHandler::ExecuteHandler(nsIDOMEventReceiver* aReceiver,
     return NS_OK;
   }
 
+  // If we're executing on a XUL key element, just dispatch a command
+  // event at the element.  It will take care of retargeting it to its
+  // command element, if applicable, and executing the event handler.
+  if (isXULKey) {
+    aEvent->PreventDefault();
+
+    nsEventStatus status = nsEventStatus_eIgnore;
+    nsMouseEvent event(PR_TRUE, NS_XUL_COMMAND, nsnull, nsMouseEvent::eReal);
+
+    // Copy the modifiers from the key event.
+    nsCOMPtr<nsIDOMKeyEvent> keyEvent = do_QueryInterface(aEvent);
+    if (!keyEvent) {
+      NS_ERROR("Trying to execute a key handler for a non-key event!");
+      return NS_ERROR_FAILURE;
+    }
+
+    keyEvent->GetAltKey(&event.isAlt);
+    keyEvent->GetCtrlKey(&event.isControl);
+    keyEvent->GetShiftKey(&event.isShift);
+    keyEvent->GetMetaKey(&event.isMeta);
+    
+    nsPresContext *pc = nsnull;
+    nsIDocument *doc = mHandlerElement->GetCurrentDoc();
+    if (doc) {
+      nsIPresShell *shell = doc->GetShellAt(0);
+      if (shell) {
+        pc = shell->GetPresContext();
+      }
+    }
+
+    nsEventDispatcher::Dispatch(mHandlerElement, pc, &event, nsnull, &status);
+    return NS_OK;
+  }
+
   // Look for a compiled handler on the element. 
   // Should be compiled and bound with "on" in front of the name.
   nsAutoString onEvent(NS_LITERAL_STRING("onxbl"));
@@ -367,30 +400,6 @@ nsXBLPrototypeHandler::ExecuteHandler(nsIDOMEventReceiver* aReceiver,
 
   void* handler = nsnull;
   
-  // Compile the event handler.
-  nsAutoString xulText;
-  nsIContent* keyCommandContent = nsnull;
-  if (isXULKey) {
-    // Try an oncommand attribute (used by XUL <key> elements, which
-    // are implemented using this code).
-    mHandlerElement->GetAttr(kNameSpaceID_None, nsLayoutAtoms::oncommand, xulText);
-    keyCommandContent = mHandlerElement;
-    if (xulText.IsEmpty()) {
-      // Maybe the receiver is a <command> elt.
-      if (isReceiverCommandElement) {
-        // It is!  See if it has an oncommand attribute.
-        content->GetAttr(kNameSpaceID_None, nsLayoutAtoms::oncommand, xulText);
-        keyCommandContent = content;
-      }
-      
-      if (xulText.IsEmpty())
-        return NS_ERROR_FAILURE; // For whatever reason, they didn't give us anything to do.
-    }
-  }
-  
-  if (isXULKey)
-    aEvent->PreventDefault(); // Preventing default for XUL key handlers
-
   // Compile the handler and bind it to the element.
   nsCOMPtr<nsIScriptGlobalObject> boundGlobal;
   nsCOMPtr<nsPIWindowRoot> winRoot(do_QueryInterface(aReceiver));
@@ -465,25 +474,16 @@ nsXBLPrototypeHandler::ExecuteHandler(nsIDOMEventReceiver* aReceiver,
 
   const char *eventName = nsContentUtils::GetEventArgName(kNameSpaceID_XBL);
 
-  if (isXULKey) {
-    nsCAutoString documentURI;
-    keyCommandContent->GetOwnerDoc()->GetDocumentURI()->GetSpec(documentURI);
-    rv = boundContext->CompileEventHandler(scriptObject, onEventAtom, eventName,
-                                           xulText, documentURI.get(), 0, 
-                                           PR_TRUE, &handler);
-  }
-  else {
-    nsDependentString handlerText(mHandlerText);
-    if (handlerText.IsEmpty())
-      return NS_ERROR_FAILURE;
-    
-    nsCAutoString bindingURI;
-    mPrototypeBinding->DocURI()->GetSpec(bindingURI);
-    
-    rv = boundContext->CompileEventHandler(scriptObject, onEventAtom, eventName,
-                                           handlerText, bindingURI.get(),
-                                           mLineNumber, PR_TRUE, &handler);
-  }
+  nsDependentString handlerText(mHandlerText);
+  if (handlerText.IsEmpty())
+    return NS_ERROR_FAILURE;
+  
+  nsCAutoString bindingURI;
+  mPrototypeBinding->DocURI()->GetSpec(bindingURI);
+
+  rv = boundContext->CompileEventHandler(scriptObject, onEventAtom, eventName,
+                                         handlerText, bindingURI.get(),
+                                         mLineNumber, PR_TRUE, &handler);
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsAutoGCRoot root(&handler, &rv);

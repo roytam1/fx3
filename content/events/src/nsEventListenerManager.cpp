@@ -699,10 +699,9 @@ nsEventListenerManager::AddEventListener(nsIDOMEventListener *aListener,
     // Go from our target to the nearest enclosing DOM window.
     nsCOMPtr<nsPIDOMWindow> window;
     nsCOMPtr<nsIDocument> document;
-    nsCOMPtr<nsIContent> content(do_QueryInterface(mTarget));
-    if (content)
-      document = content->GetOwnerDoc();
-    else document = do_QueryInterface(mTarget);
+    nsCOMPtr<nsINode> node(do_QueryInterface(mTarget));
+    if (node)
+      document = node->GetOwnerDoc();
     if (document)
       window = document->GetInnerWindow();
     else window = do_QueryInterface(mTarget);
@@ -1205,7 +1204,7 @@ nsEventListenerManager::AddScriptEventListener(nsISupports *aObject,
   nsIScriptContext *context = nsnull;
   JSContext* cx = nsnull;
 
-  nsCOMPtr<nsIContent> content(do_QueryInterface(aObject));
+  nsCOMPtr<nsINode> node(do_QueryInterface(aObject));
 
   nsCOMPtr<nsIDocument> doc;
 
@@ -1213,9 +1212,9 @@ nsEventListenerManager::AddScriptEventListener(nsISupports *aObject,
 
   JSObject *scope = nsnull;
 
-  if (content) {
+  if (node) {
     // Try to get context from doc
-    doc = content->GetOwnerDoc();
+    doc = node->GetOwnerDoc();
     nsIScriptGlobalObject *global;
 
     if (doc && (global = doc->GetScriptGlobalObject())) {
@@ -1234,13 +1233,7 @@ nsEventListenerManager::AddScriptEventListener(nsISupports *aObject,
       doc = do_QueryInterface(domdoc);
       global = do_QueryInterface(win);
     } else {
-      doc = do_QueryInterface(aObject);
-
-      if (doc) {
-        global = doc->GetScriptGlobalObject();
-      } else {
-        global = do_QueryInterface(aObject);
-      }
+      global = do_QueryInterface(aObject);
     }
     if (global) {
       context = global->GetContext();
@@ -1331,8 +1324,12 @@ nsEventListenerManager::AddScriptEventListener(nsISupports *aObject,
       }
       else {
         PRInt32 nameSpace = kNameSpaceID_Unknown;
-        if (content)
+        if (node && node->IsNodeOfType(nsINode::eCONTENT)) {
+          nsIContent* content =
+            NS_STATIC_CAST(nsIContent*,
+                           NS_STATIC_CAST(nsINode*, node.get()));
           nameSpace = content->GetNameSpaceID();
+        }
         else if (doc) {
           nsCOMPtr<nsIContent> root = doc->GetRootContent();
           if (root)
@@ -1553,11 +1550,10 @@ nsEventListenerManager::CompileEventHandlerInternal(nsIScriptContext *aContext,
 
       PRUint32 lineNo = 0;
       nsCAutoString url (NS_LITERAL_CSTRING("javascript:alert('TODO: FIXME')"));
-      nsCOMPtr<nsIDocument> doc = do_QueryInterface(aCurrentTarget);
-      if (!doc) {
-        nsCOMPtr<nsIContent> content = do_QueryInterface(aCurrentTarget);
-        if (content)
-          doc = content->GetOwnerDoc();
+      nsIDocument* doc = nsnull;
+      nsCOMPtr<nsINode> node = do_QueryInterface(aCurrentTarget);
+      if (node) {
+        doc = node->GetOwnerDoc();
       }
       if (doc) {
         nsIURI *uri = doc->GetDocumentURI();
@@ -2036,16 +2032,18 @@ nsEventListenerManager::PrepareToUseCaretPosition(nsIWidget* aEventWidget,
   nsCOMPtr<nsICaret> caret;
   rv = aShell->GetCaret(getter_AddRefs(caret));
   NS_ENSURE_SUCCESS(rv, PR_FALSE);
+  NS_ENSURE_TRUE(caret, PR_FALSE);
 
   PRBool caretVisible = PR_FALSE;
   rv = caret->GetCaretVisible(&caretVisible);
   if (NS_FAILED(rv) || ! caretVisible)
     return PR_FALSE;
 
-  // caret selection
+  // caret selection, watch out: GetCaretDOMSelection can return null but NS_OK
   nsCOMPtr<nsISelection> domSelection;
   rv = caret->GetCaretDOMSelection(getter_AddRefs(domSelection));
   NS_ENSURE_SUCCESS(rv, PR_FALSE);
+  NS_ENSURE_TRUE(domSelection, PR_FALSE);
 
   // since the match could be an anonymous textnode inside a
   // <textarea> or text <input>, we need to get the outer frame
@@ -2054,6 +2052,7 @@ nsEventListenerManager::PrepareToUseCaretPosition(nsIWidget* aEventWidget,
   nsCOMPtr<nsIDOMNode> node;
   rv = domSelection->GetFocusNode(getter_AddRefs(node));
   NS_ENSURE_SUCCESS(rv, PR_FALSE);
+  NS_ENSURE_TRUE(node, PR_FALSE);
   nsCOMPtr<nsIContent> content(do_QueryInterface(node));
   for ( ; content; content = content->GetParent()) {
     if (!content->IsNativeAnonymous()) {

@@ -58,6 +58,7 @@ bin/components/autoconfig.xpt
 bin/components/bookmarks.xpt
 bin/components/browsercompsbase.xpt
 bin/components/browsersearch.xpt
+bin/components/browser-feeds.xpt
 bin/components/caps.xpt
 bin/components/chardet.xpt
 bin/components/chrome.xpt
@@ -94,6 +95,7 @@ bin/components/editor.xpt
 bin/components/embed_base.xpt
 bin/components/exthandler.xpt
 bin/components/fastfind.xpt
+bin/components/feeds.xpt
 bin/components/filepicker.xpt
 bin/components/find.xpt
 bin/components/gfx.xpt
@@ -113,6 +115,7 @@ bin/components/layout_xul_tree.xpt
 bin/components/layout_xul.xpt
 bin/components/locale.xpt
 bin/components/lwbrk.xpt
+bin/components/microsummaries.xpt
 bin/components/migration.xpt
 bin/components/mimetype.xpt
 bin/components/mozbrwsr.xpt
@@ -141,6 +144,7 @@ bin/components/proxyObjInst.xpt
 bin/components/toolkitremote.xpt
 bin/components/rdf.xpt
 bin/components/satchel.xpt
+bin/components/saxparser.xpt
 bin/components/search.xpt
 bin/components/shistory.xpt
 bin/components/storage.xpt
@@ -174,9 +178,13 @@ bin/components/xuldoc.xpt
 bin/components/xultmpl.xpt
 bin/components/shellservice.xpt
 ; JavaScript components
+bin/components/FeedProcessor.js
+bin/components/FeedConverter.js
+bin/components/WebContentConverter.js
 bin/components/nsBrowserContentHandler.js
 bin/components/nsBrowserGlue.js
 bin/components/nsSetDefaultBrowser.js
+bin/components/nsMicrosummaryService.js
 bin/components/nsSearchService.js
 bin/components/jsconsole-clhandler.js
 bin/components/nsCloseAllWindows.js
@@ -195,6 +203,8 @@ bin/components/nsUpdateService.js
 bin/components/pluginGlue.js
 bin/components/extensions.xpt
 bin/components/update.xpt
+bin/components/nsSessionStore.js
+bin/components/sessionstore.xpt
 
 ; Kerberos NegotiateAuth
 bin/components/libauth.so

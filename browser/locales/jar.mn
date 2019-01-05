@@ -23,6 +23,7 @@
     locale/browser/engineManager.dtd               (%chrome/browser/engineManager.dtd)
     locale/browser/setDesktopBackground.dtd        (%chrome/browser/setDesktopBackground.dtd)
     locale/browser/shellservice.properties         (%chrome/browser/shellservice.properties)
+    locale/browser/sessionstore.properties         (%chrome/browser/sessionstore.properties)
 #ifdef MOZ_PLACES
     locale/browser/places/places.dtd               (%chrome/browser/places/places.dtd)
     locale/browser/places/bookmarkProperties.dtd   (%chrome/browser/places/bookmarkProperties.dtd)
@@ -37,6 +38,9 @@
 *   locale/browser/bookmarks/addBookmark.dtd       (%chrome/browser/bookmarks/addBookmark.dtd)
 *   locale/browser/bookmarks/bookmarks.properties  (%chrome/browser/bookmarks/bookmarks.properties)
 *   locale/browser/bookmarks/bookmarksProperties.dtd (%chrome/browser/bookmarks/bookmarksProperties.dtd)
+#endif
+#ifdef MOZ_SAFE_BROWSING
+     locale/browser/safebrowsing/phishing-afterload-warning-message.dtd (%chrome/browser/safebrowsing/phishing-afterload-warning-message.dtd)
 #endif
 #ifdef MOZ_FEEDS
     locale/browser/feeds/subscribe.dtd              (%chrome/browser/feeds/subscribe.dtd)

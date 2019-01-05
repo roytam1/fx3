@@ -539,7 +539,7 @@ nsresult nsZipArchive::Test(const char *aEntryName)
   // test all items in archive
   for (int i = 0; i < ZIP_TABSIZE; i++) {
     for (currItem = mFiles[i]; currItem; currItem = currItem->next) {
-      if (currItem->isSynthetic)
+      if (currItem->isSynthetic || currItem->isDirectory)
         continue;
       nsresult rv = ExtractFile(currItem, 0, 0);
       if (rv != ZIP_OK)
@@ -559,7 +559,9 @@ nsresult nsZipArchive::Test(const char *aEntryName)
 nsresult nsZipArchive::CloseArchive()
 {
 #ifndef STANDALONE
-  PL_FinishArenaPool(&mArena);
+  if (mFd) {
+    PL_FinishArenaPool(&mArena);
+  }
 
   // CAUTION:
   // We don't need to delete each of the nsZipItem as the memory for

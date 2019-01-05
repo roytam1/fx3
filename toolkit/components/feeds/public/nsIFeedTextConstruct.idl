@@ -70,4 +70,5 @@ interface nsIFeedTextConstruct : nsISupports
    * The content of the text construct.
    */
   attribute AString text;
-}
+};
+ 
