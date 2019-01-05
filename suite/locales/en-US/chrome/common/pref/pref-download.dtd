@@ -1,25 +1,31 @@
-<!-- extracted from content/pref-download.xul -->
-
-<!--LOCALIZATION NOTE : FILE 'Download' prefs dialog. Handles optins for reading mail/news offline -->
-<!ENTITY  title.label "Download">
-<!ENTITY  lHeader "Download">
-<!ENTITY  rHeader "Choose settings for sending messages offline">
-<!ENTITY  downOnlyCheck "Download only unread messages">
-<!ENTITY  downDateCheck "Download by date">
-<!ENTITY  newmes "Newsgroup Messages">
-<!ENTITY  downUnread "Download only unread messages">
-<!ENTITY  downloadDate "Download by date">
-<!ENTITY  fromRadio.label "from">
-<!ENTITY  yesterday.select "yesterday">
-<!ENTITY  oneW.select "1 week ago">
-<!ENTITY  twoW.select "2 weeks ago">
-<!ENTITY  oneM.select "1 month ago">
-<!ENTITY  sixM.select "6 months ago">
-<!ENTITY  oneY.select "1 year ago">
-<!ENTITY  sinceRadio.label "since">
-<!ENTITY  daysAgo "days ago">
-<!ENTITY  Allmsg "All Messages">
-<!ENTITY  offlineMsgs "In order to read mail and newsgroup messages offline, you must
-          first select them for downloading.  Use the Select... button to 
-		      select items for dowloading.">
-<!ENTITY  select "Select...">
+<!ENTITY pref.download.title            "Downloads">
+<!ENTITY downloadBehavior.label         "When starting a download">
+<!ENTITY downloadLocation.label         "When saving a file">
+<!ENTITY finishedBehavior.label         "When a download completes">
+<!ENTITY openDM.label                   "Open the download manager">
+<!ENTITY openDM.accesskey               "m">
+<!ENTITY openProgressDialog.label       "Open a progress dialog">
+<!ENTITY openProgressDialog.accesskey   "O">
+<!ENTITY doNothing.label                "Don't open anything">
+<!ENTITY doNothing.accesskey            "D">
+<!ENTITY promptDownload.label           "Prompt for download location and default to">
+<!ENTITY promptDownload.accesskey       "P">
+<!ENTITY lastLocation.label             "Last download folder">
+<!ENTITY lastLocation.accesskey         "L">
+<!ENTITY specifiedLocation.label        "Specified download folder">
+<!ENTITY specifiedLocation.accesskey    "e">
+<!ENTITY autoDownload.label             "Automatically download files to specified download folder">
+<!ENTITY autoDownload.accesskey         "A">
+<!ENTITY downloadFolder.label           "Current Download Folder:">
+<!ENTITY chooseDownloadFolder.label     "Choose Folder...">
+<!ENTITY chooseDownloadFolder.accesskey "C">
+<!ENTITY playSound.label                "Play a sound">
+<!ENTITY playSound.accesskey            "s">
+<!ENTITY showAlert.label                "Show an alert">
+<!ENTITY showAlert.accesskey            "n">
+<!ENTITY browse.label                   "Browse...">
+<!ENTITY browse.accesskey               "B">
+<!ENTITY preview.label                  "Preview">
+<!ENTITY preview.accesskey              "v">
+<!ENTITY soundURL.label                 "Sound URL:">
+<!ENTITY soundURL.accesskey             "U">

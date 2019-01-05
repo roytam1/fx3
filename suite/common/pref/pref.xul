@@ -1,56 +1,59 @@
 <?xml version="1.0"?> 
-<!--
-   The contents of this file are subject to the Netscape Public
-   License Version 1.1 (the "License"); you may not use this file
-   except in compliance with the License. You may obtain a copy of
-   the License at http://www.mozilla.org/NPL/
-    
-   Software distributed under the License is distributed on an "AS
-   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-   implied. See the License for the specific language governing
-   rights and limitations under the License.
-    
-   The Original Code is Mozilla Communicator client code, released
-   March 31, 1998.
-   
-   The Initial Developer of the Original Code is Netscape
-   Communications Corporation. Portions created by Netscape are
-   Copyright (C) 1998-1999 Netscape Communications Corporation. All
-   Rights Reserved.
-   
-   Contributor(s): 
-  -->
+<?xml-stylesheet href="chrome://communicator/skin/" type="text/css"?> 
 
-<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
-<?xul-overlay href="chrome://global/content/dialogOverlay.xul"?>
+<?xul-overlay href="chrome://communicator/content/pref/preftree.xul"?>
+
+<!DOCTYPE dialog [
+  <!ENTITY % dtd1 SYSTEM "chrome://communicator/locale/pref/pref.dtd" > %dtd1;
+  <!ENTITY % dtd2 SYSTEM "chrome://communicator-platform/locale/pref/platformPrefOverlay.dtd" > %dtd2;
+]>
 
 
-<!DOCTYPE window SYSTEM "chrome://pref/locale/PrefsWindow.dtd" >
+<!-- This dialog has a fixed size and is not resizable. 
+     You MAY NOT increase the size of this dialog. 
+     Questions, Comments -> ben@netscape.com -->
+<dialog id="prefDialog" 
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="&prefWindow.title;" 
+        style="&prefWindow.size;"
+        windowtype="mozilla:preferences"
+        buttons="accept,cancel,help"
+        onload="onLoad();"
+        ondialogaccept="return hPrefWindow.onAccept();"
+        ondialogcancel="return hPrefWindow.onCancel();"
+        ondialoghelp="doHelpButton();"
+        persist="screenX screenY"> 
 
-<window xmlns:html="http://www.w3.org/TR/REC-html40"
-  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-  class="dialog"
-  onload="StartUp('Top'); OnLoadPref();"
-  title="&window.title;"
-  height="436"
-  width="600"
-  align="vertical">
+  <stringbundle id="bundle_prefutilities"
+               src="chrome://communicator/locale/pref/prefutilities.properties"/>
+  <script type="application/x-javascript" src="chrome://global/content/nsWidgetStateManager.js"/>
+  <script type="application/x-javascript" src="chrome://communicator/content/pref/nsPrefWindow.js"/>
+  <script type="application/x-javascript" src="chrome://communicator/content/pref/pref-help.js"/>
+  <script type="application/x-javascript" src="chrome://help/content/contextHelp.js"/>
 
-<html:script language="javascript" src="PrefsWindow.js"/>
+  <hbox flex="1">
+    <vbox>
+      <label value="&categoryHeader;" control="prefsTree"/>
+      <!-- tree sidebar -->
+      <tree id="prefsTree" style="width: 13em;" flex="1"/>
+    </vbox>
+    <vbox flex="1">
+      <dialogheader id="header"/>
+      <iframe id="panelFrame" name="panelFrame" style="width: 0px" flex="1"/>
+   </vbox>
+  </hbox>
 
-<keyset id="keyset"/>
+   <script type="application/x-javascript">
+    <![CDATA[
+      if(window.arguments && window.arguments[0]) {
+        document.getElementById("panelFrame").setAttribute("src", window.arguments[0] );
+        document.getElementById("panelFrame").setAttribute("tag", window.arguments[0] );
+      }
+      else {
+        document.getElementById("panelFrame").setAttribute("src", "chrome://communicator/content/pref/pref-navigator.xul" );
+        document.getElementById("panelFrame").setAttribute("tag", "chrome://communicator/content/pref/pref-navigator.xul" );
+      }
+    ]]>
+    </script>
 
-<html:div>
-&categoryHeader;
-</html:div>
-
-<box align="horizontal" flex="1">
-  <html:iframe name="preftree" id="preftree" src="chrome://pref/content/preftree.xul" style="width: 150px; height: 600px; overflow: auto"/>
-  <splitter/>
-  <html:iframe name="pref-appearance" id="pref-appearance"
-	src="chrome://pref/content/pref-appearance.xul" flex="1" style="width: 378px; height: 600px; overflow: auto"/>
-</box>
-
-<box id="okCancelButtons"/>
-
-</window>
+</dialog>

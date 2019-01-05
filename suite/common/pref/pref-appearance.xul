@@ -1,99 +1,106 @@
 <?xml version="1.0"?> 
 
-<!--
-   The contents of this file are subject to the Netscape Public
-   License Version 1.1 (the "License"); you may not use this file
-   except in compliance with the License. You may obtain a copy of
-   the License at http://www.mozilla.org/NPL/
+<!-- ***** BEGIN LICENSE BLOCK *****
+ Version: MPL 1.1/GPL 2.0/LGPL 2.1
+
+ The contents of this file are subject to the Mozilla Public License Version
+ 1.1 (the "License"); you may not use this file except in compliance with
+ the License. You may obtain a copy of the License at
+ http://www.mozilla.org/MPL/
+
+ Software distributed under the License is distributed on an "AS IS" basis,
+ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ for the specific language governing rights and limitations under the
+ License.
+
+ The Original Code is Mozilla Communicator client code, released
+ March 31, 1998.
+
+ The Initial Developer of the Original Code is
+ Netscape Communications Corporation.
+ Portions created by the Initial Developer are Copyright (C) 1998-1999
+ the Initial Developer. All Rights Reserved.
+
+ Contributor(s):
+
+ Alternatively, the contents of this file may be used under the terms of
+ either of the GNU General Public License Version 2 or later (the "GPL"),
+ or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ in which case the provisions of the GPL or the LGPL are applicable instead
+ of those above. If you wish to allow use of your version of this file only
+ under the terms of either the GPL or the LGPL, and not to allow others to
+ use your version of this file under the terms of the MPL, indicate your
+ decision by deleting the provisions above and replace them with the notice
+ and other provisions required by the GPL or the LGPL. If you do not delete
+ the provisions above, a recipient may use your version of this file under
+ the terms of any one of the MPL, the GPL or the LGPL.
+
+ ***** END LICENSE BLOCK ***** -->
+
+<?xml-stylesheet href="chrome://communicator/skin/" type="text/css"?>
+
+<!DOCTYPE page [
+<!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd" >
+%brandDTD;
+<!ENTITY % prefAppearanceDTD SYSTEM "chrome://communicator/locale/pref/pref-appearance.dtd" >
+%prefAppearanceDTD;
+]>
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      onload="parent.initPanel(panel);"
+      headertitle="&pref.appearance.title;">
+
+  <script type="application/x-javascript">
+  <![CDATA[
+    var panel = "chrome://communicator/content/pref/pref-appearance.xul";
+    var _elementIDs = [
+      "generalStartupBrowser", "toolbarStyle", "showHideTooltips",
+      "useSiteIcons", "useSmoothScroll", "enableAutomaticImageResizing"
+    ];
+  ]]>
+  </script>
+          
+  <groupbox id="generalStartupPreferences" align="start">
+    <caption label="&onStartLegend.label;"/>
+    <!-- XXX remove when navigator overlays.rdf works -->
+    <checkbox id="generalStartupBrowser"
+              label="&navCheck.label;" accesskey="&navCheck.accesskey;"
+              prefstring="general.startup.browser"/>
+    <!-- XXX -->
+  </groupbox>
+  
+  <groupbox id="toolbarStyleBox">
+    <caption label="&showToolsLegend.label;"/>
+    <radiogroup id="toolbarStyle" align="start"
+                prefstring="browser.chrome.toolbar_style">
+      <radio group="toolbarStyle" value="2" label="&picsNtextRadio.label;" accesskey="&picsNtextRadio.accesskey;"/>
+      <radio group="toolbarStyle" value="0" label="&picsOnlyRadio.label;" accesskey="&picsOnlyRadio.accesskey;"/>
+      <radio group="toolbarStyle" value="1" label="&textonlyRadio.label;" accesskey="&textonlyRadio.accesskey;"/>
+    </radiogroup>
+  </groupbox>
+
+  <vbox class="box-padded" align="start">
+    <separator class="thin" />
+
+    <checkbox id="showHideTooltips" label="&showHideTooltips.label;"
+              accesskey="&showHideTooltips.accesskey;"
+              prefstring="browser.chrome.toolbar_tips"/>
     
-   Software distributed under the License is distributed on an "AS
-   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-   implied. See the License for the specific language governing
-   rights and limitations under the License.
-    
-   The Original Code is Mozilla Communicator client code, released
-   March 31, 1998.
-   
-   The Initial Developer of the Original Code is Netscape
-   Communications Corporation. Portions created by Netscape are
-   Copyright (C) 1998-1999 Netscape Communications Corporation. All
-   Rights Reserved.
-   
-   Contributor(s): 
-  -->
+    <checkbox id="useSiteIcons" label="&useSiteIcons.label;"
+              accesskey="&useSiteIcons.accesskey;"
+              prefstring="browser.chrome.site_icons"/>
 
-<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+    <checkbox id="useSmoothScroll"
+              label="&useSmoothScroll.label;"
+              accesskey="&useSmoothScroll.accesskey;"
+              prefstring="general.smoothScroll"/>
 
-<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-appearance.dtd" >
-<window  xmlns:html="http://www.w3.org/TR/REC-html40"
-		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-        class="dialog"
-		onload="StartUp('Appearance')" 
-		align="vertical">
+    <checkbox id="enableAutomaticImageResizing"
+              label="&enableAutomaticImageResizing.label;"
+              accesskey="&enableAutomaticImageResizing.accesskey;"
+              prefstring="browser.enable_automatic_image_resizing"/>
 
+    <separator/>
 
+  </vbox> 
+</page>
 
-<html:script language="javascript" src="chrome://pref/content/PrefsWindow.js"/>
- 
-	<box class="header" align="horizontal">  
-	      <titledbutton class="left-header-text" value="&lHeader;"/>
-   		  <spring class="header-spring" flex="1"/>
-		  <titledbutton class="right-header-text" value="&rHeader;"/>
-	</box>
-
-
-		<html:fieldset>
-			<html:legend align="left">
-			<html:div>&onStartLegend.label;</html:div> 
-			</html:legend>
-						<html:div>
-				<html:input type="checkbox" id="pref:0:bool:general.startup.browser" />
-				<html:label for="pref:0:bool:general.startup.browser" accesskey="n" tabindex="0">
-				&navCheck.label;
-				</html:label>
-			</html:div>
-			<html:div>
-				<html:input type="checkbox" id="pref:0:bool:general.startup.mail" />
-				<html:label for="pref:0:bool:general.startup.mail" accesskey="m" tabindex="0">
-				&mesCheck.label;
-				</html:label>
-			</html:div>
-			<html:div>
-				<html:input type="checkbox" id="pref:0:bool:general.startup.editor" />
-				<html:label for="pref:0:bool:general.startup.editor" accesskey="c" tabindex="0">
-				&compCheck.label;
-				</html:label>
-			</html:div>
-			<html:div>
-				<html:input type="checkbox" id="ref:0:bool:general.startup.calendar" />
-				<html:label for="pref:0:bool:general.startup.calendar" accesskey="a" tabindex="0">
-				&calCheck.label;
-				</html:label>
-			</html:div>
-		
-		</html:fieldset>
-
-		<html:fieldset>
-			<html:legend align="left">
-			<html:div>&showToolsLegend.label;</html:div> 
-			</html:legend>
-			<html:div>
-				<html:input name="showtoolbar" type="radio" id="pref:2:int:browser.chrome.toolbar_style" />
-				<html:label for="pref:2:int:browser.chrome.toolbar_style" accesskey="p" tabindex="0">
-				&picsNtextRadio.label;
-				</html:label>
-			</html:div>
-			<html:div>
-				<html:input name="showtoolbar" type="radio" id="pref:0:int:browser.chrome.toolbar_style" />
-				<html:label for="pref:0:int:browser.chrome.toolbar_style" accesskey="o" tabindex="0">
-				&picsOnlyRadio.label;
-				</html:label>
-			</html:div>
-			<html:div>
-				<html:input name="showtoolbar" type="radio" id="pref:1:int:browser.chrome.toolbar_style" />
-				<html:label for="pref:1:int:browser.chrome.toolbar_style" accesskey="t" tabindex="0">
-				&textonlyRadio.label;
-				</html:label>
-			</html:div>		
-		</html:fieldset>	
-</window>

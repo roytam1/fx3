@@ -1,24 +1,24 @@
-<!-- extracted from content/pref-advanced.xul -->
 
 <!--LOCALIZATION NOTE : FILE 'Advanced' prefs settings -->
-<!ENTITY window.title "Advanced">
-<!ENTITY lHeader "Advanced">
-<!ENTITY autoLoadImgCheck.label "Automatically load images"> 
-<!--LOCALIZATION NOTE (enbJavaCheck.label): 'Java' should never be translated -->
-<!ENTITY enbJavaCheck.label "Enable Java">
-<!--LOCALIZATION NOTE (enbJsCheck.label): 'JavaScript' should never be translated -->
-<!ENTITY enbJsCheck.label "Enable JavaScript">
-<!ENTITY enbJsCheck.labelforMailNNews "Enable JavaScript for Mail and News">
-<!ENTITY enbCssCheck.label "Enable style sheets">
-<!ENTITY sendAddFtpCheck.label "Send email address as anonymous FTP password">
-<!ENTITY cookies "Cookies">
-<!ENTITY accAllCookiesRadio.label "Accept all cookies">
-<!ENTITY accpOrgCookiesRadio.label "Accept only cookies that get sent back to the originating server">
-<!ENTITY disCookRadio.label "Disable cookies">
-<!ENTITY warnCookCheck.label "Warn me before accepting a cookie">
-<!ENTITY remSignCheck.label "Automatically prefill usernames and passwords">
-<!ENTITY capFormsCheck.label "Enable prefilling of forms">
-<!ENTITY rHeader "Changing preferences that affect the entire product">
-<!--LOCALIZATION NOTE (server.label): 'Wallet' is a product name and should not be translated. -->
-<!ENTITY server.label "Server for wallet tables">
+<!ENTITY pref.advanced.title        "Advanced">
+
+<!ENTITY prefEnableJava.caption     "Features that help interpret web pages">
+
+<!ENTITY enbJavaCheck.label         "Enable Java">
+<!ENTITY enbJavaCheck.accesskey     "J">
+
+<!ENTITY prefTurbo.caption          "Quick Launch">
+<!ENTITY enableTurbo.label          "Keep &brandShortName; in memory to improve startup performance">
+<!ENTITY enableTurboCheck.accesskey "K">
+
+<!ENTITY prefTurbo.desc             "If you check this item, part of &brandShortName; will stay in memory when not in use, allowing it to start up more quickly.">
+
+<!ENTITY prefJvmConf.caption        "Select Java version (change requires restart)">
+<!ENTITY jvm.name                   "Version">
+<!ENTITY jvm.home                   "Path">
+
+<!ENTITY systemPref.caption         "System Preferences">
+<!ENTITY systemPrefCheck.label      "Use Preferences from System">
+<!ENTITY systemPrefCheck.accesskey  "U">
+<!ENTITY systemPref.desc            "Check this item to inherit preferences from the system. The system settings will override the &brandShortName; preferences">
 

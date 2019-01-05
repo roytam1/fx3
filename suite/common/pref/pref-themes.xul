@@ -1,153 +1,111 @@
 <?xml version="1.0"?> 
-<!--
-   The contents of this file are subject to the Netscape Public
-   License Version 1.1 (the "License"); you may not use this file
-   except in compliance with the License. You may obtain a copy of
-   the License at http://www.mozilla.org/NPL/
-    
-   Software distributed under the License is distributed on an "AS
-   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-   implied. See the License for the specific language governing
-   rights and limitations under the License.
-    
-   The Original Code is Mozilla Communicator client code, released
-   March 31, 1998.
-   
-   The Initial Developer of the Original Code is Netscape
-   Communications Corporation. Portions created by Netscape are
-   Copyright (C) 1998-1999 Netscape Communications Corporation. All
-   Rights Reserved.
-   
-   Contributor(s): 
-  -->
+<!-- ***** BEGIN LICENSE BLOCK *****
+ Version: MPL 1.1/GPL 2.0/LGPL 2.1
 
-<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+ The contents of this file are subject to the Mozilla Public License Version
+ 1.1 (the "License"); you may not use this file except in compliance with
+ the License. You may obtain a copy of the License at
+ http://www.mozilla.org/MPL/
 
-<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-themes.dtd" >
-<window xmlns:html="http://www.w3.org/TR/REC-html40"
-		xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-        class="dialog"
-        align="vertical">
+ Software distributed under the License is distributed on an "AS IS" basis,
+ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ for the specific language governing rights and limitations under the
+ License.
 
-<box class="header" align="horizontal">
-  <titledbutton class="left-header-text" value="&lHeader;"/>
-  <spring class="header-spring" flex="1"/>
-  <titledbutton class="right-header-text" value="&rHeader;"/>
-</box>
+ The Original Code is Mozilla Communicator client code, released
+ March 31, 1998.
 
-<tabcontrol flex="1" align="vertical">
-  <tabbox>
-    <tab selected="true">Theme View</tab>
-    <tab>Package View</tab>
-  </tabbox>
-  <tabpanel align="vertical" flex="1">
-    <box flex="1" align="vertical">
-	  <html:fieldset>
-	    <html:legend align="left">
-		  <html:div>Themes</html:div> 
-		</html:legend>
-		<html:div style="height:100px">
-		<tree style="height:100%;width:100%;">
-			<treecol/>
-			<treechildren>
-			  <treeitem>
-				<treerow>
-				  <treecell value="Classic 4.x"/>
-				</treerow>
-			  </treeitem>
-			  <treeitem>
-				<treerow>
-				  <treecell value="Purple and Blue"/>
-				</treerow>
-			  </treeitem>
-			  <treeitem>
-				<treerow>
-				  <treecell value="That 70's Chrome"/>
-				</treerow>
-			  </treeitem>
-			</treechildren>
-		  </tree>
-		</html:div>
-	</html:fieldset>
-	  <spring style="width: 2px"/>
-	  <html:fieldset>
-	    <html:legend align="left">
-		  <html:div>Selected Theme: Purple and Blue</html:div> 
-		</html:legend>
-		<html:div>Author: Mozilla.org</html:div>
-		<html:div>Version: 1.0</html:div>
-		<html:div>Site: <html:a href="http://www.mozilla.org" target="_blank">http://www.mozilla.org</html:a></html:div>
-		<html:div>Preview Image:<html:br/>The thumbnail image would go here.</html:div>
-		<html:div>
-		    <titledbutton class="push dialog" value="Apply Theme"/>
-		    <titledbutton class="push dialog" value="Delete Theme"/>
-			<titledbutton class="push dialog" value="View Details"/>
-		</html:div>
-	  </html:fieldset>
-	</box>
+ The Initial Developer of the Original Code is
+ Netscape Communications Corporation.
+ Portions created by the Initial Developer are Copyright (C) 1998-1999
+ the Initial Developer. All Rights Reserved.
 
-	<box flex="1" align="vertical">
-	  <html:fieldset>
-	    <html:legend align="left">
-		  <html:div>Packages</html:div> 
-		</html:legend>
-		<html:div style="height:100px">
-		<tree style="height:100%;width:100%;">
-			<treecol/>
-			<treechildren>
-			  <treeitem>
-				<treerow>
-				  <treecell value="Global"/>
-				</treerow>
-			  </treeitem>
-			  <treeitem>
-				<treerow>
-				  <treecell value="Navigator"/>
-				</treerow>
-			  </treeitem>
-			  <treeitem>
-				<treerow>
-				  <treecell value="Messenger"/>
-				</treerow>
-			  </treeitem>
-			</treechildren>
-		  </tree>
-		</html:div>
-	</html:fieldset>
-	  <spring style="width: 2px"/>
-	  <html:fieldset>
-	    <html:legend align="left">
-		  <html:div>Selected Package: Messenger</html:div> 
-		</html:legend>
-		<html:div>Author: Mozilla.org</html:div>
-		<html:div>Version: 1.0</html:div>
-		<html:div>Site: <html:a href="http://www.mozilla.org">http://www.mozilla.org</html:a></html:div>
-		<html:div style="height:100px">
-		    <tree style="height:80px;width:100%">
-			  <treecol/>
-			  <treechildren>
-			  <treeitem selected="true">
-				<treerow>
-				  <treecell value="That 70's Chrome"/>
-				</treerow>
-			  </treeitem>
-			  <treeitem>
-				<treerow>
-				  <treecell value="Star Trek"/>
-				</treerow>
-			  </treeitem>
-			  <treeitem>
-				<treerow>
-				  <treecell value="Candy Land"/>
-				</treerow>
-			  </treeitem>
-			  </treechildren>
-		    </tree>
-		</html:div>
-	  </html:fieldset>
-	</box>
+ Contributor(s):
 
-  </tabpanel>
-</tabcontrol>
+ Alternatively, the contents of this file may be used under the terms of
+ either of the GNU General Public License Version 2 or later (the "GPL"),
+ or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ in which case the provisions of the GPL or the LGPL are applicable instead
+ of those above. If you wish to allow use of your version of this file only
+ under the terms of either the GPL or the LGPL, and not to allow others to
+ use your version of this file under the terms of the MPL, indicate your
+ decision by deleting the provisions above and replace them with the notice
+ and other provisions required by the GPL or the LGPL. If you do not delete
+ the provisions above, a recipient may use your version of this file under
+ the terms of any one of the MPL, the GPL or the LGPL.
 
-</window>
+ ***** END LICENSE BLOCK ***** -->
+
+<?xml-stylesheet href="chrome://communicator/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://communicator/skin/prefpanels.css" type="text/css"?>
+
+<!DOCTYPE page [
+<!ENTITY % themesDTD SYSTEM "chrome://communicator/locale/pref/pref-themes.dtd" >
+%themesDTD;
+<!ENTITY % regionDTD SYSTEM "chrome://global-region/locale/region.dtd" >
+%regionDTD;
+]>
+
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      onload="parent.initPanel('chrome://communicator/content/pref/pref-themes.xul');"
+      headertitle="&pref.themes.title;">
+
+  <stringbundle id="bundle_prefutilities"
+                src="chrome://communicator/locale/pref/prefutilities.properties"/>
+  <stringbundle id="bundle_brand"
+                src="chrome://branding/locale/brand.properties"/>
+  <stringbundle id="bundle_navigator"
+                src="chrome://navigator/locale/navigator.properties"/>
+
+  <script type="application/x-javascript" src="chrome://communicator/content/pref/pref-themes.js"/>
+
+  <description>&skinIntro.label;</description>
+  
+  <label control="skinsList">&installedThemes.label;</label>
+  
+  <listbox id="skinsList" datasources="rdf:chrome" 
+        onselect="themeSelect();"
+        ref="urn:mozilla:skin:root" rows="5"
+        sortResource="http://www.mozilla.org/rdf/chrome#displayName"
+        sortDirection="ascending">
+    <template>
+      <rule>
+        <listitem uri="..." skin="true"
+                  label="rdf:http://www.mozilla.org/rdf/chrome#displayName"
+                  author="rdf:http://www.mozilla.org/rdf/chrome#author"
+                  displayName="rdf:http://www.mozilla.org/rdf/chrome#displayName"
+                  name="rdf:http://www.mozilla.org/rdf/chrome#name"
+                  description="rdf:http://www.mozilla.org/rdf/chrome#description"
+                  image="rdf:http://www.mozilla.org/rdf/chrome#image"
+                  loctype="rdf:http://www.mozilla.org/rdf/chrome#locType"/>
+      </rule>
+    </template>
+  </listbox>
+
+  <separator class="thin"/>
+  
+  <hbox id="previewImageContainer" class="inset" align="center" pack="center">
+    <image id="previewImage"/>
+  </hbox>
+
+  <separator class="thin"/>
+  <hbox>
+    <vbox flex="1">
+      <label class="header" id="displayName" value=""/>
+      <hbox align="center">
+        <label value="&author.label;"/>
+        <label id="author"/>
+      </hbox>
+    </vbox>
+    <vbox>
+      <button id="uninstallSkin" label="&uninstallSkin.label;" oncommand="uninstallSkin();"
+              accesskey="&uninstallSkin.accesskey;"/>
+    </vbox>
+  </hbox>
+  <vbox class="inset" style="overflow: auto;" flex="1">
+    <label id="description"/>
+  </vbox>
+  <label class="small-margin"><html:a href="&getNewThemesURL;" id="themesLink"
+         class="themesLink" target="_blank">&getNewThemes.label;</html:a></label>
+</page>

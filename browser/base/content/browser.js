@@ -847,7 +847,7 @@ function prepareForStartup()
   gBrowser.addEventListener("DOMUpdatePageReport", gPopupBlockerObserver.onUpdatePageReport, false);
   // Note: we need to listen to untrusted events, because the pluginfinder XBL
   // binding can't fire trusted ones (runs with page privileges).
-  gBrowser.addEventListener("PluginNotFound", gMissingPluginInstaller.newMissingPlugin, false, true);
+  gBrowser.addEventListener("PluginNotFound", gMissingPluginInstaller.newMissingPlugin, true, true);
   gBrowser.addEventListener("NewTab", BrowserOpenTab, false);
 
   var webNavigation;
@@ -982,7 +982,7 @@ function delayedStartup()
 
   // called when we go into full screen, even if it is
   // initiated by a web page script
-  window.addEventListener("fullscreen", onFullScreen, false);
+  window.addEventListener("fullscreen", onFullScreen, true);
 
   var element;
   if (gIsLoadingBlank && gURLBar && !gURLBar.hidden && !gURLBar.parentNode.parentNode.collapsed)
@@ -2930,7 +2930,7 @@ const BrowserSearch = {
       const targetDoc = target.ownerDocument;
       // Set the attribute of the (first) search button.
       var searchButton = document.getAnonymousElementByAttribute(this.getSearchBar(),
-                                  "anonid", "searchbar-dropmarker");
+                                  "anonid", "search-go-button");
       if (searchButton) {
         var browser = gBrowser.getBrowserForDocument(targetDoc);
          // Append the URI and an appropriate title to the browser data.
@@ -2960,7 +2960,7 @@ const BrowserSearch = {
    */
   updateSearchButton: function() {
     var searchButton = document.getAnonymousElementByAttribute(this.getSearchBar(),
-                                "anonid", "searchbar-dropmarker");
+                                "anonid", "search-go-button");
     if (!searchButton)
       return;
     var engines = gBrowser.mCurrentBrowser.engines;
@@ -6188,7 +6188,7 @@ var FeedHandler = {
   init: function() {
     gBrowser.addEventListener("DOMLinkAdded", 
                               function (event) { FeedHandler.onLinkAdded(event); }, 
-                              false);
+                              true);
   },
   
   /**

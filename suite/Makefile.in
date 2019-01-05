@@ -52,7 +52,11 @@ DIRS		= \
 # XXX Once SeaMonkey becomes a fully fledged xul app, we can remove
 # this ifdef.
 ifdef MOZ_XUL_APP
-DIRS +=		app
+DIRS += \
+		app \
+		browser \
+		profile \
+		$(NULL)
 else
 # XXX This should completely go away in the future but still holds the
 # xulappinfo component needed as long as suite is not a fully fledged

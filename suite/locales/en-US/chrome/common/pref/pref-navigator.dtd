@@ -1,28 +1,42 @@
-<!-- extracted from content/pref-navigator.xul -->
+<!ENTITY  pref.navigator.title      "Navigator">
 
-<!--LOCALIZATION NOTE : FILE Navigator prefs screen -->
-<!--LOCALIZATION NOTE (title.label): DONT_TRANSLATE -->
-<!ENTITY  title.label "Navigator">
-<!ENTITY  lHeader "Navigator">
-<!ENTITY  rHeader "Specify the home page location">
-<!ENTITY  navRadio "Navigator starts with">
-<!ENTITY  blankRadio "Blank page">
-<!ENTITY  header2.label "Home page">
-<!ENTITY  lastPageRadio "Last page visited">
-<!ENTITY  homepageRadio "Home page">
-<!ENTITY  clickRadio "Clicking the Home button will take you to this page.">
-<!ENTITY  location "Location:">
-<!ENTITY  useCurrent "Use Current Page">
-<!ENTITY  browseFile "Select File...">
-<!ENTITY  header3.label "History">
-<!ENTITY  historyPages "List of the pages you have previously visited.">
-<!--LOCALIZATION NOTE (histDay): DONT_TRANSLATE -->
-<!ENTITY  histDay "9">
-<!ENTITY  daysRadio "days">
-<!ENTITY  homepageRadio "Homepage">
-<!ENTITY  pagesHis "Pages in history expire after:">
-<!ENTITY  clearRadio "Clear the list of sites on the location bar: ">
-<!ENTITY  clearHis "clear history">
-<!ENTITY  header4.label "Location Bar History">
-<!ENTITY  clearBar "Clear the list of sites on the location bar:">
-<!ENTITY  clearLoc "Clear">
+<!ENTITY  navRadio                  "Display on">
+<!ENTITY  navStartPageMenu.label    "Navigator Startup">
+<!ENTITY  newWinPageMenu.label      "New Window">
+<!ENTITY  newTabPageMenu.label      "New Tab">
+
+<!ENTITY  blankPageRadio.label      "Blank page">
+<!ENTITY  blankPageRadio.accesskey  "B">
+<!ENTITY  homePageRadio.label       "Home page">
+<!ENTITY  homePageRadio.accesskey   "m">
+<!ENTITY  lastPageRadio.label       "Last page visited">
+<!ENTITY  lastPageRadio.accesskey   "L">
+
+<!ENTITY  header2.label             "Home Page">
+<!ENTITY  homePageIntro.label       "Clicking the Home button takes you to this page or group of pages.">
+<!ENTITY  location.label            "Location:">
+<!ENTITY  location.accesskey        "a">
+<!ENTITY  useCurrent.label          "Use Current Page">
+<!ENTITY  useCurrent.accesskey      "U">
+<!ENTITY  useCurrentGroup.label     "Use Current Group">
+<!ENTITY  useCurrentGroup.accesskey "G">
+<!ENTITY  browseFile.label          "Choose File...">
+<!ENTITY  browseFile.accesskey      "C">
+<!ENTITY  useDefault.label          "Restore Default">
+<!ENTITY  useDefault.accesskey      "R">
+
+<!ENTITY  toolbarIntro.label        "Select the buttons you want to see in the toolbars:">
+
+<!ENTITY  navToolbarIntro.label     "Navigation Toolbar">
+<!ENTITY  goButton.label            "Go">
+<!ENTITY  goButton.accesskey        "o">
+<!ENTITY  searchButton.label        "Search">
+<!ENTITY  searchButton.accesskey    "S">
+<!ENTITY  printButton.label         "Print">
+<!ENTITY  printButton.accesskey     "P">
+
+<!ENTITY  persToolbarIntro.label    "Personal Toolbar">
+<!ENTITY  homeButton.label          "Home">
+<!ENTITY  homeButton.accesskey      "e">
+<!ENTITY  bookmarksButton.label     "Bookmarks">
+<!ENTITY  bookmarksButton.accesskey "k">

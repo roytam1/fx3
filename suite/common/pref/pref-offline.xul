@@ -1,72 +1,71 @@
 <?xml version="1.0"?> 
 
-<!--
-   The contents of this file are subject to the Netscape Public
-   License Version 1.1 (the "License"); you may not use this file
-   except in compliance with the License. You may obtain a copy of
-   the License at http://www.mozilla.org/NPL/
-    
-   Software distributed under the License is distributed on an "AS
-   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-   implied. See the License for the specific language governing
-   rights and limitations under the License.
-    
-   The Original Code is Mozilla Communicator client code, released
-   March 31, 1998.
-   
-   The Initial Developer of the Original Code is Netscape
-   Communications Corporation. Portions created by Netscape are
-   Copyright (C) 1998-1999 Netscape Communications Corporation. All
-   Rights Reserved.
-   
-   Contributor(s): 
-  -->
+<!-- ***** BEGIN LICENSE BLOCK *****
+ Version: MPL 1.1/GPL 2.0/LGPL 2.1
 
-<?xml-stylesheet href="chrome://pref/skin/" type="text/css"?>
+ The contents of this file are subject to the Mozilla Public License Version
+ 1.1 (the "License"); you may not use this file except in compliance with
+ the License. You may obtain a copy of the License at
+ http://www.mozilla.org/MPL/
 
-<!DOCTYPE window SYSTEM "chrome://pref/locale/pref-offline.dtd" >
-<window xmlns:html="http://www.w3.org/TR/REC-html40"
-		    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-        class="dialog"
-        onload="return StartUp('offline');"  title="&title.label;">
+ Software distributed under the License is distributed on an "AS IS" basis,
+ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ for the specific language governing rights and limitations under the
+ License.
 
-<html:script language="javascript" src="PrefsWindow.js"/>
-<html:div flex="100%">
-<html:DIV ID="top">
-		<html:SPAN ID="lefttext">&header;</html:SPAN>
-</html:DIV>
+ The Original Code is Mozilla Communicator client code, released
+ March 31, 1998.
 
+ The Initial Developer of the Original Code is
+ Netscape Communications Corporation.
+ Portions created by the Initial Developer are Copyright (C) 1998-1999
+ the Initial Developer. All Rights Reserved.
 
+ Contributor(s):
+   Mohan Bhamidipati (mohanb@netscape.com)
 
-&header1;	
-<html:table>	
-      <html:tr><html:td>&descipt1;
-			</html:td></html:tr>
-			<html:tr><html:td><html:label>
-				<html:input name="state" type="radio" id="pref:0:int:offline.startup_state" />&prevRadio.label;
-				<html:br />&communRemember;
-			</html:label></html:td></html:tr>
-			<html:tr><html:td><html:label>
-				<html:input name="state" type="radio" id="pref:1:int:offline.startup_state" />&askOfflineRadio.label;
-				<html:br />&offlineStartAskEach;
-			</html:label></html:td></html:tr>
+ Alternatively, the contents of this file may be used under the terms of
+ either of the GNU General Public License Version 2 or later (the "GPL"),
+ or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ in which case the provisions of the GPL or the LGPL are applicable instead
+ of those above. If you wish to allow use of your version of this file only
+ under the terms of either the GPL or the LGPL, and not to allow others to
+ use your version of this file under the terms of the MPL, indicate your
+ decision by deleting the provisions above and replace them with the notice
+ and other provisions required by the GPL or the LGPL. If you do not delete
+ the provisions above, a recipient may use your version of this file under
+ the terms of any one of the MPL, the GPL or the LGPL.
 
-</html:table>
-&heaeder2;
-<html:table>	
-	
-            
-			<html:tr><html:td><html:label><html:input name="offmail" type="radio" id="pref:0:int:offline.send.unsent_messages" />&unsentAskRadio.label;</html:label></html:td></html:tr>
-			<html:tr><html:td><html:label><html:input name="offmail" type="radio" id="pref:1:int:offline.send.unsent_messages" />&unsentAutoRadio.label;</html:label></html:td></html:tr>
-			<html:tr><html:td><html:label><html:input name="offmail" type="radio" id="pref:2:int:offline.send.unsent_messages" />&unsentDoNotRadio.label;</html:label></html:td></html:tr>
-</html:table>
-&header3;
-<html:table>		
-            
-			<html:tr><html:td><html:label>
-				<html:input type="checkbox" id="pref:0:bool:offline.prompt_synch_on_exit" />&promptSynchCheck.label;
-			</html:label></html:td></html:tr>
+ ***** END LICENSE BLOCK ***** -->
+<?xml-stylesheet href="chrome://communicator/skin/" type="text/css"?>
 
-</html:table>
-</html:div>
-</window>
+<!DOCTYPE page [
+<!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd" >
+%brandDTD;
+<!ENTITY % offlineDTD SYSTEM "chrome://communicator/locale/pref/pref-offline.dtd" >
+%offlineDTD;
+]>
+
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      onload="parent.initPanel('chrome://communicator/content/pref/pref-offline.xul');"
+      headertitle="&boxHeader;">
+
+  <script type="application/x-javascript">
+  <![CDATA[
+    var _elementIDs = ["offlineStartupstate"];
+  ]]>
+  </script>
+
+<groupbox>
+  <caption label="&rHeader;"/>
+
+  <!-- uncomment when 82487 is fixed -->
+  <!-- <label value="&textStart;"/>
+  <radiogroup id="offlineStartupstate"
+              prefstring="offline.startup_state">
+    <radio value="0" label="&radioAskMode;"/>
+    <radio value="1" label="&radioUsePrev;"/>
+  </radiogroup> -->
+
+</groupbox>
+</page>
