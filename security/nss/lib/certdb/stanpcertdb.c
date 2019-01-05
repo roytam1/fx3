@@ -815,23 +815,10 @@ certdb_SaveSingleProfile(CERTCertificate *cert, const char *emailAddr,
 		                                          emailProfile->data);
 	    } else if (profileTime && emailProfile) {
 		PRStatus nssrv;
-		NSSDER subject;
 		NSSItem profTime, profData;
-		NSSItem *pprofTime, *pprofData;
-		NSSITEM_FROM_SECITEM(&subject, &cert->derSubject);
-		if (profileTime) {
-		    NSSITEM_FROM_SECITEM(&profTime, profileTime);
-		    pprofTime = &profTime;
-		} else {
-		    pprofTime = NULL;
-		}
-		if (emailProfile) {
-		    NSSITEM_FROM_SECITEM(&profData, emailProfile);
-		    pprofData = &profData;
-		} else {
-		    pprofData = NULL;
-		}
-		stanProfile = nssSMIMEProfile_Create(c, pprofTime, pprofData);
+		NSSITEM_FROM_SECITEM(&profTime, profileTime);
+		NSSITEM_FROM_SECITEM(&profData, emailProfile);
+		stanProfile = nssSMIMEProfile_Create(c, &profTime, &profData);
 		if (!stanProfile) goto loser;
 		nssrv = nssCryptoContext_ImportSMIMEProfile(cc, stanProfile);
 		rv = (nssrv == PR_SUCCESS) ? SECSuccess : SECFailure;

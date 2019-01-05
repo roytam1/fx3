@@ -571,11 +571,15 @@ nsHTMLDocument::TryBookmarkCharset(nsIDocShell* aDocShell,
   PRBool wantCharset;         // ignored for now
   nsCAutoString charset;
   nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(aDocShell));
+  nsCOMPtr<nsISupports> closure;
   nsresult rv = bookmarksResolver->RequestCharset(webNav,
                                                   aChannel,
                                                   &wantCharset,
-                                                  nsnull,
+                                                  getter_AddRefs(closure),
                                                   charset);
+  // FIXME: Bug 337790
+  NS_ASSERTION(!wantCharset, "resolved charset notification not implemented!");
+
   if (NS_SUCCEEDED(rv) && !charset.IsEmpty()) {
     aCharset = charset;
     aCharsetSource = kCharsetFromBookmarks;

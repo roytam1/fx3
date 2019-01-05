@@ -73,6 +73,14 @@
 
     isItemSelected(item) - return true if item is selected
       @param item - item control returned by appendItem()
+
+    getFreeEntryValues() - return space delimited list of free entry items values
+
+    allowFreeEntry(allowed) - enable/disable free entry
+      @param allowed - boolean value
+
+    appendFreeEntryItem(value) - append and select free entry item
+      @param value - item value
 -->
 
 <bindings id="xformsSelectBindings"
@@ -185,9 +193,19 @@
         </getter>
       </property>
 
-      <property name="selection"
-                onget="return this.getAttribute('selection'); "
-                onset="this.setAttribute('selection', val); "/>
+      <property name="selection">
+        <getter>
+          return this.getAttribute("selection");
+        </getter>
+        <setter>
+          this.setAttribute("selection", val);
+
+          if (val == "open")
+            this.control.allowFreeEnry(true);
+          else
+            this.control.allowFreeEnry(false);
+        </setter>
+      </property>
 
       <method name="_buildSelect">
         <body>
@@ -230,8 +248,7 @@
           for (var index in this._defaultHash) {
             if (this._defaultHash[index].hits == 0) {
               if (this.selection == 'open') {
-                // XXX: If the select is open, the missing elements should be added
-                // and selected per 8.1.10 in the spec.
+                this.control.appendFreeEntryItem(index);
               } else {
                 // XXX: some of default values not found, we need to throw an
                 // xforms-out-of-range event, but only if the select is 'closed'.
@@ -532,6 +549,8 @@
       </method>
 
       <method name="_setBoundValue">
+        <parameter name="aContentEnvelope"/>
+        <parameter name="aCopySelectedOrDeselected"/>
         <body>
           <![CDATA[
           var boundNode = this.accessors.getBoundNode();
@@ -542,43 +561,39 @@
           // ALL of the current content with the newly selected content.  Which
           // means calling setContent.  setValue only messes with the first
           // textnode under the bound node.
-          var copySelectedOrDeselected = new Boolean();
-          copySelectedOrDeselected.value = false;
-          var contentEnvelope = this._processSelectedValues(copySelectedOrDeselected);
-          if (contentEnvelope) {
-            if (boundNode.nodeType == Node.ELEMENT_NODE) {
-              // we shouldn't call setContent if we haven't selected any
-              // copyItems.  We can't just test for a single text node under
-              // the bound node because this could still have been the result
-              // of a copyItem being selected.  And if a copyItem is selected,
-              // then we need to do the whole rebuild, recalculate, revalidate,
-              // refresh process according to the spec...whether we really need
-              // to or not.
-              if (copySelectedOrDeselected.value == false) {
-                // well, no copyItems are selected, so need to find the value
-                // to set.  Will be in the first child.
-                var firstChild = contentEnvelope.firstChild;
-                var value = null;
-                if (firstChild) {
-                  value = firstChild.nodeValue;
-                }
-                this.accessors.setValue(value);
-              } else {
-                this.accessors.setContent(contentEnvelope, true);
-              }
-            } else {
-              // if some copyItems were selected by the user prior to the call
-              // to _processSelectedValues, then we would not have set up
-              // _accessorValueCache.  Since the node we are bound to can't
-              // be set by copyItems (its not an ELEMENT_NODE), any copyItems
-              // in this select would have been deselected during
-              // _processSelectedValues.  Thus, anything in the contentEnvelope at
-              // this point should just be strings and so we can set
-              // delegate.value directly and use _accessorValueCache after all.
 
-              this.accessors.setValue(contentEnvelope.nodeValue);
-              this._accessorValueCache = contentEnvelope.nodeValue;
+          if (boundNode.nodeType == Node.ELEMENT_NODE) {
+            // we shouldn't call setContent if we haven't selected any
+            // copyItems.  We can't just test for a single text node under
+            // the bound node because this could still have been the result
+            // of a copyItem being selected.  And if a copyItem is selected,
+            // then we need to do the whole rebuild, recalculate, revalidate,
+            // refresh process according to the spec...whether we really need
+            // to or not.
+            if (!aCopySelectedOrDeselected) {
+              // well, no copyItems are selected, so need to find the value
+              // to set.  Will be in the first child.
+              var firstChild = aContentEnvelope.firstChild;
+              var value = null;
+              if (firstChild) {
+                value = firstChild.nodeValue;
+              }
+              this.accessors.setValue(value);
+            } else {
+              this.accessors.setContent(aContentEnvelope, true);
             }
+          } else {
+            // if some copyItems were selected by the user prior to the call
+            // to _processSelectedValues, then we would not have set up
+            // _accessorValueCache.  Since the node we are bound to can't
+            // be set by copyItems (its not an ELEMENT_NODE), any copyItems
+            // in this select would have been deselected during
+            // _processSelectedValues.  Thus, anything in the contentEnvelope at
+            // this point should just be strings and so we can set
+            // delegate.value directly and use _accessorValueCache after all.
+
+            this.accessors.setValue(aContentEnvelope.nodeValue);
+            this._accessorValueCache = aContentEnvelope.nodeValue;
           }
           ]]>
         </body>
@@ -594,11 +609,6 @@
         <parameter name="aIsACopyItemSelectedOrDeselected"/>
         <body>
         <![CDATA[
-          var selectedValues = "";
-
-          // select if found, unselect if not
-          var options = this._controlArray;
-
           if (aIsACopyItemSelectedOrDeselected) {
             aIsACopyItemSelectedOrDeselected.value = false;
           }
@@ -621,6 +631,13 @@
             this._dispatchSelectEvents();
             return;
           }
+
+          var selectedValues = "";
+          if (this.selection == "open") {
+            selectedValues = this.control.getFreeEntryValues();
+          }
+
+          var options = this._controlArray;
           var boundType = boundNode.nodeType;
           var copyNode;
 
@@ -852,12 +869,17 @@
           if (this.parentControl.incremental && !aIncremental)
             return;
 
+          // Fire 'xfroms-select'/'xforms-deselect' events and unselect illegaly
+          // selected items.
+          var copySelectedOrDeselected = new Boolean();
+          copySelectedOrDeselected.value = false;
+          var contentEnvelope =
+            this.parentControl._processSelectedValues(copySelectedOrDeselected);
+
           if (!aIncremental || this.parentControl.incremental) {
-            this.parentControl._setBoundValue();
-          } else {
-            // we should call _processSelectedValues() method since we probably
-            // should unselect illegaly selected items.
-            this.parentControl._processSelectedValues();
+            if (contentEnvelope) {
+              this.parentControl._setBoundValue(contentEnvelope, copySelectedOrDeselected.value);
+            }
           }
         ]]>
         </body>
@@ -868,6 +890,33 @@
         <parameter name="aType"/>
         <body>
           this.parentControl.dispatchDOMUIEvent(aType);
+        </body>
+      </method>
+
+      <!-- Return values of free entry. The method is a stub and it should
+        be removed when all native controls will support @selection="open".
+      -->
+      <method name="getFreeEntryValues">
+        <body>
+          return "";
+        </body>
+      </method>
+
+      <!-- Allow free entry. The method is a stub and it should be removed when
+        all native controls will support @selection="open".
+      -->
+      <method name="allowFreeEntry">
+        <parameter name="aAllowed"/>
+        <body>
+        </body>
+      </method>
+
+      <!-- Append and select free entry item. The method is a stub and it should
+        be removed when all native controls will support @selection="open".
+      -->
+      <method name="appendFreeEntryItem">
+        <parameter name="aValue"/>
+        <body>
         </body>
       </method>
 
@@ -882,6 +931,13 @@
 
       <property name="XBL_NS" readonly="true"
                 onget="return 'http://www.mozilla.org/xbl';"/>
+
+      <constructor>
+        if (this.parentControl.selection == "open")
+          this.allowFreeEntry(true);
+        else
+          this.allowFreeEntry(false);
+      </constructor>
 
     </implementation>
   </binding>

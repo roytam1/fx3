@@ -51,7 +51,6 @@ class nsVoidArray;
 class nsIDOMEvent;
 class nsIContent;
 class nsISupportsArray;
-class nsIDOMRange;
 class nsIEventListenerManager;
 class nsIURI;
 class nsICSSStyleRule;
@@ -61,36 +60,40 @@ class nsAttrName;
 
 // IID for the nsIContent interface
 #define NS_ICONTENT_IID       \
-{ 0x26e42639, 0x013b, 0x442a, \
-  { 0xbe, 0xa0, 0x31, 0xad, 0x43, 0x33, 0x6f, 0x79 } }
+{ 0x823ca304, 0x2dc4, 0x4b06, \
+  { 0x98, 0x60, 0x1a, 0x21, 0x45, 0xb9, 0xf6, 0x1c } }
+
+// hack to make egcs / gcc 2.95.2 happy
+class nsIContent_base : public nsINode {
+public:
+#ifdef MOZILLA_INTERNAL_API
+  // If you're using the external API, the only thing you can know about
+  // nsIContent is that it exists with an IID
+
+  nsIContent_base(nsINodeInfo *aNodeInfo)
+    : nsINode(aNodeInfo)
+  {
+  }
+#endif
+
+  NS_DECLARE_STATIC_IID_ACCESSOR(NS_ICONTENT_IID)
+};
 
 /**
  * A node of content in a document's content model. This interface
  * is supported by all content objects.
  */
-class nsIContent : public nsINode {
+class nsIContent : public nsIContent_base {
 public:
-  NS_DECLARE_STATIC_IID_ACCESSOR(NS_ICONTENT_IID)
-
 #ifdef MOZILLA_INTERNAL_API
   // If you're using the external API, the only thing you can know about
   // nsIContent is that it exists with an IID
 
   nsIContent(nsINodeInfo *aNodeInfo)
-    : nsINode(aNodeInfo)
+    : nsIContent_base(aNodeInfo)
   {
     NS_ASSERTION(aNodeInfo,
                  "No nsINodeInfo passed to nsIContent, PREPARE TO CRASH!!!");
-  }
-
-  /**
-   * DEPRECATED - Use GetCurrentDoc or GetOwnerDoc.
-   * Get the document for this content.
-   * @return the document
-   */
-  nsIDocument *GetDocument() const
-  {
-    return GetCurrentDoc();
   }
 
   /**
@@ -161,18 +164,32 @@ public:
   }
 
   /**
+   * DEPRECATED - Use GetCurrentDoc or GetOwnerDoc.
+   * Get the document for this content.
+   * @return the document
+   */
+  nsIDocument *GetDocument() const
+  {
+    return GetCurrentDoc();
+  }
+
+  /**
    * Get whether this content is C++-generated anonymous content
    * @see nsIAnonymousContentCreator
    * @return whether this content is anonymous
    */
-  virtual PRBool IsNativeAnonymous() const = 0;
+  PRBool IsNativeAnonymous() const
+  {
+    return HasFlag(NODE_IS_ANONYMOUS);
+  }
 
   /**
    * Set whether this content is anonymous
+   * This is virtual and non-inlined due to nsXULElement::SetNativeAnonymous
    * @see nsIAnonymousContentCreator
    * @param aAnonymous whether this content is anonymous
    */
-  virtual void SetNativeAnonymous(PRBool aAnonymous) = 0;
+  virtual void SetNativeAnonymous(PRBool aAnonymous);
 
   /**
    * Get the namespace that this element's tag is defined in
@@ -378,35 +395,6 @@ public:
   virtual PRUint32 GetAttrCount() const = 0;
 
   /**
-   * Inform content of range ownership changes.  This allows content
-   * to do the right thing to ranges in the face of changes to the content
-   * model.
-   * RangeRemove -- informs content that it no longer owns a range endpoint
-   * GetRangeList -- returns the list of ranges that have one or both endpoints
-   *                 within this content item
-   */
-  /**
-   * Inform content that it owns one or both range endpoints
-   * @param aRange the range the content owns
-   */
-  virtual nsresult RangeAdd(nsIDOMRange* aRange) = 0;
-
-  /**
-   * Inform content that it no longer owns either range endpoint
-   * @param aRange the range the content no longer owns
-   */
-  virtual void RangeRemove(nsIDOMRange* aRange) = 0;
-
-  /**
-   * Get the list of ranges that have either endpoint in this content
-   * item.
-   * @return the list of ranges owned partially by this content. The
-   * nsVoidArray is owned by the content object and its lifetime is
-   * controlled completely by the content object.
-   */
-  virtual const nsVoidArray *GetRangeList() const = 0;
-
-  /**
    * Set the focus on this content.  This is generally something for the event
    * state manager to do, not ordinary people.  Ordinary people should do
    * something like nsGenericHTMLElement::SetElementFocus().  This method is
@@ -505,18 +493,6 @@ public:
    * @return the binding parent
    */
   virtual nsIContent *GetBindingParent() const = 0;
-
-  /**
-   * Get the event listener manager, the guy you talk to to register for events
-   * on this element.
-   * @param aCreateIfNotFound If PR_FALSE, returns a listener manager only if
-   *                          one already exists. [IN]
-   * @param aResult           The event listener manager [OUT]
-   *
-   * FIXME! Remove this method, there is similar in nsINode. Bug 329112
-   */
-  virtual nsresult GetListenerManager(PRBool aCreateIfNotFound,
-                                      nsIEventListenerManager** aResult) = 0;
 
   /**
    * Get the base URI for any relative URIs within this piece of
@@ -638,8 +614,10 @@ public:
     return 0;
   }
     
-
-  virtual void SetHasProperties() = 0;
+  void SetHasProperties()
+  {
+    SetFlags(NODE_HAS_PROPERTIES);
+  }
 
   /**
    * Clones this node, using aNodeInfoManager to get the nodeinfo for the

@@ -183,35 +183,6 @@ nsresult nsSVGUtils::GetReferencedFrame(nsIFrame **aRefFrame, nsIURI* aURI, nsIC
   return NS_OK;
 }
 
-nsresult nsSVGUtils::GetPaintType(PRUint16 *aPaintType, const nsStyleSVGPaint& aPaint, 
-                                  nsIContent *aContent, nsIPresShell *aPresShell )
-{
-  *aPaintType = aPaint.mType;
-  // If the type is a Paint Server, determine what kind
-  if (*aPaintType == eStyleSVGPaintType_Server) {
-    nsIURI *server = aPaint.mPaint.mPaintServer;
-    if (server == nsnull)
-      return NS_ERROR_FAILURE;
-
-    // Get the frame
-    nsIFrame *aFrame = nsnull;
-    nsresult rv;
-    rv = GetReferencedFrame(&aFrame, server, aContent, aPresShell);
-    if (!NS_SUCCEEDED(rv) || !aFrame)
-      return NS_ERROR_FAILURE;
-
-    // Finally, figure out what type it is
-    if (aFrame->GetType() == nsLayoutAtoms::svgLinearGradientFrame ||
-        aFrame->GetType() == nsLayoutAtoms::svgRadialGradientFrame)
-      *aPaintType = nsSVGGeometryFrame::PAINT_TYPE_GRADIENT;
-    else if (aFrame->GetType() == nsLayoutAtoms::svgPatternFrame)
-      *aPaintType = nsSVGGeometryFrame::PAINT_TYPE_PATTERN;
-    else
-      return NS_ERROR_FAILURE;
-  }
-  return NS_OK;
-}
-
 nsresult
 nsSVGUtils::GetBBox(nsFrameList *aFrames, nsIDOMSVGRect **_retval)
 {
@@ -1134,9 +1105,11 @@ nsSVGUtils::GetCoveredRegion(const nsFrameList &aFrames)
     if (child) {
       nsCOMPtr<nsISVGRendererRegion> dirty_region = child->GetCoveredRegion();
       if (dirty_region) {
-        if (accu_region)
-          dirty_region->Combine(accu_region, getter_AddRefs(accu_region));
-        else
+        if (accu_region) {
+          nsCOMPtr<nsISVGRendererRegion> tmp;
+          dirty_region->Combine(accu_region, getter_AddRefs(tmp));
+          accu_region = tmp;
+        } else
           accu_region = dirty_region;
       }
     }

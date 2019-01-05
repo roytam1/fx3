@@ -82,7 +82,6 @@ function PROT_Controller(win, tabWatcher, phishingWarden) {
   this.prefs_.addObserver(this.checkRemotePrefName_, 
                           this.checkRemotePrefObserver);
 
-
   // Global preference to enable the phishing warden
   this.phishWardenPrefName_ = PROT_GlobalStore.getPhishWardenEnabledPrefName();
   this.phishWardenEnabled_ = this.prefs_.getPref(this.phishWardenPrefName_, 
@@ -96,8 +95,6 @@ function PROT_Controller(win, tabWatcher, phishingWarden) {
 
   // Set us up to receive the events we want.
   this.tabWatcher_ = tabWatcher;
-  this.onShutdown_ = BindToObject(this.shutdown, this);
-  this.win_.addEventListener("unload", this.onShutdown_, false);
   this.onTabSwitchCallback_ = BindToObject(this.onTabSwitch, this);
   this.tabWatcher_.registerListener("tabswitch",
                                     this.onTabSwitchCallback_);
@@ -377,14 +374,4 @@ PROT_Controller.prototype.onTabSwitch = function(e) {
  */
 PROT_Controller.prototype.loadURI = function(browser, url) {
   browser.loadURI(url, null, null);
-}
-
-/**
- * Reload the current page in the given browser
- *
- * @param browser Browser which to reload
- */
-PROT_Controller.prototype.reloadPage = function(browser) {
-  var normalReload = browser.webNavigation.LOAD_FLAGS_NORMAL;
-  browser.reload(normalReload);
 }

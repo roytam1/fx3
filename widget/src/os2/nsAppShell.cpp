@@ -41,7 +41,7 @@
 #include "nsToolkit.h"
 #include "nsThreadUtils.h"
 
-static UINT sMsgId = WM_USER + 0x77;
+static UINT sMsgId;
 
 //-------------------------------------------------------------------------
 
@@ -69,10 +69,11 @@ nsAppShell::~nsAppShell()
 nsresult
 nsAppShell::Init()
 {
-//  if (!sMsgId)
-//    sMsgId = RegisterWindowMessage("nsAppShell:EventID");
+  if (!sMsgId) {
+    sMsgId = WinAddAtom( WinQuerySystemAtomTable(), "nsAppShell:EventID");
+    WinRegisterClass((HAB)0, "nsAppShell:EventWindowClass", EventWindowProc, NULL, 0);
+  }
 
-  WinRegisterClass((HAB)0, "nsAppShell:EventWindowClass", EventWindowProc, NULL, 0);
   mEventWnd = ::WinCreateWindow(HWND_DESKTOP,
                                 "nsAppShell:EventWindowClass",
                                 "nsAppShell:EventWindow",

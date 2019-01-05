@@ -399,7 +399,7 @@ public:
 
  */
 
-#define XUL_ELEMENT_LAZY_STATE_OFFSET ELEMENT_TYPE_SPECIFIC_BITS_OFFSET
+#define XUL_ELEMENT_LAZY_STATE_OFFSET NODE_TYPE_SPECIFIC_BITS_OFFSET
 
 class nsXULElement : public nsGenericElement,
                      public nsIDOMXULElement,
@@ -464,12 +464,8 @@ public:
     // nsINode
     virtual PRUint32 GetChildCount() const;
     virtual nsIContent *GetChildAt(PRUint32 aIndex) const;
-    virtual PRInt32 IndexOf(nsIContent* aPossibleChild) const;
+    virtual PRInt32 IndexOf(nsINode* aPossibleChild) const;
     virtual nsresult PreHandleEvent(nsEventChainPreVisitor& aVisitor);
-    virtual nsresult GetEventListenerManager(PRBool aCreateIfNotFound,
-                                             nsIEventListenerManager** aRes) {
-      return GetListenerManager(aCreateIfNotFound, aRes);
-    }
     virtual nsresult InsertChildAt(nsIContent* aKid, PRUint32 aIndex,
                                    PRBool aNotify);
 
@@ -479,7 +475,7 @@ public:
                                 PRBool aCompileEventHandlers);
     virtual void UnbindFromTree(PRBool aDeep = PR_TRUE,
                                 PRBool aNullParent = PR_TRUE);
-    virtual PRBool IsNativeAnonymous() const;
+    virtual void SetNativeAnonymous(PRBool aAnonymous);
     virtual nsresult RemoveChildAt(PRUint32 aIndex, PRBool aNotify);
     virtual nsIAtom *GetIDAttributeName() const;
     virtual nsIAtom *GetClassAttributeName() const;
@@ -515,8 +511,8 @@ public:
 
     virtual nsIContent *GetBindingParent() const;
     virtual PRBool IsNodeOfType(PRUint32 aFlags) const;
-    virtual nsresult GetListenerManager(PRBool aCreateIfNotFound,
-                                        nsIEventListenerManager** aResult);
+    NS_IMETHOD GetListenerManager(PRBool aCreateIfNotFound,
+                                  nsIEventListenerManager** aResult);
     virtual PRBool IsFocusable(PRInt32 *aTabIndex = nsnull);
     virtual nsIAtom* GetID() const;
     virtual const nsAttrValue* GetClasses() const;

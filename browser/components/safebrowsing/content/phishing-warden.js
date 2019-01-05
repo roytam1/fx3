@@ -87,13 +87,9 @@ function PROT_PhishingWarden() {
   // We use this dude to do lookups on our remote server
   this.fetcher_ = new PROT_TRFetcher();
 
-  // Register w/NavWatcher to hear notifications about requests for docs
-  if (!this.testing_) {
-    this.navWatcher_ = new G_NavWatcher(true /* filter spurious navs */);
-    this.navWatcher_.registerListener("docnavstart", 
-                                      BindToObject(this.onDocNavStart, 
-                                                   this));
-  }
+  var wp = Ci.nsIWebProgress;
+  var wpService = Cc["@mozilla.org/docloaderservice;1"].getService(wp);
+  wpService.addProgressListener(this, wp.NOTIFY_STATE_DOCUMENT);
 
   // We need to know whether we're enabled and whether we're in advanced
   // mode, so reflect the appropriate preferences into our state.
@@ -124,6 +120,17 @@ function PROT_PhishingWarden() {
 }
 
 PROT_PhishingWarden.inherits(PROT_ListWarden);
+
+/**
+ * We implement nsIWebProgressListener
+ */
+PROT_PhishingWarden.prototype.QueryInterface = function(iid) {
+  if (iid.equals(Ci.nsISupports) || 
+      iid.equals(Ci.nsIWebProgressListener) ||
+      iid.equals(Ci.nsISupportsWeakReference))
+    return this;
+  throw Components.results.NS_ERROR_NO_INTERFACE;
+}
 
 /**
  * When a preference (either advanced features or the phishwarden
@@ -234,19 +241,16 @@ PROT_PhishingWarden.prototype.onPhishWardenEnabledPrefChanged = function(
 /**
  * A request for a Document has been initiated somewhere. Check it!
  *
- * @param e Event object passed in by the NavWatcher
+ * @param request
+ * @param url
  */ 
-PROT_PhishingWarden.prototype.onDocNavStart = function(e) {
-
-  var url = e.url;
-  var request = e.request;
-
-  G_Debug(this, "phishWarden: " + 
-          (this.phishWardenEnabled_ ? "enabled" : "disabled"));
-  G_Debug(this, "checkRemote: " +
-          (this.checkRemote_ ? "yes" : "no"));
-  G_Debug(this, "isTestURL: " +
-          (this.isBlacklistTestURL(url) ? "yes" : "no"));
+PROT_PhishingWarden.prototype.onDocNavStart = function(request, url) {
+  //G_Debug(this, "phishWarden: " + 
+  //        (this.phishWardenEnabled_ ? "enabled" : "disabled"));
+  //G_Debug(this, "checkRemote: " +
+  //        (this.checkRemote_ ? "yes" : "no"));
+  //G_Debug(this, "isTestURL: " +
+  //        (this.isBlacklistTestURL(url) ? "yes" : "no"));
 
   // This logic is a bit involved. In some instances of SafeBrowsing
   // (the stand-alone extension, for example), the user might yet have
@@ -258,24 +262,29 @@ PROT_PhishingWarden.prototype.onDocNavStart = function(e) {
   // explicitly disabled.
 
   // If we're on the test page and we're not explicitly disabled
-  if (this.isBlacklistTestURL(url) && 
-      (this.phishWardenEnabled_ === true ||
-       this.phishWardenEnabled_ === null)) {
-    this.houstonWeHaveAProblem_(request);
-  } else if (this.phishWardenEnabled_ === true) {
-    // We're enabled. Either send a request off or check locally
-    // TODO: move this logic to checkUrl, formalize the error callback
-    if (this.checkRemote_) {
-      // TODO: Use local whitelists to suppress remote BL lookups. 
-      this.fetcher_.get(url,
-                        BindToObject(this.onTRFetchComplete,
-                                     this,
-                                     request));
-    } else {
-      this.checkUrl(url, BindToObject(this.houstonWeHaveAProblem_,
-                                      this,
-                                      request));
-    }
+  // XXX Do we still need a test url or should each provider just put
+  // it in their local list?
+  //if (this.isBlacklistTestURL(url)) {
+  //  this.houstonWeHaveAProblem_(request);
+  //  return;
+  //}
+  // Either send a request off or check locally
+  if (this.checkRemote_) {
+    // TODO: Use local whitelists to suppress remote BL lookups. 
+    this.fetcher_.get(url,
+                      BindToObject(this.onTRFetchComplete,
+                                   this,
+                                   request));
+  } else {
+    // Check the local lists for a match.
+    // XXX This is to not slow down Tp.  The real solution is to
+    // move all the logic in isEvilURL_ to the background thread.
+    // This involves moving the method into the listmanager.
+    var evilCallback = BindToObject(this.localListMatch_,
+                                    this,
+                                    url,
+                                    request);
+    new G_Alarm(BindToObject(this.checkUrl_, this, url, evilCallback), 1000);
   }
 }
 
@@ -425,28 +434,24 @@ PROT_PhishingWarden.prototype.isBlacklistTestURL = function(url) {
 }
 
 /**
- * Look the URL up in our local blacklists 
+ * Check to see if the url is in the blacklist.
  *
- * @param url URL to check
- * @param callback Function to invoke if there is a problem.
- *
+ * @param url String
+ * @param callback Function
  */
-PROT_PhishingWarden.prototype.checkUrl = function(url, callback) {
-  G_Debug(this, "Checking URL for " + url);
-  if (this.isBlacklistTestURL(url)) {
-    callback();
-  } else {
-    // We wrap the callback because we also want
-    // to report the blacklist hit to our data provider.
-    function evilCallback() {
-      G_Debug("evilCallback", "Local blacklist hit");
-      // maybe send a report
-      (new PROT_Reporter).report("phishblhit", url);
-      callback();
-    }
-    // Check the local lists.
-    this.isEvilURL_(url, evilCallback);
-  }
+PROT_PhishingWarden.prototype.checkUrl_ = function(url, callback) {
+  if (!this.isSpurious_(url))
+    this.isEvilURL_(url, callback);
+}
+
+/**
+ * Callback for found local blacklist match.  First we report that we have
+ * a blacklist hit, then we bring up the warning dialog.
+ */
+PROT_PhishingWarden.prototype.localListMatch_ = function(url, request) {
+  // Maybe send a report
+  (new PROT_Reporter).report("phishblhit", url);
+  this.houstonWeHaveAProblem_(request);
 }
 
 /**
@@ -473,3 +478,86 @@ PROT_PhishingWarden.prototype.checkRemoteData = function(callback,
     G_Debug(this, "Remote blacklist miss");
   }
 }
+
+/**
+ * Helper function to determine whether a given URL is "spurious" for some
+ * definition of "spurious".
+ *
+ * @param url String containing the URL to check
+ * 
+ * @returns Boolean indicating whether Fritz thinks it's too boring to notice
+ */ 
+PROT_PhishingWarden.prototype.isSpurious_ = function(url) {
+  return (url == "about:blank" ||
+          url == "about:config" ||  
+          url.startsWith("chrome://") ||
+          url.startsWith("file://") ||
+          url.startsWith("jar:") ||
+          url.startsWith("javascript:"));
+}
+
+/**
+ * We do our dirtywork on state changes.
+ */
+PROT_PhishingWarden.prototype.onStateChange = function(webProgress, 
+                                                       request, 
+                                                       stateFlags, 
+                                                       status) {
+  var wp = Ci.nsIWebProgressListener;
+
+  // Thanks Darin for helping with this
+  if (stateFlags & wp.STATE_START &&
+      stateFlags & wp.STATE_IS_REQUEST &&
+      request.loadFlags & Ci.nsIChannel.LOAD_DOCUMENT_URI &&
+      this.phishWardenEnabled_ === true) {
+
+    var url;
+    try {
+      url = request.name;
+    } catch(e) { return; }
+
+    G_Debug(this, "firing docnavstart for " + url);
+    this.onDocNavStart(request, url);
+  }
+}
+
+// We don't care about the other kinds of updates (and won't get them since we
+// only signed up for state requests), but we should implement the interface
+// anyway.
+  
+/**
+ * NOP
+ */
+PROT_PhishingWarden.prototype.onLocationChange = function(webProgress, 
+                                                          request, 
+                                                          location) { }
+
+/**
+ * NOP
+ */
+PROT_PhishingWarden.prototype.onProgressChange = function(webProgress, 
+                                                          request, 
+                                                          curSelfProgress, 
+                                                          maxSelfProgress, 
+                                                          curTotalProgress, 
+                                                          maxTotalProgress) { }
+
+/**
+ * NOP
+ */
+PROT_PhishingWarden.prototype.onSecurityChange = function(webProgress, 
+                                                          request, 
+                                                          state) { }
+
+/**
+ * NOP
+ */
+PROT_PhishingWarden.prototype.onStatusChange = function(webProgress, 
+                                                        request, 
+                                                        status, 
+                                                        message) { }
+
+/**
+ * NOP
+ */
+PROT_PhishingWarden.prototype.onLinkIconAvailable = function(browser, aHref) { }

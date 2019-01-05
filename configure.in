@@ -4040,6 +4040,7 @@ MOZ_REFLOW_PERF=
 MOZ_SAFE_BROWSING=
 MOZ_SINGLE_PROFILE=
 MOZ_STATIC_MAIL_BUILD=
+MOZ_STORAGE=1
 MOZ_SVG=1
 MOZ_SVG_FOREIGNOBJECT=$MOZ_ENABLE_CAIRO_GFX
 MOZ_TIMELINE=
@@ -4060,7 +4061,7 @@ MOZ_XUL=1
 NS_PRINTING=1
 NECKO_COOKIES=1
 NECKO_DISK_CACHE=1
-NECKO_PROTOCOLS_DEFAULT="about data file ftp gopher http keyword res viewsource"
+NECKO_PROTOCOLS_DEFAULT="about data file ftp gopher http res viewsource"
 NECKO_SMALL_BUFFERS=
 SUNCTL=
 JS_STATIC_BUILD=
@@ -4207,6 +4208,7 @@ minimal)
   MOZ_PROFILELOCKING=
   MOZ_PROFILESHARING=
   MOZ_SINGLE_PROFILE=1
+  MOZ_STORAGE=
   MOZ_SVG=
   MOZ_UNIVERSALCHARDET=
   MOZ_UPDATER=
@@ -4258,7 +4260,7 @@ browser)
   MOZ_PLACES=1
   MOZ_APP_VERSION=$FIREFOX_VERSION
   MOZ_NO_XPCOM_OBSOLETE=1
-  MOZ_EXTENSIONS_DEFAULT=" cookie xml-rpc inspector gnomevfs permissions reporter"
+  MOZ_EXTENSIONS_DEFAULT=" cookie xml-rpc inspector gnomevfs permissions reporter spellcheck"
   AC_DEFINE(MOZ_PHOENIX)
   ;;
 
@@ -5803,9 +5805,6 @@ dnl = Enable mozStorage
 dnl = XXX need to implement --with-system-sqlite3 (see bug 263381)
 dnl ========================================================
 dnl Implicitly enabled by default if building calendar or places
-if test -n "$MOZ_CALENDAR" || test -n "$MOZ_PLACES"; then
-    MOZ_STORAGE=1
-fi
 MOZ_ARG_ENABLE_BOOL(storage,
 [  --enable-storage        Enable mozStorage module and related components],
     MOZ_STORAGE=1,

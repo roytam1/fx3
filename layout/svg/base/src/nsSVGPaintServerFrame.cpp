@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -12,11 +12,10 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is mozilla.org code.
+ * The Original Code is the Mozilla SVG project.
  *
- * The Initial Developer of the Original Code is
- * Netscape Communications Corporation.
- * Portions created by the Initial Developer are Copyright (C) 1998
+ * The Initial Developer of the Original Code is IBM Corporation.
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
@@ -35,15 +34,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nsIGenericFactory.h"
-#include "nsKeywordProtocolHandler.h"
+#include "nsSVGPaintServerFrame.h"
 
-static const nsModuleComponentInfo gResComponents[] = {
-    { "The Keyword Protocol Handler", 
-      NS_KEYWORDPROTOCOLHANDLER_CID,
-      NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "keyword",
-      nsKeywordProtocolHandler::Create
-    }
-};
-
-NS_IMPL_NSGETMODULE(keyword, gResComponents)
+NS_INTERFACE_MAP_BEGIN(nsSVGPaintServerFrame)
+  NS_INTERFACE_MAP_ENTRY(nsISVGValue)
+NS_INTERFACE_MAP_END_INHERITING(nsSVGPaintServerFrameBase)
