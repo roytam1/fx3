@@ -193,6 +193,8 @@ LOCALES_core :=                                 \
 BOOTSTRAP_core :=                               \
   mozilla/browser/config/version.txt            \
   mozilla/mail/config/version.txt               \
+  mozilla/calendar/sunbird/config/version.txt   \
+  $(NULL)
 
 MODULES_NS_toolkit :=                           \
   $(MODULES_NS_core)                            \
@@ -374,7 +376,7 @@ MODULES_all :=                                  \
 # and commit this file on that tag.
 #MOZ_CO_TAG          = <tag>
 NSPR_CO_TAG          = NSPRPUB_PRE_4_2_CLIENT_BRANCH
-NSS_CO_TAG           = NSS_3_11_20060403_TAG
+NSS_CO_TAG           = NSS_3_11_20060512_TAG
 LDAPCSDK_CO_TAG      = ldapcsdk_5_17_client_branch
 LOCALES_CO_TAG       =
 

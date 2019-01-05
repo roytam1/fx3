@@ -152,19 +152,15 @@ NS_IMETHODIMP nsAbOutlookDirectory::Init(const char *aUri)
 
 NS_IMETHODIMP nsAbOutlookDirectory::GetURI(nsACString &aURI)
 {
-  // XXX to do, convert GetStringValue & users to use nsACString for result
-  nsXPIDLCString result;
-  nsresult rv = GetStringValue("uri", "", getter_Copies(result));
+  nsresult rv = GetStringValue("uri", EmptyCString(), aURI);
 
-  if (result.IsEmpty())
+  if (aURI.IsEmpty())
   {
-    rv = GetFileName(getter_Copies(result));
+    rv = GetFileName(aURI);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    result.Insert(kMDBDirectoryRoot, 0);
+    aURI.Insert(kMDBDirectoryRoot, 0);
   }
-
-  aURI = result;
 
   return NS_OK;
 }
@@ -1027,10 +1023,10 @@ NS_IMETHODIMP nsAbOutlookDirectory::StartSearch(void)
     NS_ENSURE_SUCCESS(retCode, retCode) ;
     nsCOMPtr<nsIAbDirectoryQueryResultListener> proxyListener;
 
-    retCode = NS_GetProxyForObject(NS_UI_THREAD_EVENTQ,
+    retCode = NS_GetProxyForObject(NS_PROXY_TO_MAIN_THREAD,
                      NS_GET_IID(nsIAbDirectoryQueryResultListener),
                      NS_STATIC_CAST(nsIAbDirectoryQueryResultListener *, new nsAbDirSearchListener(this)),
-                     PROXY_SYNC | PROXY_ALWAYS,
+                     NS_PROXY_SYNC | NS_PROXY_ALWAYS,
                      getter_AddRefs(proxyListener));
     NS_ENSURE_SUCCESS(retCode, retCode) ;
 

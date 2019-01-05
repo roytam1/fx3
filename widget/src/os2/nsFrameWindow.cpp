@@ -240,10 +240,6 @@ void nsFrameWindow::RealDoCreate( HWND hwndP, nsWindow *aParent,
    mBounds.height = frameRect.height;
 
    // Record passed in things
-   mAppShell = aAppShell;
-
-//   NS_IF_ADDREF( mAppShell);
-   GetAppShell();  // Let the base widget class update the refcount for us....
    mEventCallback = aHandleEventFunction;
 
    if( mParent)

@@ -122,8 +122,6 @@
 #include "nsIObjectLoadingContent.h"
 #include "nsContentErrors.h"
 
-static NS_DEFINE_CID(kEventQueueServiceCID,   NS_EVENTQUEUESERVICE_CID);
-
 #include "nsIDOMWindowInternal.h"
 #include "nsIMenuFrame.h"
 
@@ -1939,9 +1937,6 @@ nsCSSFrameConstructor::nsCSSFrameConstructor(nsIDocument *aDocument,
     // now what?
   }
 
-  // XXXbz this should be in Init() or something!
-  mEventQueueService = do_GetService(kEventQueueServiceCID);
-  
 #ifdef DEBUG
   static PRBool gFirstTime = PR_TRUE;
   if (gFirstTime) {
@@ -3577,12 +3572,7 @@ nsCSSFrameConstructor::AdjustParentFrame(nsFrameConstructorState&     aState,
       (!IsTableRelated(aChildStyle->GetStyleDisplay()->mDisplay, PR_TRUE) ||
        // Also need to create a pseudo-parent if the child is going to end up
        // with a frame based on something other than display.
-       IsSpecialContent(aChildContent, aTag, aNameSpaceID, aChildStyle)) &&
-      // XXXbz evil hack for HTML forms.... see similar in
-      // nsCSSFrameConstructor::TableProcessChild.  It should just go away.
-      (!aChildContent->IsNodeOfType(nsINode::eHTML) ||
-       !aChildContent->NodeInfo()->Equals(nsHTMLAtoms::form,
-                                          kNameSpaceID_None))) {
+       IsSpecialContent(aChildContent, aTag, aNameSpaceID, aChildStyle))) {
     nsTableCreator tableCreator(aState.mPresShell);
     nsresult rv = GetPseudoCellFrame(tableCreator, aState, *aParentFrame);
     if (NS_FAILED(rv)) {
@@ -4336,27 +4326,6 @@ nsCSSFrameConstructor::TableProcessChild(nsFrameConstructorState& aState,
 
   default:
     {
-
-      // if <form>'s parent is <tr>/<table>/<tbody>/<thead>/<tfoot> in html,
-      // NOT create pseudoframe for it.
-      // see bug 159359
-      nsINodeInfo *childNodeInfo = aChildContent->NodeInfo();
-      // Sometimes aChildContent is a #text node.  In those cases we want to
-      // construct a foreign frame for it in any case.
-      if (aChildContent->IsNodeOfType(nsINode::eHTML) &&
-          childNodeInfo->Equals(nsHTMLAtoms::form, kNameSpaceID_None) &&
-          aParentContent->IsNodeOfType(nsINode::eHTML)) {
-        nsINodeInfo *parentNodeInfo = aParentContent->NodeInfo();
-
-        if (parentNodeInfo->Equals(nsHTMLAtoms::table) ||
-            parentNodeInfo->Equals(nsHTMLAtoms::tr)    ||
-            parentNodeInfo->Equals(nsHTMLAtoms::tbody) ||
-            parentNodeInfo->Equals(nsHTMLAtoms::thead) ||
-            parentNodeInfo->Equals(nsHTMLAtoms::tfoot)) {
-          break;
-        }
-      }
-
       // ConstructTableForeignFrame puts the frame in the right child list and all that
       return ConstructTableForeignFrame(aState, aChildContent, aParentFrame,
                                         childStyleContext, aTableCreator, 
@@ -10833,12 +10802,8 @@ nsCSSFrameConstructor::WillDestroyFrameTree()
   mQuoteList.Clear();
   mCounterManager.Clear();
 
-  // Cancel all pending reresolves
-  mRestyleEventQueue = nsnull;
-  nsCOMPtr<nsIEventQueue> eventQueue;
-  mEventQueueService->GetSpecialEventQueue(nsIEventQueueService::UI_THREAD_EVENT_QUEUE,
-                                           getter_AddRefs(eventQueue));
-  eventQueue->RevokeEvents(this);
+  // Cancel all pending re-resolves
+  mRestyleEvent.Revoke();
 }
 
 //STATIC
@@ -13482,7 +13447,7 @@ nsCSSFrameConstructor::PostRestyleEvent(nsIContent* aContent,
     // Nothing to do here
     return;
   }
-  
+
   RestyleData existingData;
   existingData.mRestyleHint = nsReStyleHint(0);
   existingData.mChangeHint = NS_STYLE_HINT_NONE;
@@ -13494,64 +13459,40 @@ nsCSSFrameConstructor::PostRestyleEvent(nsIContent* aContent,
 
   mPendingRestyles.Put(aContent, existingData);
     
-  nsCOMPtr<nsIEventQueue> eventQueue;
-  mEventQueueService->GetSpecialEventQueue(nsIEventQueueService::UI_THREAD_EVENT_QUEUE,
-                                           getter_AddRefs(eventQueue));
-    
-  if (eventQueue != mRestyleEventQueue) {
-    RestyleEvent* ev = new RestyleEvent(this);
-    if (NS_FAILED(eventQueue->PostEvent(ev))) {
-      PL_DestroyEvent(ev);
+  if (!mRestyleEvent.IsPending()) {
+    nsRefPtr<RestyleEvent> ev = new RestyleEvent(this);
+    if (NS_FAILED(NS_DispatchToCurrentThread(ev))) {
+      NS_WARNING("failed to dispatch restyle event");
       // XXXbz and what?
     } else {
-      mRestyleEventQueue = eventQueue;
+      mRestyleEvent = ev;
     }
   }
 }
 
-void nsCSSFrameConstructor::RestyleEvent::HandleEvent() {
-  nsCSSFrameConstructor* constructor =
-    NS_STATIC_CAST(nsCSSFrameConstructor*, owner);
+NS_IMETHODIMP nsCSSFrameConstructor::RestyleEvent::Run() {
+  if (!mConstructor)
+    return NS_OK;  // event was revoked
+
   nsIViewManager* viewManager =
-    constructor->mPresShell->GetViewManager();
+    mConstructor->mPresShell->GetViewManager();
   NS_ASSERTION(viewManager, "Must have view manager for update");
 
   viewManager->BeginUpdateViewBatch();
   // Force flushing of any pending content notifications that might have queued
   // up while our event was pending.  That will ensure that we don't construct
   // frames for content right now that's still waiting to be notified on,
-  constructor->mPresShell->GetDocument()->
+  mConstructor->mPresShell->GetDocument()->
     FlushPendingNotifications(Flush_ContentAndNotify);
 
   // Make sure that any restyles that happen from now on will go into
   // a new event.
-  constructor->mRestyleEventQueue = nsnull;
+  mConstructor->mRestyleEvent.Forget();
 
-  constructor->ProcessPendingRestyles();
+  mConstructor->ProcessPendingRestyles();
   viewManager->EndUpdateViewBatch(NS_VMREFRESH_NO_SYNC);
-}
 
-PR_STATIC_CALLBACK(void*)
-HandleRestyleEvent(PLEvent* aEvent)
-{
-  nsCSSFrameConstructor::RestyleEvent* evt =
-    NS_STATIC_CAST(nsCSSFrameConstructor::RestyleEvent*, aEvent);
-  evt->HandleEvent();
-  return nsnull;
-}
-
-PR_STATIC_CALLBACK(void)
-DestroyRestyleEvent(PLEvent* aEvent)
-{
-  delete NS_STATIC_CAST(nsCSSFrameConstructor::RestyleEvent*, aEvent);
-}
-
-nsCSSFrameConstructor::RestyleEvent::RestyleEvent(nsCSSFrameConstructor* aConstructor)
-{
-  NS_PRECONDITION(aConstructor, "Must have a constructor!");
-
-  PL_InitEvent(this, aConstructor,
-               ::HandleRestyleEvent, ::DestroyRestyleEvent);
+  return NS_OK;
 }
 
 nsresult

@@ -56,8 +56,6 @@
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsIXULWindow.h"
 
-#include "nsIEventQueueService.h"
-
 // Define Class IDs -- i hate having to do this
 static NS_DEFINE_CID(kCDragServiceCID,  NS_DRAGSERVICE_CID);
 
@@ -300,6 +298,7 @@ nsresult nsCocoaWindow::StandardCreate(nsIWidget *aParent,
         else {
           features = NSMiniaturizableWindowMask;
         }
+        features |= NSTitledWindowMask;
         break;
       case eWindowType_popup:
         features |= NSBorderlessWindowMask;

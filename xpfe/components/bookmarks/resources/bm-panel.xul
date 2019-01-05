@@ -83,7 +83,11 @@
                 oncommandupdate="document.getElementById('bookmarks-view').onCommandUpdate();">
     </commandset>                
     <commandset id="bookmarksItems"/>
+    <command id="cmd_undo"/>
+    <command id="cmd_redo"/>
   </commands>
+
+  <keyset id="bookmarks-tasksKeys"/>
   
   <hbox id="panel-bar" class="toolbar">
     <toolbarbutton id="btnAddBookmark" label="&command.addBookmark.label;"

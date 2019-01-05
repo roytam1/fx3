@@ -56,9 +56,10 @@ public:
 
   nsServerSocket();
 
-private:
+  // This must be public to support older compilers (xlC_r on AIX)
   virtual ~nsServerSocket();
 
+private:
   void OnMsgClose();
   void OnMsgAttach();
   
@@ -70,6 +71,7 @@ private:
   PRFileDesc                       *mFD;
   PRNetAddr                         mAddr;
   nsCOMPtr<nsIServerSocketListener> mListener;
+  nsCOMPtr<nsIEventTarget>          mListenerTarget;
   PRBool                            mAttached;
 };
 

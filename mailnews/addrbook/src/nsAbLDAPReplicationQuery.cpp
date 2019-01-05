@@ -75,8 +75,8 @@ nsresult nsAbLDAPReplicationQuery::InitLDAPData()
   mDirectory = do_QueryInterface(resource, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
  
-  nsXPIDLCString fileName;
-  rv = mDirectory->GetReplicationFileName(getter_Copies(fileName));
+  nsCAutoString fileName;
+  rv = mDirectory->GetReplicationFileName(fileName);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // this is done here to take care of the problem related to bug # 99124.
@@ -165,10 +165,10 @@ NS_IMETHODIMP nsAbLDAPReplicationQuery::ConnectToLDAPServer(nsILDAPURL *aURL, co
 
     // Initiate LDAP message listener to the current thread
     nsCOMPtr<nsILDAPMessageListener> listener;
-    rv = NS_GetProxyForObject(NS_CURRENT_EVENTQ,
+    rv = NS_GetProxyForObject(NS_PROXY_TO_CURRENT_THREAD,
                   NS_GET_IID(nsILDAPMessageListener), 
                   NS_STATIC_CAST(nsILDAPMessageListener*, mDataProcessor),
-                  PROXY_SYNC | PROXY_ALWAYS, 
+                  NS_PROXY_SYNC | NS_PROXY_ALWAYS, 
                   getter_AddRefs(listener));
     if (!listener) 
         return NS_ERROR_FAILURE;

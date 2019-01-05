@@ -11,16 +11,15 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is mozilla.org code.
+ * The Original Code is Chimera code.
  *
- * The Initial Developer of the Original Code is Netscape
- * Communications Corporation.  Portions created by Netscape are
- * Copyright (C) 1998 Netscape Communications Corporation. All
- * Rights Reserved.
+ * The Initial Developer of the Original Code is
+ * Netscape Communications Corporation.
+ * Portions created by the Initial Developer are Copyright (C) 2006
+ * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Javier Delgadillo <javi@netscape.com>
- *   Robert Relyea     <rrelyea@redhat.com>
+ *   Aaron Schulman <aschulm@umd.edu>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,20 +34,14 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
+ 
+#import <Cocoa/Cocoa.h>
 
-#ifndef NSS_EVENT_
-#define NSS_EVENT_
-
-#include "nsIRunnable.h"
-#include "nsIEventQueueService.h"
-#include "nsIEventQueue.h"
-
-
-//Grab the UI event queue so that we can post some events to it.
-already_AddRefed<nsIEventQueue> nsNSSEventGetUIEventQueue();
-
-// post something to it
-nsresult nsNSSEventPostToUIEventQueue(nsIRunnable *event);
-
-#endif
-
+@interface RolloverImageButton : NSButton {
+  @private
+    NSImage* mImage;               //STRONG Refrence
+    NSImage* mHoverImage;          //STRONG Refrence
+    NSTrackingRectTag mTrackingTag;
+}
+- (void)setHoverImage:(NSImage*)inImage;  
+@end

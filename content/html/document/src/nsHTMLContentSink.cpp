@@ -58,6 +58,8 @@
 #include "nsIMarkupDocumentViewer.h"
 #include "nsINodeInfo.h"
 #include "nsHTMLTokens.h"
+#include "nsIAppShell.h"
+#include "nsWidgetsCID.h"
 #include "nsCRT.h"
 #include "prtime.h"
 #include "prlog.h"
@@ -118,12 +120,22 @@
 #include "nsIPrompt.h"
 #include "nsLayoutCID.h"
 #include "nsIDocShellTreeItem.h"
-#include "plevent.h"
 
 #include "nsEscape.h"
 #include "nsIElementObserver.h"
 #include "nsNodeInfoManager.h"
 #include "nsContentCreatorFunctions.h"
+
+//----------------------------------------------------------------------
+
+static void
+FavorPerformanceHint(PRBool perfOverStarvation, PRUint32 starvationDelay)
+{
+  static NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
+  nsCOMPtr<nsIAppShell> appShell = do_GetService(kAppShellCID);
+  if (appShell)
+    appShell->FavorPerformanceHint(perfOverStarvation, starvationDelay);
+}
 
 //----------------------------------------------------------------------
 
@@ -1746,10 +1758,14 @@ SinkContext::FlushTags(PRBool aNotify)
   FlushText();
 
   if (aNotify) {
-    // Start from the base of the stack (growing upward) and do
+    // Start from the base of the stack (growing downward) and do
     // a notification from the node that is closest to the root of
     // tree for any content that has been added.
-    PRInt32 stackPos = 1;
+
+    // Note that we can start at stackPos == 0 here, because it's the caller's
+    // responsibility to handle flushing interactions between contexts (see
+    // HTMLContentSink::BeginContext).
+    PRInt32 stackPos = 0;
     PRBool flushed = PR_FALSE;
     PRUint32 childCount;
     nsGenericHTMLElement* content;
@@ -1799,9 +1815,10 @@ SinkContext::UpdateChildCounts()
   // Start from the top of the stack (growing upwards) and see if any
   // new content has been appended. If so, we recognize that reflows
   // have been generated for it and we should make sure that no
-  // further reflows occur.
+  // further reflows occur.  Note that we have to include stackPos == 0
+  // to properly notify on kids of <html>.
   PRInt32 stackPos = mStackPos - 1;
-  while (stackPos > 0) {
+  while (stackPos >= 0) {
     Node & node = mStack[stackPos];
     node.mNumFlushed = node.mContent->GetChildCount();
 
@@ -2312,7 +2329,7 @@ HTMLContentSink::DidBuildModel(void)
   if (mFlags & NS_SINK_FLAG_DYNAMIC_LOWER_VALUE) {
     // Reset the performance hint which was set to FALSE
     // when NS_SINK_FLAG_DYNAMIC_LOWER_VALUE was set. 
-    PL_FavorPerformanceHint(PR_TRUE , 0);
+    FavorPerformanceHint(PR_TRUE , 0);
   }
 
   if (mFlags & NS_SINK_FLAG_CAN_INTERRUPT_PARSER) {
@@ -2652,6 +2669,9 @@ HTMLContentSink::OpenBody(const nsIParserNode& aNode)
     PRInt32 parentIndex    = mCurrentContext->mStackPos - 2;
     nsGenericHTMLElement *parent = mCurrentContext->mStack[parentIndex].mContent;
     PRInt32 numFlushed     = mCurrentContext->mStack[parentIndex].mNumFlushed;
+    PRInt32 childCount = parent->GetChildCount();
+    NS_ASSERTION(numFlushed < childCount, "Already notified on the body?");
+    
     PRInt32 insertionPoint =
       mCurrentContext->mStack[parentIndex].mInsertionPoint;
 
@@ -2664,6 +2684,7 @@ HTMLContentSink::OpenBody(const nsIParserNode& aNode)
     } else {
       NotifyAppend(parent, numFlushed);
     }
+    mCurrentContext->mStack[parentIndex].mNumFlushed = childCount;
   }
 
   StartLayout();
@@ -2804,6 +2825,9 @@ HTMLContentSink::OpenFrameset(const nsIParserNode& aNode)
     PRInt32 parentIndex    = mCurrentContext->mStackPos - 2;
     nsGenericHTMLElement *parent = mCurrentContext->mStack[parentIndex].mContent;
     PRInt32 numFlushed     = mCurrentContext->mStack[parentIndex].mNumFlushed;
+    PRInt32 childCount = parent->GetChildCount();
+    NS_ASSERTION(numFlushed < childCount, "Already notified on the frameset?");
+
     PRInt32 insertionPoint =
       mCurrentContext->mStack[parentIndex].mInsertionPoint;
 
@@ -2816,6 +2840,7 @@ HTMLContentSink::OpenFrameset(const nsIParserNode& aNode)
     } else {
       NotifyAppend(parent, numFlushed);
     }
+    mCurrentContext->mStack[parentIndex].mNumFlushed = childCount;
   }
   
   return rv;
@@ -2923,7 +2948,11 @@ HTMLContentSink::OpenContainer(const nsIParserNode& aNode)
           PRInt32 index = mDocument->IndexOf(mRoot);
           NS_ASSERTION(index != -1, "mRoot not child of document?");
           NotifyInsert(nsnull, mRoot, index);
-          
+
+          // Now update the notification information in all our
+          // contexts, since we just inserted the root and notified on
+          // our whole tree
+          UpdateAllContexts();          
         }
       }
       break;
@@ -3430,7 +3459,7 @@ HTMLContentSink::DidProcessAToken(void)
           // Set the performance hint to prevent event starvation when
           // dispatching PLEvents. This improves application responsiveness 
           // during page loads.
-          PL_FavorPerformanceHint(PR_FALSE, 0);
+          FavorPerformanceHint(PR_FALSE, 0);
         }
 
       } else {
@@ -3440,7 +3469,7 @@ HTMLContentSink::DidProcessAToken(void)
           // to favor overall page load speed over responsiveness.
           mFlags &= ~NS_SINK_FLAG_DYNAMIC_LOWER_VALUE;
           // Reset the hint that to favoring performance for PLEvent dispatch.
-          PL_FavorPerformanceHint(PR_TRUE, 0);
+          FavorPerformanceHint(PR_TRUE, 0);
         }
 
       }

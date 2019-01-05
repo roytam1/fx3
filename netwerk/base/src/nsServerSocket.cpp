@@ -39,6 +39,7 @@
 #include "nsIServiceManager.h"
 #include "nsSocketTransport2.h"
 #include "nsServerSocket.h"
+#include "nsProxyRelease.h"
 #include "nsAutoLock.h"
 #include "nsAutoPtr.h"
 #include "nsNetError.h"
@@ -52,47 +53,14 @@ static NS_DEFINE_CID(kSocketTransportServiceCID, NS_SOCKETTRANSPORTSERVICE_CID);
 
 typedef void (nsServerSocket:: *nsServerSocketFunc)(void);
 
-struct nsServerSocketEvent : PLEvent
-{
-  nsServerSocketEvent(nsServerSocket *s, nsServerSocketFunc f)
-    : func(f)
-  {
-    NS_ADDREF(s);
-    PL_InitEvent(this, s, EventHandler, EventCleanup);
-  }
-
-  PR_STATIC_CALLBACK(void *)
-  EventHandler(PLEvent *ev)
-  {
-    nsServerSocket *s = (nsServerSocket *) ev->owner;
-    nsServerSocketEvent *event = (nsServerSocketEvent *) ev;
-    nsServerSocketFunc func = event->func;
-    (s->*func)();
-    return nsnull;
-  }
-
-  PR_STATIC_CALLBACK(void)
-  EventCleanup(PLEvent *ev)
-  {
-    nsServerSocket *s = (nsServerSocket *) ev->owner;
-    NS_RELEASE(s);
-    delete (nsServerSocketEvent *) ev;
-  }
-
-  nsServerSocketFunc func;
-};
-
 static nsresult
 PostEvent(nsServerSocket *s, nsServerSocketFunc func)
 {
-  nsServerSocketEvent *ev = new nsServerSocketEvent(s, func);
+  nsCOMPtr<nsIRunnable> ev = new nsRunnableMethod<nsServerSocket>(s, func);
   if (!ev)
     return NS_ERROR_OUT_OF_MEMORY;
 
-  nsresult rv = gSocketTransportService->PostEvent(ev);
-  if (NS_FAILED(rv))
-    PL_DestroyEvent(ev);
-  return rv;
+  return gSocketTransportService->Dispatch(ev, NS_DISPATCH_NORMAL);
 }
 
 //-----------------------------------------------------------------------------
@@ -182,16 +150,14 @@ nsServerSocket::TryAttach()
   //
   if (!gSocketTransportService->CanAttachSocket())
   {
-    PLEvent *event = new nsServerSocketEvent(this, &nsServerSocket::OnMsgAttach);
+    nsCOMPtr<nsIRunnable> event =
+        NS_NEW_RUNNABLE_METHOD(nsServerSocket, this, OnMsgAttach);
     if (!event)
       return NS_ERROR_OUT_OF_MEMORY;
 
     nsresult rv = gSocketTransportService->NotifyWhenCanAttachSocket(event);
     if (NS_FAILED(rv))
-    {
-      PL_DestroyEvent(event);
       return rv;
-    }
   }
 
   //
@@ -272,8 +238,15 @@ nsServerSocket::OnSocketDetached(PRFileDesc *fd)
     mListener->OnStopListening(this, mCondition);
 
     // need to atomically clear mListener.  see our Close() method.
-    nsAutoLock lock(mLock);
-    mListener = nsnull;
+    nsIServerSocketListener *listener = nsnull;
+    {
+      nsAutoLock lock(mLock);
+      mListener.swap(listener);
+    }
+    // XXX we need to proxy the release to the listener's target thread to work
+    // around bug 337492.
+    if (listener)
+      NS_ProxyRelease(mListenerTarget, listener);
   }
 }
 
@@ -400,13 +373,14 @@ nsServerSocket::AsyncListen(nsIServerSocketListener *aListener)
   NS_ENSURE_TRUE(mListener == nsnull, NS_ERROR_IN_PROGRESS);
   {
     nsAutoLock lock(mLock);
-    nsresult rv = NS_GetProxyForObject(NS_CURRENT_EVENTQ,
+    nsresult rv = NS_GetProxyForObject(NS_PROXY_TO_CURRENT_THREAD,
                                        NS_GET_IID(nsIServerSocketListener),
                                        aListener,
-                                       PROXY_ASYNC | PROXY_ALWAYS,
+                                       NS_PROXY_ASYNC | NS_PROXY_ALWAYS,
                                        getter_AddRefs(mListener));
     if (NS_FAILED(rv))
       return rv;
+    mListenerTarget = NS_GetCurrentThread();
   }
   return PostEvent(this, &nsServerSocket::OnMsgAttach);
 }

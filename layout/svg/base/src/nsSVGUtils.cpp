@@ -1108,11 +1108,41 @@ already_AddRefed<nsSVGCoordCtxProvider>
 nsSVGUtils::GetCoordContextProvider(nsSVGElement *aElement)
 {
   nsCOMPtr<nsIDOMSVGSVGElement> owner;
-  aElement->GetOwnerSVGElement(getter_AddRefs(owner));
+  nsresult rv = aElement->GetOwnerSVGElement(getter_AddRefs(owner));
+
+  // GetOwnerSVGElement can fail during teardown
+  if (NS_FAILED(rv) || !owner)
+    return nsnull;
 
   nsSVGCoordCtxProvider *ctx;
   CallQueryInterface(owner, &ctx);
 
   NS_IF_ADDREF(ctx);
   return ctx;
+}
+
+already_AddRefed<nsISVGRendererRegion>
+nsSVGUtils::GetCoveredRegion(const nsFrameList &aFrames)
+{
+  nsCOMPtr<nsISVGRendererRegion> accu_region;
+  
+  for (nsIFrame* kid = aFrames.FirstChild();
+       kid;
+       kid = kid->GetNextSibling()) {
+    nsISVGChildFrame* child = nsnull;
+    CallQueryInterface(kid, &child);
+    if (child) {
+      nsCOMPtr<nsISVGRendererRegion> dirty_region = child->GetCoveredRegion();
+      if (dirty_region) {
+        if (accu_region)
+          dirty_region->Combine(accu_region, getter_AddRefs(accu_region));
+        else
+          accu_region = dirty_region;
+      }
+    }
+  }
+
+  nsISVGRendererRegion* result = nsnull;
+  accu_region.swap(result);
+  return result;
 }

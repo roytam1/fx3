@@ -40,13 +40,14 @@
 #include "nsFileChannel.h"
 #include "nsBaseContentStream.h"
 #include "nsDirectoryIndexStream.h"
-#include "nsEventQueueUtils.h"
+#include "nsThreadUtils.h"
 #include "nsTransportUtils.h"
 #include "nsStreamUtils.h"
 #include "nsURLHelper.h"
 #include "nsMimeTypes.h"
 #include "nsNetUtil.h"
 #include "nsNetSegmentUtils.h"
+#include "nsProxyRelease.h"
 #include "nsAutoPtr.h"
 
 #include "nsIFileURL.h"
@@ -54,7 +55,7 @@
 
 //-----------------------------------------------------------------------------
 
-class nsFileCopyEvent : public PLEvent {
+class nsFileCopyEvent : public nsRunnable {
 public:
   nsFileCopyEvent(nsIOutputStream *dest, nsIInputStream *source, PRInt64 len)
     : mDest(dest)
@@ -62,7 +63,6 @@ public:
     , mLen(len)
     , mStatus(NS_OK)
     , mInterruptStatus(NS_OK) {
-    PL_InitEvent(this, nsnull, HandleEvent, DestroyEvent);
   }
 
   // Read the current status of the file copy operation.
@@ -73,7 +73,7 @@ public:
 
   // Call this method to perform the file copy on a background thread.  The
   // callback is dispatched when the file copy completes.
-  nsresult Dispatch(nsIOutputStreamCallback *callback,
+  nsresult Dispatch(nsIRunnable *callback,
                     nsITransportEventSink *sink,
                     nsIEventTarget *target);
 
@@ -85,19 +85,14 @@ public:
     mInterruptStatus = status;
   }
 
+  NS_IMETHOD Run() {
+    DoCopy();
+    return NS_OK;
+  }
+
 private:
-
-  PR_STATIC_CALLBACK(void *) HandleEvent(PLEvent *ev) {
-    nsFileCopyEvent *f = NS_STATIC_CAST(nsFileCopyEvent *, ev);
-    f->DoCopy();
-    return nsnull;
-  }
-
-  PR_STATIC_CALLBACK(void) DestroyEvent(PLEvent *ev) {
-    // nothing to do
-  }
-
-  nsCOMPtr<nsIOutputStreamCallback> mCallback;
+  nsCOMPtr<nsIEventTarget> mCallbackTarget;
+  nsCOMPtr<nsIRunnable> mCallback;
   nsCOMPtr<nsITransportEventSink> mSink;
   nsCOMPtr<nsIOutputStream> mDest;
   nsCOMPtr<nsIInputStream> mSource;
@@ -151,37 +146,40 @@ nsFileCopyEvent::DoCopy()
   mDest->Close();
 
   // Notify completion
-  if (mCallback)
-    mCallback->OnOutputStreamReady(nsnull);
+  if (mCallback) {
+    mCallbackTarget->Dispatch(mCallback, NS_DISPATCH_NORMAL);
+
+    // Release the callback on the target thread to avoid destroying stuff on
+    // the wrong thread.
+    nsIRunnable *doomed = nsnull;
+    mCallback.swap(doomed);
+    NS_ProxyRelease(mCallbackTarget, doomed);
+  }
 }
 
 nsresult
-nsFileCopyEvent::Dispatch(nsIOutputStreamCallback *callback,
+nsFileCopyEvent::Dispatch(nsIRunnable *callback,
                           nsITransportEventSink *sink,
                           nsIEventTarget *target)
 {
   // Use the supplied event target for all asynchronous operations.
 
-  nsresult rv = NS_NewOutputStreamReadyEvent(getter_AddRefs(mCallback),
-                                             callback, target);
-  if (NS_FAILED(rv))
-    return rv;
+  mCallback = callback;
+  mCallbackTarget = target;
 
   // Build a coalescing proxy for progress events
-  rv = net_NewTransportEventSinkProxy(getter_AddRefs(mSink), sink, target,
-                                      PR_TRUE);
+  nsresult rv = net_NewTransportEventSinkProxy(getter_AddRefs(mSink), sink,
+                                               target, PR_TRUE);
   if (NS_FAILED(rv))
     return rv;
 
-  // PostEvent to I/O thread...
+  // Dispatch ourselves to I/O thread pool...
   nsCOMPtr<nsIEventTarget> pool =
-      do_GetService(NS_IOTHREADPOOL_CONTRACTID, &rv);
+      do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID, &rv);
   if (NS_FAILED(rv))
     return rv;
 
-  // We don't have to call PL_DestroyEvent here if PostEvent fails because of
-  // the way we are allocated.
-  return pool->PostEvent(this);
+  return pool->Dispatch(this, NS_DISPATCH_NORMAL);
 }
 
 //-----------------------------------------------------------------------------
@@ -189,11 +187,9 @@ nsFileCopyEvent::Dispatch(nsIOutputStreamCallback *callback,
 // This is a dummy input stream that when read, performs the file copy.  The
 // copy happens on a background thread via mCopyEvent.
 
-class nsFileUploadContentStream : public nsBaseContentStream
-                                , public nsIOutputStreamCallback {
+class nsFileUploadContentStream : public nsBaseContentStream {
 public:
   NS_DECL_ISUPPORTS_INHERITED
-  NS_DECL_NSIOUTPUTSTREAMCALLBACK
 
   nsFileUploadContentStream(PRBool nonBlocking,
                             nsIOutputStream *dest,
@@ -201,8 +197,12 @@ public:
                             PRInt64 len,
                             nsITransportEventSink *sink)
     : nsBaseContentStream(nonBlocking)
-    , mCopyEvent(dest, source, len)
+    , mCopyEvent(new nsFileCopyEvent(dest, source, len))
     , mSink(sink) {
+  }
+
+  PRBool IsInitialized() {
+    return mCopyEvent != nsnull;
   }
 
   NS_IMETHODIMP ReadSegments(nsWriteSegmentFun fun, void *closure,
@@ -211,13 +211,14 @@ public:
                           PRUint32 count, nsIEventTarget *target);
 
 private:
-  nsFileCopyEvent mCopyEvent;
+  void OnCopyComplete();
+
+  nsRefPtr<nsFileCopyEvent> mCopyEvent;
   nsCOMPtr<nsITransportEventSink> mSink;
 };
 
-NS_IMPL_ISUPPORTS_INHERITED1(nsFileUploadContentStream,
-                             nsBaseContentStream,
-                             nsIOutputStreamCallback)
+NS_IMPL_ISUPPORTS_INHERITED0(nsFileUploadContentStream,
+                             nsBaseContentStream)
 
 NS_IMETHODIMP
 nsFileUploadContentStream::ReadSegments(nsWriteSegmentFun fun, void *closure,
@@ -236,8 +237,8 @@ nsFileUploadContentStream::ReadSegments(nsWriteSegmentFun fun, void *closure,
   }
 
   // Perform copy synchronously, and then close out the stream.
-  mCopyEvent.DoCopy();
-  nsresult status = mCopyEvent.Status();
+  mCopyEvent->DoCopy();
+  nsresult status = mCopyEvent->Status();
   CloseWithStatus(NS_FAILED(status) ? status : NS_BASE_STREAM_CLOSED);
   return status;
 }
@@ -251,20 +252,23 @@ nsFileUploadContentStream::AsyncWait(nsIInputStreamCallback *callback,
   if (NS_FAILED(rv) || IsClosed())
     return rv;
 
-  if (IsNonBlocking())
-    mCopyEvent.Dispatch(this, mSink, target);
+  if (IsNonBlocking()) {
+    nsCOMPtr<nsIRunnable> callback =
+        NS_NEW_RUNNABLE_METHOD(nsFileUploadContentStream, this,
+                               OnCopyComplete);
+    mCopyEvent->Dispatch(callback, mSink, target);
+  }
 
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsFileUploadContentStream::OnOutputStreamReady(nsIAsyncOutputStream *unused)
+void
+nsFileUploadContentStream::OnCopyComplete()
 {
   // This method is being called to indicate that we are done copying.
-  nsresult status = mCopyEvent.Status();
+  nsresult status = mCopyEvent->Status();
 
   CloseWithStatus(NS_FAILED(status) ? status : NS_BASE_STREAM_CLOSED);
-  return NS_OK;
 }
 
 //-----------------------------------------------------------------------------
@@ -325,10 +329,12 @@ nsFileChannel::OpenContentStream(PRBool async, nsIInputStream **result)
     if (NS_FAILED(rv))
       return rv;
 
-    stream = new nsFileUploadContentStream(async, fileStream, mUploadStream,
-                                           mUploadLength, this);
-    if (!stream)
+    nsFileUploadContentStream *uploadStream =
+        new nsFileUploadContentStream(async, fileStream, mUploadStream,
+                                      mUploadLength, this);
+    if (!uploadStream || !uploadStream->IsInitialized())
       return NS_ERROR_OUT_OF_MEMORY;
+    stream = uploadStream;
 
     SetContentLength64(0);
 

@@ -54,7 +54,6 @@
 #include "nsCSSFrameConstructor.h"
 #include "nsStyleContext.h"
 #include "nsStyleChangeList.h"
-#include "nsIEventQueueService.h"
 #include "nsIServiceManager.h"
 #include "nsCOMPtr.h"
 #include "prthread.h"
@@ -112,9 +111,6 @@
     #define NOISY_TRACE(_msg);
     #define NOISY_TRACE_FRAME(_msg,_frame);
   #endif
-
-// Class IID's
-static NS_DEFINE_CID(kEventQueueServiceCID, NS_EVENTQUEUESERVICE_CID);
 
 // IID's
 
@@ -566,9 +562,12 @@ nsFrameManager::SetUndisplayedContent(nsIContent* aContent,
                                       nsStyleContext* aStyleContext)
 {
 #ifdef DEBUG_UNDISPLAYED_MAP
-   static int i = 0;
-   printf("SetUndisplayedContent(%d): p=%p \n", i++, (void *)aContent);
+  static int i = 0;
+  printf("SetUndisplayedContent(%d): p=%p \n", i++, (void *)aContent);
 #endif
+
+  NS_ASSERTION(!GetUndisplayedContent(aContent),
+               "Already have an undisplayed context entry for aContent");
 
   if (! mUndisplayedMap) {
     mUndisplayedMap = new UndisplayedMap;
