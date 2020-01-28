@@ -11,15 +11,15 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is mozilla.org code.
+ * The Original Code is the Mozilla platform.
  *
  * The Initial Developer of the Original Code is
- * Netscape Communications Corporation.
- * Portions created by the Initial Developer are Copyright (C) 2001
- * the Initial Developer. All Rights Reserved.
+ * Benjamin Smedberg <benjamin@smedbergs.us>.
+ *
+ * Portions created by the Initial Developer are Copyright (C) 2006
+ * the Mozilla Foundation <http://www.mozilla.org/>. All Rights Reserved.
  *
  * Contributor(s):
- *   Joe Hewitt <hewitt@netscape.com> (original author)
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,38 +35,30 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#ifndef __inDeepTreeWalker_h___
-#define __inDeepTreeWalker_h___
+#ifndef nsLayoutStatics_h__
+#define nsLayoutStatics_h__
 
-#include "inIDeepTreeWalker.h"
+#include "nscore.h"
 
-#include "nsCOMPtr.h"
-#include "nsIDOMNode.h"
-#include "nsVoidArray.h"
+// This isn't really a class, it's a namespace for static methods.
+// Documents and other objects can hold a reference to the layout static
+// objects so that they last past the xpcom-shutdown notification.
 
-class inIDOMUtils;
-
-class inDeepTreeWalker : public inIDeepTreeWalker
+class nsLayoutStatics
 {
 public:
-	NS_DECL_ISUPPORTS
-	NS_DECL_NSIDOMTREEWALKER
-	NS_DECL_INIDEEPTREEWALKER
+  // Called by the layout module constructor. This call performs an AddRef()
+  // internally.
+  static nsresult Initialize();
 
-  inDeepTreeWalker();
-  virtual ~inDeepTreeWalker();
+  static void AddRef();
+  static void Release();
 
-protected:
-  void PushNode(nsIDOMNode* aNode);
+private:
+  // not to be called!
+  nsLayoutStatics();
 
-  PRBool mShowAnonymousContent;
-  PRBool mShowSubDocuments;
-  nsCOMPtr<nsIDOMNode> mRoot;
-  nsCOMPtr<nsIDOMNode> mCurrentNode;
-  PRUint32 mWhatToShow;
-  
-  nsAutoVoidArray mStack;
-  nsCOMPtr<inIDOMUtils> mDOMUtils;
+  static void Shutdown();
 };
 
-#endif // __inDeepTreeWalker_h___
+#endif // nsLayoutStatics_h__

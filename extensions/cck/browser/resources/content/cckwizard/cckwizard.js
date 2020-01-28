@@ -1917,6 +1917,24 @@ function InitConfigInfo()
 function CCKWriteConfigFile(destdir)
 {
   var file = destdir.clone();
+  if (!file.exists()) {
+        var bundle = document.getElementById("bundle_cckwizard");
+        var button = gPromptService.confirmEx(window, bundle.getString("windowTitle"), bundle.getString("createDir").replace(/%S/g, file.path),
+                                              gPromptService.BUTTON_TITLE_YES * gPromptService.BUTTON_POS_0 +
+                                              gPromptService.BUTTON_TITLE_NO * gPromptService.BUTTON_POS_1,
+                                              null, null, null, null, {});
+        if (button == 0) {
+          try {
+            file.create(Components.interfaces.nsIFile.DIRECTORY_TYPE, 0775);
+          } catch (ex) {
+            gPromptService.alert(window, bundle.getString("windowTitle"),
+                                 bundle.getString("createDirError").replace(/%S/g, filename));
+            return;
+          }
+        } else {
+          return;
+        }
+  }  
   file.append("cck.config");
              
   var fos = Components.classes["@mozilla.org/network/file-output-stream;1"]
@@ -2359,7 +2377,7 @@ function Validate(field, message)
   
   for (var i=0; i < arguments.length; i+=2) {
     /* special case ID */
-    if (document.getElementById(arguments[i] = "id")) {
+    if (document.getElementById(arguments[i]).id == "id") {
       if (!gIDTest.test(document.getElementById(arguments[i]).value)) {
         var bundle = document.getElementById("bundle_cckwizard");
         gPromptService.alert(window, bundle.getString("windowTitle"), arguments[i+1]);

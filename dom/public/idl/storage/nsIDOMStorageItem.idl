@@ -1,3 +1,4 @@
+/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -14,16 +15,15 @@
  * The Original Code is mozilla.org code.
  *
  * The Initial Developer of the Original Code is
- * Netscape Communications Corporation.
- * Portions created by the Initial Developer are Copyright (C) 2001
+ *   Neil Deakin <enndeakin@sympatico.ca>
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Joe Hewitt <hewitt@netscape.com> (original author)
  *
  * Alternatively, the contents of this file may be used under the terms of
- * either the GNU General Public License Version 2 or later (the "GPL"), or
- * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * either of the GNU General Public License Version 2 or later (the "GPL"),
+ * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
  * in which case the provisions of the GPL or the LGPL are applicable instead
  * of those above. If you wish to allow use of your version of this file only
  * under the terms of either the GPL or the LGPL, and not to allow others to
@@ -35,46 +35,26 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#ifndef __inFlasher_h__
-#define __inFlasher_h__
+#include "domstubs.idl"
 
-#include "inIFlasher.h"
+/**
+ * Interface for a client side storage item. See
+ * http://www.whatwg.org/specs/web-apps/current-work/#scs-client-side
+ * for more information.
+ *
+ * A respresentation of a storage object item.
+ */
 
-#include "nsIInspectorCSSUtils.h"
-#include "nsIDOMElement.h"
-#include "nsIRenderingContext.h"
-
-#include "nsCOMPtr.h"
-
-#define BOUND_INNER 0
-#define BOUND_OUTER 1
-
-#define DIR_VERTICAL 0
-#define DIR_HORIZONTAL 1 
-
-class inFlasher : public inIFlasher
+[scriptable, uuid(0CC37C78-4C5F-48E1-ADFC-7480B8FE9DC4)]
+interface nsIDOMStorageItem : nsISupports
 {
-public:
-  NS_DECL_ISUPPORTS
-  NS_DECL_INIFLASHER
+  /**
+   * Indicates whether a key is available only in a secure context.
+   */
+  attribute boolean secure;
 
-  inFlasher();
-  virtual ~inFlasher();
-
-protected:
-  void DrawOutline(nscoord aX, nscoord aY, nscoord aWidth, nscoord aHeight,
-                   float aP2T, nsIRenderingContext* aRenderContext,
-                   PRBool aDrawBegin, PRBool aDrawEnd);
-  void DrawLine(nscoord aX, nscoord aY, nscoord aLength,
-                PRBool aDir, PRBool aBounds, float aP2T,
-                nsIRenderingContext* aRenderContext);
-
-  nsCOMPtr<nsIInspectorCSSUtils> mCSSUtils;
-
-  nscolor mColor;
-
-  PRUint16 mThickness;
-  PRPackedBool mInvert;
+  /**
+   * The value associated with the item.
+   */
+  attribute DOMString value;
 };
-
-#endif // __inFlasher_h__

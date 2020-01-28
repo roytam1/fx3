@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set sw=2 ts=2 et tw=80: */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -11,15 +13,15 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is mozilla.org code.
+ * The Original Code is mozilla.com code.
  *
  * The Initial Developer of the Original Code is
- * Netscape Communications Corporation.
- * Portions created by the Initial Developer are Copyright (C) 2001
+ * Mozilla Corporation.
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Joe Hewitt <hewitt@netscape.com> (original author)
+ *   Johnny Stenback <jst@mozilla.com> (original author)
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,27 +37,28 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#ifndef __inDOMUtils_h__
-#define __inDOMUtils_h__
+#ifndef __nsPIDOMStorage_h_
+#define __nsPIDOMStorage_h_
 
-#include "inIDOMUtils.h"
+#include "nsISupports.h"
+#include "nsTArray.h"
 
-#include "nsIEventStateManager.h"
-#include "nsISupportsArray.h"
-#include "nsIInspectorCSSUtils.h"
+class nsIDOMStorage;
 
-class inDOMUtils : public inIDOMUtils
+#define NS_PIDOMSTORAGE_IID                                 \
+  { 0x2fdbb82e, 0x4b47, 0x406a,                             \
+      { 0xb1, 0x17, 0x6d, 0x67, 0x58, 0xc1, 0xee, 0x6b } }
+
+class nsPIDOMStorage : public nsISupports
 {
 public:
-  NS_DECL_ISUPPORTS
-  NS_DECL_INIDOMUTILS
+  NS_DECLARE_STATIC_IID_ACCESSOR(NS_PIDOMSTORAGE_IID)
 
-  inDOMUtils();
-  virtual ~inDOMUtils();
+  virtual void Init(const nsAString &aDomain, PRBool aUseDB) = 0;
 
-protected:
-  nsCOMPtr<nsIInspectorCSSUtils> mCSSUtils;
+  virtual already_AddRefed<nsIDOMStorage> Clone() = 0;
 
+  virtual nsTArray<nsString> *GetKeys() = 0;
 };
 
-#endif // __inDOMUtils_h__
+#endif // __nsPIDOMStorage_h_
