@@ -196,6 +196,11 @@ public:
   static char* strtok(char* str, const char* delims, char* *newStr); 
 
   static PRUint32 strlen(const PRUnichar* s) {
+    // XXXbsmedberg: remove this null-check at some point
+    if (!s) {
+      NS_ERROR("Passing null to nsCRT::strlen");
+      return 0;
+    }
     return NS_strlen(s);
   }
 

@@ -49,12 +49,7 @@
 #include "nsCarbonHelpers.h"
 #include "nsIRollupListener.h"
 #include "nsIMenuRollup.h"
-#include "nsTSMStrategy.h"
 #include "nsGfxUtils.h"
-
-#ifndef XP_MACOSX
-#include <locale>
-#endif
 
 #define PINK_PROFILING_ACTIVATE 0
 #if PINK_PROFILING_ACTIVATE
@@ -91,20 +86,6 @@ nsMacEventDispatchHandler	gEventDispatchHandler;
 
 static void ConvertKeyEventToContextMenuEvent(const nsKeyEvent* inKeyEvent, nsMouseEvent* outCMEvent);
 static inline PRBool IsContextMenuKey(const nsKeyEvent& inKeyEvent);
-
-class StPackedBoolSetter {
-  public:
-    StPackedBoolSetter(PRPackedBool& aFlag): mFlag(aFlag) {
-      mFlag = PR_TRUE;
-    };
-
-    ~StPackedBoolSetter() {
-      mFlag = PR_FALSE;
-    };
-
-  protected:
-    PRPackedBool& mFlag;
-};
 
 
 //-------------------------------------------------------------------------
@@ -362,23 +343,17 @@ void nsMacEventDispatchHandler::SetGlobalPoint(Point inPoint)
 //-------------------------------------------------------------------------
 nsMacEventHandler::nsMacEventHandler(nsMacWindow* aTopLevelWidget)
 {
-	OSErr	err;
-	InterfaceTypeList supportedServices;
-	
-	mTopLevelWidget = aTopLevelWidget;
-	
-  nsTSMStrategy tsmstrategy;
-  
-	//
-	// create a TSMDocument for this window.  We are allocating a TSM document for
-	// each Mac window
-	//
-	mTSMDocument = nsnull;
-  if (tsmstrategy.UseUnicodeForInputMethod()) {
-    supportedServices[0] = kUnicodeDocument;
-  } else {
-	supportedServices[0] = kTextService;
-  }
+  OSErr err;
+  InterfaceTypeList supportedServices;
+
+  mTopLevelWidget = aTopLevelWidget;
+
+  //
+  // create a TSMDocument for this window.  We are allocating a TSM document for
+  // each Mac window
+  //
+  mTSMDocument = nsnull;
+  supportedServices[0] = kUnicodeDocument;
   err = ::NewTSMDocument(1, supportedServices,&mTSMDocument, (long)this);
   NS_ASSERTION(err==noErr, "nsMacEventHandler::nsMacEventHandler: NewTSMDocument failed.");
 #ifdef DEBUG_TSM
@@ -393,7 +368,8 @@ nsMacEventHandler::nsMacEventHandler(nsMacWindow* aTopLevelWidget)
   mIMEIsComposing = PR_FALSE;
   mIMECompositionStr = nsnull;
 
-  mHandlingKeyEvent = PR_FALSE;
+  mKeyIgnore = PR_FALSE;
+  mKeyHandled = PR_FALSE;
 }
 
 
@@ -421,12 +397,6 @@ PRBool nsMacEventHandler::HandleOSEvent ( EventRecord& aOSEvent )
 
 	switch (aOSEvent.what)
 	{
-		case keyUp:
-		case keyDown:
-		case autoKey:
-			retVal = HandleKeyEvent(aOSEvent);
-			break;
-
 		case activateEvt:
 			retVal = HandleActivateEvent(aOSEvent);
 			break;
@@ -465,11 +435,6 @@ PRBool nsMacEventHandler::HandleOSEvent ( EventRecord& aOSEvent )
 			}
 		}
 		break;
-	
-		case nullEvent:
-			if (! sInBackground)
-				retVal = HandleMouseMoveEvent(aOSEvent);
-			break;
 	}
 
 	return retVal;
@@ -690,10 +655,8 @@ enum
 	
 };
 
-static PRUint32 ConvertMacToRaptorKeyCode(UInt32 eventMessage, UInt32 eventModifiers)
+static PRUint32 ConvertMacToRaptorKeyCode(char charCode, UInt32 keyCode, UInt32 eventModifiers)
 {
-	UInt8			charCode = (eventMessage & charCodeMask);
-	UInt8			keyCode = (eventMessage & keyCodeMask) >> 8;
 	PRUint32	raptorKeyCode = 0;
 	
 	switch (keyCode)
@@ -881,7 +844,7 @@ void nsMacEventHandler::InitializeKeyEvent(nsKeyEvent& aKeyEvent,
 	} // if (message == NS_KEY_PRESS && !IsSpecialRaptorKey((aOSEvent.message & keyCodeMask) >> 8) )
 	else
 	{
-		aKeyEvent.keyCode = ConvertMacToRaptorKeyCode(aOSEvent.message, aOSEvent.modifiers);
+		aKeyEvent.keyCode = ConvertMacToRaptorKeyCode(aOSEvent.message & charCodeMask, (aOSEvent.message & keyCodeMask) >> 8, aOSEvent.modifiers);
 		aKeyEvent.charCode = 0;
 	} // else for  if (message == NS_KEY_PRESS && !IsSpecialRaptorKey((aOSEvent.message & keyCodeMask) >> 8) )
   
@@ -1037,91 +1000,6 @@ PRUint32 nsMacEventHandler::ConvertKeyEventToUnicode(EventRecord& aOSEvent)
 }
 
 
-//-------------------------------------------------------------------------
-//
-// HandleKeyEvent
-//
-//-------------------------------------------------------------------------
-
-PRBool nsMacEventHandler::HandleKeyEvent(EventRecord& aOSEvent)
-{
-  // Avoid reentrancy
-  if (mHandlingKeyEvent)
-    return PR_FALSE;
-
-  StPackedBoolSetter handling(mHandlingKeyEvent);
-
-  nsresult result = NS_ERROR_UNEXPECTED;
-  nsWindow* checkFocusedWidget;
-
-  // get the focused widget
-  nsWindow* focusedWidget = gEventDispatchHandler.GetActive();
-  if (!focusedWidget)
-    focusedWidget = mTopLevelWidget;
-  
-  // nsEvent
-  switch (aOSEvent.what)
-  {
-    case keyUp:
-      {
-        nsKeyEvent keyUpEvent(PR_TRUE, NS_KEY_UP, nsnull);
-        InitializeKeyEvent(keyUpEvent, aOSEvent, focusedWidget, NS_KEY_UP);
-        result = focusedWidget->DispatchWindowEvent(keyUpEvent);
-        break;
-      }
-
-    case keyDown:
-      {
-        nsKeyEvent keyDownEvent(PR_TRUE, NS_KEY_DOWN, nsnull);
-        nsKeyEvent keyPressEvent(PR_TRUE, NS_KEY_PRESS, nsnull);
-        InitializeKeyEvent(keyDownEvent, aOSEvent, focusedWidget, NS_KEY_DOWN);
-        result = focusedWidget->DispatchWindowEvent(keyDownEvent);
-
-        // get the focused widget again in case something happened to it on the previous event
-        checkFocusedWidget = gEventDispatchHandler.GetActive();
-        if (!checkFocusedWidget)
-          checkFocusedWidget = mTopLevelWidget;
-
-        // if this isn't the same widget we had before, we should not send a keypress
-        if (checkFocusedWidget != focusedWidget)
-          return result;
-
-        InitializeKeyEvent(keyPressEvent, aOSEvent, focusedWidget, NS_KEY_PRESS);
-        if (result) {
-          // If keydown default was prevented, do same for keypress
-          keyPressEvent.flags |= NS_EVENT_FLAG_NO_DEFAULT;
-        }
-
-        // before we dispatch this key, check if it's the contextmenu key.
-        // If so, send a context menu event instead.
-        if ( IsContextMenuKey(keyPressEvent) ) {
-          nsMouseEvent contextMenuEvent(PR_TRUE, 0, nsnull,
-                                        nsMouseEvent::eReal);
-          ConvertKeyEventToContextMenuEvent(&keyPressEvent, &contextMenuEvent);
-          result = focusedWidget->DispatchWindowEvent(contextMenuEvent);
-          NS_ASSERTION(NS_SUCCEEDED(result), "cannot DispatchWindowEvent");
-        }
-        else {
-          result = focusedWidget->DispatchWindowEvent(keyPressEvent);
-          NS_ASSERTION(NS_SUCCEEDED(result), "cannot DispatchWindowEvent");
-        }
-        break;
-      }
-
-    case autoKey:
-      {
-        nsKeyEvent keyPressEvent(PR_TRUE, NS_KEY_PRESS, nsnull);
-        InitializeKeyEvent(keyPressEvent, aOSEvent, focusedWidget, NS_KEY_PRESS);
-        result = focusedWidget->DispatchWindowEvent(keyPressEvent);
-        break;
-      }
-  }
-
-  return result;
-}
-
-
-
 //
 // ConvertKeyEventToContextMenuEvent
 //
@@ -1166,11 +1044,10 @@ IsContextMenuKey(const nsKeyEvent& inKeyEvent)
 //-------------------------------------------------------------------------
 PRBool nsMacEventHandler::HandleUKeyEvent(const PRUnichar* text, long charCount, EventRecord& aOSEvent)
 {
-  // Avoid reentrancy
-  if (mHandlingKeyEvent)
+  // The focused widget changed in HandleKeyUpDownEvent, so no NS_KEY_PRESS
+  // events should be generated.
+  if (mKeyIgnore)
     return PR_FALSE;
-
-  StPackedBoolSetter handling(mHandlingKeyEvent);
 
   nsresult result = NS_ERROR_UNEXPECTED;
   // get the focused widget
@@ -1178,22 +1055,6 @@ PRBool nsMacEventHandler::HandleUKeyEvent(const PRUnichar* text, long charCount,
   if (!focusedWidget)
     focusedWidget = mTopLevelWidget;
   
-  // simulate key down event if this isn't an autoKey event
-  if (aOSEvent.what == keyDown)
-  {
-    nsKeyEvent keyDownEvent(PR_TRUE, NS_KEY_DOWN, nsnull);
-    InitializeKeyEvent(keyDownEvent, aOSEvent, focusedWidget, NS_KEY_DOWN, PR_FALSE);
-    result = focusedWidget->DispatchWindowEvent(keyDownEvent);
-    NS_ASSERTION(NS_SUCCEEDED(result), "cannot DispatchWindowEvent keydown");
-
-    // check if focus changed; see also HandleKeyEvent above
-    nsWindow *checkFocusedWidget = gEventDispatchHandler.GetActive();
-    if (!checkFocusedWidget)
-      checkFocusedWidget = mTopLevelWidget;
-    if (checkFocusedWidget != focusedWidget)
-      return result;
-  }
-
   // simulate key press events
   if (!IsSpecialRaptorKey((aOSEvent.message & keyCodeMask) >> 8))
   {
@@ -1205,9 +1066,13 @@ PRBool nsMacEventHandler::HandleUKeyEvent(const PRUnichar* text, long charCount,
       InitializeKeyEvent(keyPressEvent, aOSEvent, focusedWidget, NS_KEY_PRESS, PR_FALSE);
       keyPressEvent.charCode = text[i];
 
+      // If keydown default was prevented, do same for keypress
+      if (mKeyHandled)
+        keyPressEvent.flags |= NS_EVENT_FLAG_NO_DEFAULT;
+
       // control key is special in that it doesn't give us letters
       // it generates a charcode of 0x01 for control-a
-      // so we offset to do the right thing for gecko (as in HandleKeyEvent)
+      // so we offset to do the right thing for gecko
       // this doesn't happen for us in InitializeKeyEvent because we pass
       // PR_FALSE so no character translation occurs.
       // I'm guessing we don't want to do the translation there because
@@ -1941,363 +1806,6 @@ nsresult nsMacEventHandler::HandleOffsetToPosition(long offset,Point* thePoint)
 // HandleUpdate Event
 //
 //-------------------------------------------------------------------------
-// See ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/APPLE/CORPCHAR.TXT for detail of IS_APPLE_HINT_IN_PRIVATE_ZONE
-#define IS_APPLE_HINT_IN_PRIVATE_ZONE(u) ((0xF850 <= (u)) && ((u)<=0xF883))
-nsresult nsMacEventHandler::HandleUpdateInputArea(const char* text,Size text_size, ScriptCode textScript,long fixedLength,TextRangeArray* textRangeList)
-{
-#ifdef DEBUG_TSM
-	printf("********************************************************************************\n");
-	printf("nsMacEventHandler::HandleUpdateInputArea size=%d fixlen=%d\n",text_size, fixedLength);
-#endif
-	TextToUnicodeInfo	textToUnicodeInfo;
-	TextEncoding		textEncodingFromScript;
-	int					i;
-	OSErr				err;
-	ByteCount			source_read;
-	nsresult res = NS_OK;
-	long committedLen = 0;
-	PRUnichar* ubuf;
-
-	//====================================================================================================
-	// 0. Create Unicode Converter
-	//====================================================================================================
-
-	//
-	// convert our script code  to a TextEncoding 
-	//
-	err = ::UpgradeScriptInfoToTextEncoding(textScript,kTextLanguageDontCare,kTextRegionDontCare,nsnull,
-											&textEncodingFromScript);
-	NS_ASSERTION(err==noErr,"nsMacEventHandler::UpdateInputArea: UpgradeScriptInfoToTextEncoding failed.");
-	if (err!=noErr) { 
-		res = NS_ERROR_FAILURE;
-		return res; 
-	}
-	
-	err = ::CreateTextToUnicodeInfoByEncoding(textEncodingFromScript,&textToUnicodeInfo);
-	NS_ASSERTION(err==noErr,"nsMacEventHandler::UpdateInputArea: CreateUnicodeToTextInfoByEncoding failed.");
-	if (err!=noErr) { 
-		res = NS_ERROR_FAILURE;
-		return res; 
-	}
-	//------------------------------------------------------------------------------------------------
-	// if we aren't in composition mode alredy, signal the backing store w/ the mode change
-	//------------------------------------------------------------------------------------------------
-	if (!mIMEIsComposing) {
-		res = HandleStartComposition();
-		NS_ASSERTION(NS_SUCCEEDED(res),"nsMacEventHandler::UpdateInputArea: HandleStartComposition failed.");
-		if(NS_FAILED(res))
-			goto error;
-	}
-	// mIMECompositionStr should be created in the HandleStartComposition
-	NS_ASSERTION(mIMECompositionStr, "do not have mIMECompositionStr"); 
-	if(nsnull == mIMECompositionStr)
-	{
-		res = NS_ERROR_OUT_OF_MEMORY;
-		goto error;
-	}
-	// Prepare buffer....
-	mIMECompositionStr->SetCapacity(text_size+1);
-	ubuf = mIMECompositionStr->BeginWriting();
-	size_t len;
-
-	//====================================================================================================
-	// Note- It is possible that the UnpdateInputArea event sent both committed text and uncommitted text
-	// in the same time. The easies way to do that is using Korean input method w/ "Enter by Character" option
-	//====================================================================================================
-	//	1. Handle the committed text
-	//====================================================================================================
-	committedLen = (fixedLength == -1) ? text_size : fixedLength;
-	if(0 != committedLen)
-	{
-#ifdef DEBUG_TSM
-		printf("Have commit text from 0 to %d\n",committedLen);
-#endif
-		//------------------------------------------------------------------------------------------------
-		// 1.1 send textEvent to commit the text
-		//------------------------------------------------------------------------------------------------
-		len = 0;
-		err = ::ConvertFromTextToUnicode(textToUnicodeInfo,committedLen,text,kUnicodeLooseMappingsMask,
-						0,NULL,NULL,NULL,
-						(text_size + 1) * sizeof(PRUnichar),
-						&source_read,&len,NS_REINTERPRET_CAST(PRUint16*, ubuf));
-		NS_ASSERTION(err==noErr,"nsMacEventHandler::UpdateInputArea: ConvertFromTextToUnicode failed.\n");
-		if (err!=noErr)
-		{
-			res = NS_ERROR_FAILURE;
-			goto error; 
-		}
-		len /= sizeof(PRUnichar);
-		// 1.2 Strip off the Apple Private U+F850-U+F87F ( source hint characters, transcodeing hints
-		// Metric characters
-		// See ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/APPLE/CORPCHAR.TXT for detail
-		PRUint32 s,d;
-		for(s=d=0;s<len;s++)
-		{
-			if(! IS_APPLE_HINT_IN_PRIVATE_ZONE(ubuf[s]))
-				ubuf[d++] = ubuf[s];
-		}
-		len = d;
-		ubuf[len] = '\0';		 // null terminate
-		mIMECompositionStr->SetLength(len);
-		// for committed text, set no highlight ? (Do we need to set CaretPosition here ??? )
-#ifdef DEBUG_TSM
-			printf("1.2====================================\n");
-#endif
-		res = HandleTextEvent(0,nsnull);
-		NS_ASSERTION(NS_SUCCEEDED(res),"nsMacEventHandler::UpdateInputArea: HandleTextEvent failed.");
-		if(NS_FAILED(res)) 
-			goto error; 
-		//------------------------------------------------------------------------------------------------
-		// 1.3 send compositionEvent to end the comosition
-		//------------------------------------------------------------------------------------------------
-		res = nsMacEventHandler::HandleEndComposition();
-		NS_ASSERTION(NS_SUCCEEDED(res),"nsMacEventHandler::UpdateInputArea: HandleEndComposition failed.");
-		if(NS_FAILED(res)) 
-			goto error; 
-	}  	//	1. Handle the committed text
-
-	//====================================================================================================
-	//	2. Handle the uncommitted text
-	//====================================================================================================
-	if((-1 != fixedLength) && (text_size != fixedLength ))
-	{	
-#ifdef DEBUG_TSM
-		printf("Have new uncommited text from %d to text_size(%d)\n",committedLen,text_size);
-#endif
-		//------------------------------------------------------------------------------------------------
-		// 2.1 send compositionEvent to start the comosition
-		//------------------------------------------------------------------------------------------------
-		//
-		// if we aren't in composition mode alredy, signal the backing store w/ the mode change
-		//	
-		if (!mIMEIsComposing) {
-			res = HandleStartComposition();
-			NS_ASSERTION(NS_SUCCEEDED(res),"nsMacEventHandler::UpdateInputArea: HandleStartComposition failed.");
-			if(NS_FAILED(res))
-				goto error; 
-		} 	// 2.1 send compositionEvent to start the comosition
-		//------------------------------------------------------------------------------------------------
-		// 2.2 send textEvent for the uncommitted text
-		//------------------------------------------------------------------------------------------------
-		//------------------------------------------------------------------------------------------------
-		// 2.2.1 make sure we have one range array
-		//------------------------------------------------------------------------------------------------
-
-		TextRangeArray rawTextRangeArray;
-		TextRangeArray *rangeArray;
-		if(textRangeList && textRangeList->fNumOfRanges ) {
-			rangeArray = textRangeList;
-		} else {
-			rangeArray = &rawTextRangeArray;
-			rawTextRangeArray.fNumOfRanges = 1;
-			rawTextRangeArray.fRange[0].fStart = committedLen;
-			rawTextRangeArray.fRange[0].fEnd = text_size;
-			rawTextRangeArray.fRange[0].fHiliteStyle = NS_TEXTRANGE_RAWINPUT;			
-		}
-
-		
-#ifdef DEBUG_TSM
-		printf("nsMacEventHandler::HandleUpdateInputArea textRangeList is %s\n", textRangeList ? "NOT NULL" : "NULL");
-#endif
-		nsTextRangeArray	xpTextRangeArray  = new nsTextRange[rangeArray->fNumOfRanges];
-		NS_ASSERTION(xpTextRangeArray!=NULL,"nsMacEventHandler::UpdateInputArea: xpTextRangeArray memory allocation failed.");
-		if (xpTextRangeArray==NULL)
-		{
-			res = NS_ERROR_OUT_OF_MEMORY;
-			goto error; 
-		}
-	
-		//------------------------------------------------------------------------------------------------
-		// 2.2.2 convert range array into our xp range array
-		//------------------------------------------------------------------------------------------------
-		//
-		// the TEC offset mapping capabilities won't work here because you need to have unique, ordered offsets
-		//  so instead we iterate over the range list and map each range individually.  it's probably faster than
-		//  trying to do collapse all the ranges into a single offset list
-		//
-		for(i=0;i<rangeArray->fNumOfRanges;i++) {			
-			ByteOffset			sourceOffset[2], destinationOffset[2];
-			ItemCount			destinationLength;
-			// 2.2.2.1 check each range item in NS_ASSERTION
-			NS_ASSERTION(
-				(NS_TEXTRANGE_CARETPOSITION==rangeArray->fRange[i].fHiliteStyle)||
-				(NS_TEXTRANGE_RAWINPUT==rangeArray->fRange[i].fHiliteStyle)||
-				(NS_TEXTRANGE_SELECTEDRAWTEXT==rangeArray->fRange[i].fHiliteStyle)||
-				(NS_TEXTRANGE_CONVERTEDTEXT==rangeArray->fRange[i].fHiliteStyle)||
-				(NS_TEXTRANGE_SELECTEDCONVERTEDTEXT==rangeArray->fRange[i].fHiliteStyle),
-				"illegal range type");
-			NS_ASSERTION( rangeArray->fRange[i].fStart <= text_size,"illegal range");
-			NS_ASSERTION( rangeArray->fRange[i].fEnd <= text_size,"illegal range");
-
-#ifdef DEBUG_TSM
-			printf("nsMacEventHandler::HandleUpdateInputArea textRangeList[%d] = (%d,%d) text_size = %d\n",i,
-				rangeArray->fRange[i].fStart, rangeArray->fRange[i].fEnd, text_size);
-#endif			
-			// 2.2.2.2 fill sourceOffset array
-			typedef enum {
-				kEqualToDest0,
-				kEqualToDest1,
-				kEqualToLength
-			} rangePairType;
-			rangePairType tpStart,tpEnd;
-			
-			if(rangeArray->fRange[i].fStart < text_size) {
-				sourceOffset[0] = rangeArray->fRange[i].fStart-committedLen;
-				tpStart = kEqualToDest0;
-				destinationLength = 1;
-				if(rangeArray->fRange[i].fStart == rangeArray->fRange[i].fEnd) {
-					tpEnd = kEqualToDest0;
-				} else if(rangeArray->fRange[i].fEnd < text_size) {
-					sourceOffset[1] = rangeArray->fRange[i].fEnd-committedLen;
-					tpEnd = kEqualToDest1;
-					destinationLength++;
-				} else { 
-					// fEnd >= text_size
-					tpEnd = kEqualToLength;
-				}
-			} else { 
-				// fStart >= text_size
-				tpStart = kEqualToLength;
-				tpEnd = kEqualToLength;
-				destinationLength = 0;
-			} // if(rangeArray->fRange[i].fStart < text_size) 
-			
-			// 2.2.2.3 call unicode converter to convert the sourceOffset into destinationOffset
-			len = 0;
-			// Note : The TEC will return -50 if sourceOffset[0,1] >= text_size-committedLen
-			err = ::ConvertFromTextToUnicode(textToUnicodeInfo,text_size-committedLen,text+committedLen,kUnicodeLooseMappingsMask,
-							destinationLength,sourceOffset,&destinationLength,destinationOffset,
-							(text_size + 1) * sizeof(PRUnichar),
-							&source_read,&len, NS_REINTERPRET_CAST(PRUint16*, ubuf));
-			NS_ASSERTION(err==noErr,"nsMacEventHandler::UpdateInputArea: ConvertFromTextToUnicode failed.\n");
-			if (err!=noErr) 
-			{
-				res = NS_ERROR_FAILURE;
-				goto error; 
-			}
-			// 2.2.2.4 Convert len, destinationOffset[0,1] into the unicode of PRUnichar.
-			len /= sizeof(PRUnichar);
-			if(destinationLength > 0 ){
-				destinationOffset[0] /= sizeof(PRUnichar);
-				if(destinationLength > 1 ) {
-					destinationOffset[1] /= sizeof(PRUnichar);
-				}
-			}
-			// 2.2.2.5 Strip off the Apple Private U+F850-U+F87F ( source hint characters, transcodeing hints
-			// Metric characters
-			// See ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/APPLE/CORPCHAR.TXT for detail
-			// If we don't do this, Trad Chinese input method won't handle ',' correctly
-			PRUint32 s,d;
-			for(s=d=0;s<len;s++)
-			{
-				if(! IS_APPLE_HINT_IN_PRIVATE_ZONE(ubuf[s]))
-				{
-					ubuf[d++] = ubuf[s];
-				}
-				else 
-				{
-					if(destinationLength > 0 ){
-						if(destinationOffset[0] >= s) {
-							destinationOffset[0]--;
-						}
-						if(destinationLength > 1 ) {
-							if(destinationOffset[1] >= s) {
-								destinationOffset[1]--;
-							}
-						}
-					}	
-				}
-			}
-			len = d;
-						 
-			// 2.2.2.6 put destinationOffset into xpTextRangeArray[i].mStartOffset 
-			xpTextRangeArray[i].mRangeType = rangeArray->fRange[i].fHiliteStyle;
-			switch(tpStart) {
-				case kEqualToDest0:
-					xpTextRangeArray[i].mStartOffset = destinationOffset[0];
-				break;
-				case kEqualToLength:
-					xpTextRangeArray[i].mStartOffset = len;
-				break;
-				case kEqualToDest1:
-				default:
-					NS_ASSERTION(PR_FALSE, "tpStart is wrong");
-				break;
-			}
-			switch(tpEnd) {
-				case kEqualToDest0:
-					xpTextRangeArray[i].mEndOffset = destinationOffset[0];
-				break;
-				case kEqualToDest1:
-					xpTextRangeArray[i].mEndOffset = destinationOffset[1];
-				break;
-				case kEqualToLength:
-					xpTextRangeArray[i].mEndOffset = len;
-				break;
-				default:
-					NS_ASSERTION(PR_FALSE, "tpEnd is wrong");
-				break;
-			}
-			// 2.2.2.7 Check the converted result in NS_ASSERTION
-			NS_ASSERTION(xpTextRangeArray[i].mStartOffset <= len,"illegal range");
-			NS_ASSERTION(xpTextRangeArray[i].mEndOffset <= len,"illegal range");
-#ifdef DEBUG_TSM
-			printf("nsMacEventHandler::HandleUpdateInputArea textRangeList[%d] => type=%d (%d,%d)\n",i,
-				xpTextRangeArray[i].mRangeType,
-				xpTextRangeArray[i].mStartOffset, xpTextRangeArray[i].mEndOffset);
-#endif			
-
-			NS_ASSERTION((NS_TEXTRANGE_CARETPOSITION!=xpTextRangeArray[i].mRangeType) ||
-						 (xpTextRangeArray[i].mStartOffset == xpTextRangeArray[i].mEndOffset),
-						 "start != end in CaretPosition");
-			
-		}
-		//------------------------------------------------------------------------------------------------
-		// 2.2.3 null terminate the uncommitted text
-		//------------------------------------------------------------------------------------------------
-		mIMECompositionStr->SetLength(len);			
-		//------------------------------------------------------------------------------------------------
-		// 2.2.4 send the text event
-		//------------------------------------------------------------------------------------------------
-#ifdef DEBUG_TSM
-			printf("2.2.4====================================\n");
-#endif			
-
-		res = HandleTextEvent(rangeArray->fNumOfRanges,xpTextRangeArray);
-		NS_ASSERTION(NS_SUCCEEDED(res), "nsMacEventHandler::UpdateInputArea: HandleTextEvent failed.");
-		if(NS_FAILED(res)) 
-			goto error; 
-		if(xpTextRangeArray) 
-			delete [] xpTextRangeArray;
-	} //	2. Handle the uncommitted text
-	else if((0==text_size) && (0==fixedLength))
-	{
-		// 3. Handle empty text event
-		// This is needed when we input some uncommitted text, and then delete all of them
-		// When the last delete come, we will got a text_size = 0 and fixedLength = 0
-		// In that case, we need to send a text event to clean un the input hole....
-		mIMECompositionStr->SetLength(0);			
-#ifdef DEBUG_TSM
-			printf("3.====================================\n");
-#endif
-		// 3.1 send the empty text event.
-		res = HandleTextEvent(0,nsnull);
-		NS_ASSERTION(NS_SUCCEEDED(res),"nsMacEventHandler::UpdateInputArea: HandleTextEvent failed.");
-		if(NS_FAILED(res)) 
-			goto error; 
-		// 3.2 send an endComposition event, we need this to make sure the delete after this work properly.
-		res = nsMacEventHandler::HandleEndComposition();
-		NS_ASSERTION(NS_SUCCEEDED(res),"nsMacEventHandler::UpdateInputArea: HandleEndComposition failed.");
-		if(NS_FAILED(res)) 
-			goto error; 		
-	}
-	return res;
-error:
-	::DisposeTextToUnicodeInfo(&textToUnicodeInfo); 
-	return res; 
-}
-
-
 nsresult nsMacEventHandler::UnicodeHandleUpdateInputArea(const PRUnichar* text, long charCount,
                                                          long fixedLength, TextRangeArray* textRangeList)
 {
@@ -2669,3 +2177,100 @@ nsresult nsMacEventHandler::ResetInputState()
 	return NS_OK;	
 }
 
+PRBool
+nsMacEventHandler::HandleKeyUpDownEvent(EventHandlerCallRef aHandlerCallRef,
+                                        EventRef aEvent)
+{
+  PRUint32 eventKind = ::GetEventKind(aEvent);
+  NS_ASSERTION(eventKind == kEventRawKeyDown ||
+               eventKind == kEventRawKeyUp,
+               "Unknown event kind");
+
+  PRBool handled = PR_FALSE;
+  nsWindow* focusedWidget = gEventDispatchHandler.GetActive();
+  if (!focusedWidget)
+    focusedWidget = mTopLevelWidget;
+
+  PRUint32 modifiers = 0;
+  OSStatus err = ::GetEventParameter(aEvent, kEventParamKeyModifiers,
+                                     typeUInt32, NULL,
+                                     sizeof(modifiers), NULL,
+                                     &modifiers);
+  NS_ASSERTION(err == noErr, "Could not get kEventParamKeyModifiers");
+
+  PRUint32 keyCode = 0;
+  err = ::GetEventParameter(aEvent, kEventParamKeyCode,
+                            typeUInt32, NULL,
+                            sizeof(keyCode), NULL,
+                            &keyCode);
+  NS_ASSERTION(err == noErr, "Could not get kEventParamKeyCode");
+
+  PRUint8 charCode = 0;
+  ::GetEventParameter(aEvent, kEventParamKeyMacCharCodes,
+                      typeChar, NULL,
+                      sizeof(charCode), NULL,
+                      &charCode);
+  // Failure is not a fatal condition.
+
+  // The event's nativeMsg field historically held an EventRecord.  Some
+  // consumers (plugins) rely on this behavior.  Note that
+  // ConvertEventRefToEventRecord can return false and produce a null
+  // event record in some cases, such as when entering an IME session.
+  EventRecord eventRecord;
+  ::ConvertEventRefToEventRecord(aEvent, &eventRecord);
+
+  // kEventRawKeyDown or kEventRawKeyUp only
+
+  PRUint32 message = (eventKind == kEventRawKeyUp ? NS_KEY_UP : NS_KEY_DOWN);
+  nsKeyEvent upDownEvent(PR_TRUE, message, nsnull);
+  upDownEvent.time =      PR_IntervalNow();
+  upDownEvent.widget =    focusedWidget;
+  upDownEvent.nativeMsg = (void*)&eventRecord;
+  upDownEvent.isShift =   ((modifiers & shiftKey) != 0);
+  upDownEvent.isControl = ((modifiers & controlKey) != 0);
+  upDownEvent.isAlt =     ((modifiers & optionKey) != 0);
+  upDownEvent.isMeta =    ((modifiers & cmdKey) != 0);
+  upDownEvent.keyCode =   ConvertMacToRaptorKeyCode(charCode, keyCode,
+                                                    modifiers);
+  upDownEvent.charCode =  0;
+  handled = focusedWidget->DispatchWindowEvent(upDownEvent);
+
+  if (eventKind == kEventRawKeyUp)
+    return handled;
+
+  // kEventRawKeyDown only.  Prepare for a possible NS_KEY_PRESS event.
+
+  nsWindow* checkFocusedWidget = gEventDispatchHandler.GetActive();
+  if (!checkFocusedWidget)
+    checkFocusedWidget = mTopLevelWidget;
+
+  // Set a flag indicating that NS_KEY_PRESS events should not be dispatched,
+  // because focus changed.
+  PRBool lastIgnore = PR_FALSE;
+  if (checkFocusedWidget != focusedWidget) {
+    lastIgnore = mKeyIgnore;
+    mKeyIgnore = PR_TRUE;
+  }
+
+  // Set a flag indicating that the NS_KEY_DOWN event came back with
+  // preventDefault, and NS_KEY_PRESS events should have the same flag set.
+  PRBool lastHandled = PR_FALSE;
+  if (handled) {
+    lastHandled = mKeyHandled;
+    mKeyHandled = PR_TRUE;
+  }
+
+  // The event needs further processing.
+  //  - If no input method is active, an event will be delivered to the
+  //    kEventTextInputUnicodeForKeyEvent handler, which will call
+  //    HandleUKeyEvent, which takes care of dispatching NS_KEY_PRESS events.
+  //  - If an input method is active, an event will be delivered to the
+  //    kEventTextInputUpdateActiveInputArea handler, which will call
+  //    UnicodeHandleUpdateInputArea to handle the input session.
+  ::CallNextEventHandler(aHandlerCallRef, aEvent);
+
+  mKeyHandled = lastHandled;
+  mKeyIgnore = lastIgnore;
+
+  return handled;
+}

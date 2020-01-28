@@ -18,8 +18,6 @@
 #define _SQLITE3_H_
 #include <stdarg.h>     /* Needed for the definition of va_list */
 
-#define sqlite3_prepare_v2 sqlite3_prepare
-
 /*
 ** Make sure we can call this stuff from C++.
 */

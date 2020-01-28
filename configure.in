@@ -4261,6 +4261,7 @@ browser)
   MOZ_UPDATER=1
   MOZ_PHOENIX=1
   MOZ_PLACES=1
+  MOZ_SAFE_BROWSING=1
   MOZ_APP_VERSION=$FIREFOX_VERSION
   MOZ_NO_XPCOM_OBSOLETE=1
   MOZ_EXTENSIONS_DEFAULT=" cookie xml-rpc inspector gnomevfs permissions reporter spellcheck"
@@ -5330,7 +5331,7 @@ dnl ========================================================
 dnl XMLExtras
 dnl ========================================================
 MOZ_ARG_DISABLE_BOOL(xmlextras,
-[  --disable-xmlextras Disable XMLExtras such as XMLHttpRequest ],
+[  --disable-xmlextras Disable XMLExtras such as XPointer support ],
     MOZ_XMLEXTRAS=,
     MOZ_XMLEXTRAS=1 )
 

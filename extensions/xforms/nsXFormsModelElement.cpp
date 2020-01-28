@@ -77,6 +77,8 @@
 #include "nsIProgrammingLanguage.h"
 #include "nsDOMError.h"
 #include "nsXFormsControlStub.h"
+#include "nsIPrefService.h"
+#include "nsIPrefBranch.h"
 
 #define XFORMS_LAZY_INSTANCE_BINDING \
   "chrome://xforms/content/xforms.xml#xforms-lazy-instance"
@@ -637,12 +639,14 @@ nsXFormsModelElement::nsXFormsModelElement()
     mSchemaTotal(0),
     mPendingInstanceCount(0),
     mDocumentLoaded(PR_FALSE),
-    mNeedsRefresh(PR_FALSE),
+    mRebindAllControls(PR_FALSE),
     mInstancesInitialized(PR_FALSE),
     mReadyHandled(PR_FALSE),
-    mInstanceDocuments(nsnull),
     mLazyModel(PR_FALSE),
-    mConstructDoneHandled(PR_FALSE)
+    mConstructDoneHandled(PR_FALSE),
+    mProcessingUpdateEvent(PR_FALSE),
+    mLoopMax(600),
+    mInstanceDocuments(nsnull)
 {
 }
 
@@ -991,6 +995,15 @@ nsXFormsModelElement::OnCreated(nsIXTFGenericElementWrapper *aWrapper)
   NS_ENSURE_TRUE(mNodeToType.Init(), NS_ERROR_OUT_OF_MEMORY);
   NS_ENSURE_TRUE(mNodeToP3PType.Init(), NS_ERROR_OUT_OF_MEMORY);
 
+
+  // Get eventual user-set loop maximum. Used by RequestUpdateEvent().
+  nsCOMPtr<nsIPrefBranch> pref = do_GetService(NS_PREFSERVICE_CONTRACTID, &rv);
+  if (NS_SUCCEEDED(rv) && pref) {
+    PRInt32 val;
+    if (NS_SUCCEEDED(pref->GetIntPref("xforms.modelLoopMax", &val)))
+      mLoopMax = val;
+  }
+
   return NS_OK;
 }
 
@@ -1049,18 +1062,8 @@ nsXFormsModelElement::Rebuild()
   NS_ENSURE_SUCCESS(rv, rv);
 
   // 3. Re-attach all elements
-  if (mReadyHandled) { // if it's not during initializing phase
-    nsXFormsControlListItem::iterator it;
-    for (it = mFormControls.begin(); it != mFormControls.end(); ++it) {
-      nsCOMPtr<nsIXFormsControl> control = (*it)->Control();
-      NS_ASSERTION(control, "mFormControls has null control?!");
-
-      // run bind to reset mBoundNode for all of the model's controls
-      control->Bind();
-    }
-
-    // Triggers a refresh of all controls
-    mNeedsRefresh = PR_TRUE;
+  if (mDocumentLoaded) {
+    mRebindAllControls = PR_TRUE;
   }
 
   // 4. Rebuild graph
@@ -1186,16 +1189,16 @@ nsXFormsModelElement::RefreshSubTree(nsXFormsControlListItem *aCurrent,
 #ifdef DEBUG_MODEL
       nsCOMPtr<nsIDOMElement> controlElement;
       control->GetElement(getter_AddRefs(controlElement));
-      printf("rebind: %d, mNeedsRefresh: %d, rebindChildren: %d\n",
-             rebind, mNeedsRefresh, rebindChildren);
+      printf("rebind: %d, mRebindAllControls: %d, aForceRebind: %d\n",
+             rebind, mRebindAllControls, aForceRebind);
       if (controlElement) {
         printf("Checking control: ");
         //DBG_TAGINFO(controlElement);
       }
 #endif
 
-    if (mNeedsRefresh || rebind) {
-      refresh = PR_TRUE;
+    if (mRebindAllControls || rebind) {
+      refresh = rebind = PR_TRUE;
     } else {
       PRBool usesModelBinding = PR_FALSE;
       control->GetUsesModelBinding(&usesModelBinding);
@@ -1286,22 +1289,18 @@ nsXFormsModelElement::RefreshSubTree(nsXFormsControlListItem *aCurrent,
 
     // Handle rebinding
     if (rebind) {
-      nsCOMPtr<nsIDOMNode> oldBoundNode;
-      control->GetBoundNode(getter_AddRefs(oldBoundNode));
-      rv = control->Bind();
+      rv = control->Bind(&rebindChildren);
       NS_ENSURE_SUCCESS(rv, rv);
-      control->GetBoundNode(getter_AddRefs(boundNode));
-      rebindChildren = (oldBoundNode != boundNode);
     }
 
     // Handle refreshing
     if (rebind || refresh) {
       control->Refresh();
-      // XXX: we should really check the return result, but f.x. select1
-      // returns error because of no widget...?  so we should ensure that an
-      // error is only returned when there actually is an error, and we should
-      // report that on the console... possibly we should then continue,
-      // instead of bailing totally.
+      // XXX: bug 336608: we should really check the return result, but
+      // f.x. select1 returns error because of no widget...?  so we should
+      // ensure that an error is only returned when there actually is an
+      // error, and we should report that on the console... possibly we should
+      // then continue, instead of bailing totally.
       // NS_ENSURE_SUCCESS(rv, rv);
     }
 
@@ -1328,13 +1327,17 @@ nsXFormsModelElement::Refresh()
     return NS_OK;
   }
 
+  // XXXbeaufour: Can we somehow suspend redraw / "screen update" while doing
+  // the refresh? That should save a lot of time, and avoid flickering of
+  // controls.
+
   // Kick off refreshing on root node
   nsresult rv = RefreshSubTree(mFormControls.FirstChild(), PR_FALSE);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Clear refresh structures
   mChangedNodes.Clear();
-  mNeedsRefresh = PR_FALSE;
+  mRebindAllControls = PR_FALSE;
   mMDG.ClearDispatchFlags();
 
   return NS_OK;
@@ -1394,6 +1397,11 @@ NS_IMETHODIMP
 nsXFormsModelElement::AddFormControl(nsIXFormsControl *aControl,
                                      nsIXFormsControl *aParent)
 {
+#ifdef DEBUG_MODEL
+  printf("nsXFormsModelElement::AddFormControl(con: %p, parent: %p)\n",
+         (void*) aControl, (void*) aParent);
+#endif
+
   NS_ENSURE_ARG(aControl);
   return mFormControls.AddControl(aControl, aParent);
 }
@@ -1401,6 +1409,11 @@ nsXFormsModelElement::AddFormControl(nsIXFormsControl *aControl,
 NS_IMETHODIMP
 nsXFormsModelElement::RemoveFormControl(nsIXFormsControl *aControl)
 {
+#ifdef DEBUG_MODEL
+  printf("nsXFormsModelElement::RemoveFormControl(con: %p)\n",
+         (void*) aControl);
+#endif
+
   NS_ENSURE_ARG(aControl);
   PRBool removed;
   nsresult rv = mFormControls.RemoveControl(aControl, removed);
@@ -1534,31 +1547,46 @@ nsXFormsModelElement::FindInstanceElement(const nsAString &aID,
 }
 
 NS_IMETHODIMP
-nsXFormsModelElement::SetNodeValue(nsIDOMNode      *aContextNode,
+nsXFormsModelElement::SetNodeValue(nsIDOMNode      *aNode,
                                    const nsAString &aNodeValue,
+                                   PRBool           aDoRefresh,
                                    PRBool          *aNodeChanged)
-{ 
-  return mMDG.SetNodeValue(aContextNode,
-                           aNodeValue,
-                           aNodeChanged);
+{
+  NS_ENSURE_ARG_POINTER(aNodeChanged);
+  nsresult rv = mMDG.SetNodeValue(aNode, aNodeValue, aNodeChanged);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (*aNodeChanged && aDoRefresh) {
+    rv = RequestRecalculate();
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = RequestRevalidate();
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = RequestRefresh();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return NS_OK;
 }
 
 NS_IMETHODIMP
-nsXFormsModelElement::GetNodeValue(nsIDOMNode *aContextNode,
-                                   nsAString  &aNodeValue)
-{
-  return mMDG.GetNodeValue(aContextNode,
-                           aNodeValue);
-}
- 
-NS_IMETHODIMP
-nsXFormsModelElement::SetNodeContent(nsIDOMNode      *aContextNode,
-                                     nsIDOMNode      *aNodeContent,
-                                     PRBool          *aNodeChanged)
+nsXFormsModelElement::SetNodeContent(nsIDOMNode *aNode,
+                                     nsIDOMNode *aNodeContent,
+                                     PRBool      aDoRebuild)
 { 
-  return mMDG.SetNodeContent(aContextNode,
-                             aNodeContent,
-                             aNodeChanged);
+  nsresult rv = mMDG.SetNodeContent(aNode, aNodeContent);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (aDoRebuild) {
+    rv = RequestRebuild();
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = RequestRecalculate();
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = RequestRevalidate();
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = RequestRefresh();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1644,7 +1672,8 @@ nsXFormsModelElement::ValidateDocument(nsIDOMDocument *aInstanceDocument,
  *  SUBMIT_ABORT_SUBMISSION - abort submission (invalid node or empty required node)
  */
 NS_IMETHODIMP
-nsXFormsModelElement::HandleInstanceDataNode(nsIDOMNode *aInstanceDataNode, unsigned short *aResult)
+nsXFormsModelElement::HandleInstanceDataNode(nsIDOMNode     *aInstanceDataNode,
+                                             unsigned short *aResult)
 {
   // abort by default
   *aResult = SUBMIT_ABORT_SUBMISSION;
@@ -1771,6 +1800,84 @@ nsXFormsModelElement::GetTypeFromNode(nsIDOMNode *aInstanceData,
 
   return rv;
 }
+
+/**
+ * Poor man's try-catch to make sure that we set mProcessingUpdateEvent to
+ * when leaving scope. If we actually bail with an error at some time,
+ * something is pretty rotten, but at least we will not prevent any further
+ * updates.
+ */
+class Updating {
+private:
+  nsXFormsModelElement* mModel;
+
+public:
+  Updating(nsXFormsModelElement* aModel)
+    : mModel(aModel) { mModel->mProcessingUpdateEvent = PR_TRUE; };
+  ~Updating() { mModel->mProcessingUpdateEvent = PR_FALSE; };
+};
+
+nsresult
+nsXFormsModelElement::RequestUpdateEvent(nsXFormsEvent aEvent)
+{
+  if (mProcessingUpdateEvent) {
+    mUpdateEventQueue.AppendElement(NS_INT32_TO_PTR(aEvent));
+    return NS_OK;
+  }
+
+  Updating upd(this);
+
+  // Send the requested event
+  nsresult rv = nsXFormsUtils::DispatchEvent(mElement, aEvent);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // Process queued events
+  PRInt32 loopCount = 0;
+  while (mUpdateEventQueue.Count()) {
+    nsXFormsEvent event =
+      NS_STATIC_CAST(nsXFormsEvent, NS_PTR_TO_UINT32(mUpdateEventQueue[0]));
+    NS_ENSURE_TRUE(mUpdateEventQueue.RemoveElementAt(0), NS_ERROR_FAILURE);
+
+    rv = nsXFormsUtils::DispatchEvent(mElement, event);
+    NS_ENSURE_SUCCESS(rv, rv);
+    ++loopCount;
+    if (mLoopMax && loopCount > mLoopMax) {
+      // Note: we could also popup a dialog asking the user whether or not to
+      // continue.
+      nsXFormsUtils::ReportError(NS_LITERAL_STRING("modelLoopError"), mElement);
+      nsXFormsUtils::HandleFatalError(mElement, NS_LITERAL_STRING("LoopError"));
+      return NS_ERROR_FAILURE;
+    }
+  }
+
+  return NS_OK;
+}
+
+
+NS_IMETHODIMP
+nsXFormsModelElement::RequestRebuild()
+{
+  return RequestUpdateEvent(eEvent_Rebuild);
+}
+
+NS_IMETHODIMP
+nsXFormsModelElement::RequestRecalculate()
+{
+  return RequestUpdateEvent(eEvent_Recalculate);
+}
+
+NS_IMETHODIMP
+nsXFormsModelElement::RequestRevalidate()
+{
+  return RequestUpdateEvent(eEvent_Revalidate);
+}
+
+NS_IMETHODIMP
+nsXFormsModelElement::RequestRefresh()
+{
+  return RequestUpdateEvent(eEvent_Refresh);
+}
+
 
 // nsIXFormsContextControl
 
@@ -2002,6 +2109,7 @@ nsXFormsModelElement::InitializeControls()
 
   nsXFormsControlListItem::iterator it;
   nsresult rv;
+  PRBool dummy;
   for (it = mFormControls.begin(); it != mFormControls.end(); ++it) {
     // Get control
     nsCOMPtr<nsIXFormsControl> control = (*it)->Control();
@@ -2014,17 +2122,14 @@ nsXFormsModelElement::InitializeControls()
     // DBG_TAGINFO(controlElement);
 #endif
     // Rebind
-    rv = control->Bind();
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    // Get bound node
-    nsCOMPtr<nsIDOMNode> boundNode;
-    rv = control->GetBoundNode(getter_AddRefs(boundNode));
+    rv = control->Bind(&dummy);
     NS_ENSURE_SUCCESS(rv, rv);
 
     // Refresh controls
     rv = control->Refresh();
-    NS_ENSURE_SUCCESS(rv, rv);
+    // XXX: Bug 336608, refresh still fails for some controls, for some
+    // reason.
+    // NS_ENSURE_SUCCESS(rv, rv);
   }
 
   mChangedNodes.Clear();
@@ -2069,13 +2174,6 @@ nsXFormsModelElement::MaybeNotifyCompletion()
     }
   }
 
-  // Okay, dispatch xforms-model-construct-done and xforms-ready events!
-  for (i = 0; i < models->Count(); ++i) {
-    nsXFormsModelElement *model =
-        NS_STATIC_CAST(nsXFormsModelElement *, models->ElementAt(i));
-    nsXFormsUtils::DispatchEvent(model->mElement, eEvent_ModelConstructDone);
-  }
-
   // validate the instance documents becauar we want schemaValidation to add
   // schema type properties from the schema file unto our instance document
   // elements.  We don't care about the validation results.
@@ -2107,7 +2205,16 @@ nsXFormsModelElement::MaybeNotifyCompletion()
     }
   }
 
+  // Register deferred binds with the model. It does not bind the controls,
+  // only bind them to the model they belong to.
   nsXFormsModelElement::ProcessDeferredBinds(domDoc);
+
+  // Okay, dispatch xforms-model-construct-done
+  for (i = 0; i < models->Count(); ++i) {
+    nsXFormsModelElement *model =
+        NS_STATIC_CAST(nsXFormsModelElement *, models->ElementAt(i));
+    nsXFormsUtils::DispatchEvent(model->mElement, eEvent_ModelConstructDone);
+  }
 
   nsCOMPtr<nsIDocument> doc = do_QueryInterface(domDoc);
   if (doc) {
@@ -2122,6 +2229,7 @@ nsXFormsModelElement::MaybeNotifyCompletion()
     }
   }
 
+  // Backup instances and fire xforms-ready
   for (i = 0; i < models->Count(); ++i) {
     nsXFormsModelElement *model =
         NS_STATIC_CAST(nsXFormsModelElement *, models->ElementAt(i));
@@ -2381,8 +2489,8 @@ nsXFormsModelElement::MessageLoadFinished()
   mElement->GetOwnerDocument(getter_AddRefs(domDoc));
   const nsVoidArray *models = GetModelList(domDoc);
   nsCOMPtr<nsIDocument>doc = do_QueryInterface(domDoc);
-  nsCOMArray<nsIXFormsControlBase> *deferredBindList =
-    NS_STATIC_CAST(nsCOMArray<nsIXFormsControlBase> *,
+  nsCOMArray<nsIXFormsControl> *deferredBindList =
+    NS_STATIC_CAST(nsCOMArray<nsIXFormsControl> *,
                    doc->GetProperty(nsXFormsAtoms::deferredBindListProperty));
 
   // if we've already gotten the xforms-model-construct-done event and not
@@ -2447,8 +2555,8 @@ DeleteBindList(void    *aObject,
 }
 
 /* static */ nsresult
-nsXFormsModelElement::DeferElementBind(nsIDOMDocument *aDoc, 
-                                       nsIXFormsControlBase *aControl)
+nsXFormsModelElement::DeferElementBind(nsIDOMDocument   *aDoc,
+                                       nsIXFormsControl *aControl)
 {
   nsCOMPtr<nsIDocument> doc = do_QueryInterface(aDoc);
 
@@ -2463,7 +2571,7 @@ nsXFormsModelElement::DeferElementBind(nsIDOMDocument *aDoc,
   // We need to keep the document order of the controls AND don't want
   // to walk the deferredBindList every time we want to check about adding a
   // control.
-  nsCOMPtr<nsIXFormsControlBase> controlBase(do_QueryInterface(aControl));
+  nsCOMPtr<nsIXFormsControl> controlBase(do_QueryInterface(aControl));
   NS_ENSURE_STATE(controlBase);
     
   PRBool onList = PR_FALSE;
@@ -2472,12 +2580,12 @@ nsXFormsModelElement::DeferElementBind(nsIDOMDocument *aDoc,
     return NS_OK;
   }
 
-  nsCOMArray<nsIXFormsControlBase> *deferredBindList =
-    NS_STATIC_CAST(nsCOMArray<nsIXFormsControlBase> *,
+  nsCOMArray<nsIXFormsControl> *deferredBindList =
+    NS_STATIC_CAST(nsCOMArray<nsIXFormsControl> *,
                    doc->GetProperty(nsXFormsAtoms::deferredBindListProperty));
 
   if (!deferredBindList) {
-    deferredBindList = new nsCOMArray<nsIXFormsControlBase>(16);
+    deferredBindList = new nsCOMArray<nsIXFormsControl>(16);
     NS_ENSURE_TRUE(deferredBindList, NS_ERROR_OUT_OF_MEMORY);
 
     doc->SetProperty(nsXFormsAtoms::deferredBindListProperty, deferredBindList,
@@ -2497,6 +2605,10 @@ nsXFormsModelElement::DeferElementBind(nsIDOMDocument *aDoc,
 /* static */ void
 nsXFormsModelElement::ProcessDeferredBinds(nsIDOMDocument *aDoc)
 {
+#ifdef DEBUG_MODEL
+  printf("nsXFormsModelElement::ProcessDeferredBinds()\n");
+#endif
+
   nsCOMPtr<nsIDocument> doc = do_QueryInterface(aDoc);
 
   if (!doc) {
@@ -2507,17 +2619,16 @@ nsXFormsModelElement::ProcessDeferredBinds(nsIDOMDocument *aDoc)
 
   doc->SetProperty(nsXFormsAtoms::readyForBindProperty, doc);
 
-  nsCOMArray<nsIXFormsControlBase> *deferredBindList =
-      NS_STATIC_CAST(nsCOMArray<nsIXFormsControlBase> *,
+  nsCOMArray<nsIXFormsControl> *deferredBindList =
+      NS_STATIC_CAST(nsCOMArray<nsIXFormsControl> *,
                      doc->GetProperty(nsXFormsAtoms::deferredBindListProperty));
 
   if (deferredBindList) {
-    for (int i = 0; i < deferredBindList->Count(); ++i) {
-      nsIXFormsControlBase *base = deferredBindList->ObjectAt(i);
-      if (base) {
-        base->Bind();
-        base->Refresh();
-        base->SetOnDeferredBindList(PR_FALSE);
+    for (PRInt32 i = 0; i < deferredBindList->Count(); ++i) {
+      nsIXFormsControl *control = deferredBindList->ObjectAt(i);
+      if (control) {
+        control->BindToModel(PR_FALSE);
+        control->SetOnDeferredBindList(PR_FALSE);
       }
     }
 

@@ -177,7 +177,6 @@ bin\components\windowds.xpt
 bin\components\windowwatcher.xpt
 bin\components\shellservice.xpt
 bin\components\xml-rpc.xpt
-bin\components\xmlextras.xpt
 bin\components\xpcom_base.xpt
 bin\components\xpcom_components.xpt
 bin\components\xpcom_ds.xpt
@@ -213,6 +212,14 @@ bin\components\extensions.xpt
 bin\components\update.xpt
 bin\components\nsSessionStore.js
 bin\components\sessionstore.xpt
+
+; Safe Browsing
+bin\components\nsSafebrowsingApplication.js
+bin\components\safebrowsing.xpt
+bin\components\nsUrlClassifierListManager.js
+bin\components\nsUrlClassifierLib.js
+bin\components\nsUrlClassifierTable.js
+bin\components\url-classifier.xpt
 
 ; [Browser Chrome Files]
 bin\chrome\browser.jar

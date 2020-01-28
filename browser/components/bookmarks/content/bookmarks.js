@@ -325,8 +325,8 @@ var BookmarksCommand = {
       break;
     case "Folder":
     case "PersonalToolbarFolder":
-      commands = ["bm_openfolder", "bm_separator", 
-                  "bm_newbookmark", "bm_newfolder", "bm_newseparator", "bm_separator",
+      commands = ["bm_openfolder", "bm_separator", "bm_newbookmark", 
+                  "bm_newfolder", "bm_newseparator", "bm_separator",
                   "cut", "copy", "paste", "bm_separator",
                   "delete", "bm_separator",
                   "bm_sortbyname", "bm_separator",
@@ -1367,6 +1367,10 @@ var BookmarksUtils = {
       if (aResource == BMSVC.getBookmarksToolbarFolder())
         type = "PersonalToolbarFolder";
     }
+    // Treat microsummary bookmarks like regular bookmarks, since they behave
+    // like regular bookmarks in almost every regard.
+    if (type == "MicsumBookmark")
+      type = "Bookmark";
 
     if (type == "") {
       // we're not sure what type it is.  figure out if it's a container.

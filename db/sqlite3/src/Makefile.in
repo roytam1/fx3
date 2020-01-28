@@ -48,12 +48,6 @@ LIBRARY_NAME     = sqlite3_s
 MODULE_NAME      = sqlite3
 FORCE_STATIC_LIB = 1
 
-ifeq (,$(filter-out WINNT WINCE, $(OS_ARCH)))
-ifndef GNU_CC
-DEFFILE = $(win_srcdir)/sqlite.def
-endif
-endif
-
 EXPORTS = sqlite3.h sqlite3file.h
 
 CSRCS = \
@@ -76,7 +70,6 @@ CSRCS = \
 	main.c \
 	opcodes.c \
 	os.c \
-	os_beos.c \
 	os_unix.c \
 	os_win.c \
 	os_os2.c \
@@ -103,7 +96,7 @@ CSRCS = \
 	$(NULL)
 
 # REFEF_IO allows us to override IO functions, which is used in the AsyncIO
-# storage system. SECURE_DELETE will cause SQLITE to 0-fill delete data so we
+# -DSQLITE_SECURE_DELETE=1 will cause SQLITE to 0-fill delete data so we
 # don't have to vacuum to make sure the data is not visible in the file.
 DEFINES = -DSQLITE_ENABLE_REDEF_IO -DSQLITE_SECURE_DELETE=1 -DTHREADSAFE=1
 

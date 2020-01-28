@@ -88,6 +88,12 @@ LOCAL_INCLUDES += -I$(srcdir)/../feeds/src
 SHARED_LIBRARY_LIBS += ../feeds/src/$(LIB_PREFIX)browser_feeds_s.$(LIB_SUFFIX)
 endif
 
+ifdef MOZ_SAFE_BROWSING
+REQUIRES += safebrowsing
+LOCAL_INCLUDES += -I$(srcdir)/../safebrowsing/src
+SHARED_LIBRARY_LIBS += ../safebrowsing/src/$(LIB_PREFIX)safebrowsing_s.$(LIB_SUFFIX)
+endif
+
 # Link to gkgfx for GNOME shell service
 ifeq ($(MOZ_WIDGET_TOOLKIT), gtk2)
 EXTRA_DSO_LIBS += gkgfx

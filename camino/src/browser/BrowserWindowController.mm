@@ -62,7 +62,6 @@
 #import "SearchTextField.h"
 #import "SearchTextFieldCell.h"
 #import "STFPopUpButtonCell.h"
-#import "MainController.h"
 #import "DraggableImageAndTextCell.h"
 #import "MVPreferencesController.h"
 #import "ViewCertificateDialogController.h"
@@ -2983,6 +2982,19 @@ enum BWCOpenDest {
 }
 
 //
+// -createNewTabBrowser:
+// BrowserUICreationDelegate
+//
+// create a new tab in the window associated with this wrapper and get its
+// browser view without loading anything into it.
+//
+- (CHBrowserView*)createNewTabBrowser:(BOOL)inLoadInBG
+{
+  BrowserTabViewItem* newTab = [self openNewTab:inLoadInBG];
+  return [[newTab view] getBrowserView];
+}
+
+//
 // -openNewTab:
 //
 // open a new tab, but doesn't load anything into it. Must be matched
@@ -3088,6 +3100,7 @@ enum BWCOpenDest {
 {
   BrowserTabViewItem* newTab = [BrowserTabView makeNewTabItem];
   BrowserWrapper* newView = [[BrowserWrapper alloc] initWithTab:newTab inWindow:[self window]];
+  [newView setUICreationDelegate:self];
 
   // register the bookmarks as a custom view
   BookmarkViewController* bmController = [[[BookmarkViewController alloc] initWithBrowserWindowController:self] autorelease];
@@ -3747,6 +3760,21 @@ enum BWCOpenDest {
 }
 
 //
+// -loadBookmarkBarIndex:
+//
+// Load the item in the bookmark bar given by |inIndex| using the given behavior.
+// Uses the top-level |-loadBookmark:...| in order to get the right behavior with folders and
+// tab groups.
+//
+- (BOOL)loadBookmarkBarIndex:(unsigned short)inIndex openBehavior:(EBookmarkOpenBehavior)inBehavior
+{
+  BookmarkItem* item = [[[BookmarkManager sharedBookmarkManager] toolbarFolder] objectAtIndex:inIndex];
+  if (item)
+    [[NSApp delegate] loadBookmark:item withWindowController:self openBehavior:inBehavior];
+  return YES;
+}
+
+//
 // - handleCommandReturn:
 //
 // handle command-return in location or search field, opening a new tab or window as appropriate
@@ -3932,4 +3960,5 @@ int TabBarVisiblePrefChangedCallback(const char* inPref, void* inBWC)
   }
   return NS_OK;
 }
+
 

@@ -354,13 +354,14 @@ nsXPInstallManager::ConfirmInstall(nsIDOMWindow *aParent, const PRUnichar **aPac
         ifptr->SetDataIID(&NS_GET_IID(nsIDialogParamBlock));
 
         char* confirmDialogURL;
-        nsCOMPtr<nsIPrefBranch> pref(do_GetService(NS_PREFSERVICE_CONTRACTID));
-        if (pref) {
-          rv = pref->GetCharPref(PREF_XPINSTALL_CONFIRM_DLG, &confirmDialogURL);
-          NS_ASSERTION(NS_SUCCEEDED(rv), "Can't invoke XPInstall FE without a FE URL! Set xpinstall.dialog.confirm");
-          if (NS_FAILED(rv))
-            return rv;
-        }
+        nsCOMPtr<nsIPrefBranch> pref(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
+        if (!pref)
+          return rv;
+          
+        rv = pref->GetCharPref(PREF_XPINSTALL_CONFIRM_DLG, &confirmDialogURL);
+        NS_ASSERTION(NS_SUCCEEDED(rv), "Can't invoke XPInstall FE without a FE URL! Set xpinstall.dialog.confirm");
+        if (NS_FAILED(rv))
+          return rv;
 
         rv = parentWindow->OpenDialog(NS_ConvertASCIItoUTF16(confirmDialogURL),
                                       NS_LITERAL_STRING("_blank"),
@@ -904,7 +905,7 @@ nsXPInstallManager::GetDestinationFile(nsString& url, nsILocalFile* *file)
             if (NS_SUCCEEDED(rv))
             { 
                 temp->AppendNative(NS_LITERAL_CSTRING("tmp.xpi"));
-                temp->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 0644);
+                temp->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 0600);
                 *file = temp;
                 NS_IF_ADDREF(*file);
             }
@@ -954,6 +955,18 @@ nsXPInstallManager::OnStartRequest(nsIRequest* request, nsISupports *ctxt)
 {
     nsresult rv = NS_ERROR_FAILURE;
 
+    // If we are dealing with a HTTP request, then treat HTTP error pages as
+    // download failures.
+    nsCOMPtr<nsIHttpChannel> httpChan = do_QueryInterface(request);
+    if (httpChan) {
+        PRBool succeeded;
+        if (NS_SUCCEEDED(httpChan->GetRequestSucceeded(&succeeded)) && !succeeded) {
+            // HTTP response is not a 2xx!
+            request->Cancel(NS_BINDING_ABORTED);
+            return NS_OK;
+        }
+    }
+
     NS_ASSERTION( mItem && mItem->mFile, "XPIMgr::OnStartRequest bad state");
     if ( mItem && mItem->mFile )
     {
@@ -962,7 +975,7 @@ nsXPInstallManager::OnStartRequest(nsIRequest* request, nsISupports *ctxt)
         rv = NS_NewLocalFileOutputStream(getter_AddRefs(mItem->mOutStream),
                                          mItem->mFile,
                                          PR_WRONLY | PR_CREATE_FILE | PR_TRUNCATE,
-                                         0664);
+                                         0600);
     }
     return rv;
 }

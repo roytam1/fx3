@@ -42,7 +42,6 @@
 #include <Script.h>
 #include <TextServices.h>
 #include <AEDataModel.h>
-#include "nsTSMStrategy.h"
 
 #include "nsCarbonHelpers.h"
 
@@ -67,7 +66,6 @@ AEEventHandlerUPP nsMacTSMMessagePump::mGetSelectedTextUPP = NULL;
 nsMacTSMMessagePump::nsMacTSMMessagePump()
 {
 	OSErr	err;
-	nsTSMStrategy tsmstrategy;
 
 	mPos2OffsetUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::PositionToOffsetHandler);
 	NS_ASSERTION(mPos2OffsetUPP!=NULL, "nsMacTSMMessagePump::InstallTSMAEHandlers: NewAEEventHandlerUPP[Pos2Pffset] failed");
@@ -75,11 +73,7 @@ nsMacTSMMessagePump::nsMacTSMMessagePump()
 	mOffset2PosUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::OffsetToPositionHandler);
 	NS_ASSERTION(mPos2OffsetUPP!=NULL, "nsMacTSMMessagePump::InstallTSMAEHandlers: NewAEEventHandlerUPP[Pos2Pffset] failed");
 
-  if (tsmstrategy.UseUnicodeForInputMethod()) {
-    mUpdateUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::UnicodeUpdateHandler);
-  } else {
-	mUpdateUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::UpdateHandler);
-  }
+  mUpdateUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::UnicodeUpdateHandler);
   NS_ASSERTION(mPos2OffsetUPP!=NULL, "nsMacTSMMessagePump::InstallTSMAEHandlers: NewAEEventHandlerUPP[Pos2Pffset] failed");
 
   err = AEInstallEventHandler(kTextServiceClass, kPos2Offset, mPos2OffsetUPP, (long)this, false);
@@ -91,20 +85,17 @@ nsMacTSMMessagePump::nsMacTSMMessagePump()
   err = AEInstallEventHandler(kTextServiceClass, kUpdateActiveInputArea, mUpdateUPP, (long)this, false);
   NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::InstallTSMAEHandlers: AEInstallEventHandler[Update] failed");
 
-  if (tsmstrategy.UseUnicodeForKeyboard()) {
-    mKeyboardUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::UnicodeNotFromInputMethodHandler);
-    NS_ASSERTION(mKeyboardUPP!=NULL, "nsMacTSMMessagePump::InstallTSMAEHandlers: NewAEEventHandlerUPP[FromInputMethod] failed");
+  mKeyboardUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::UnicodeNotFromInputMethodHandler);
+  NS_ASSERTION(mKeyboardUPP!=NULL, "nsMacTSMMessagePump::InstallTSMAEHandlers: NewAEEventHandlerUPP[FromInputMethod] failed");
 
-    err = AEInstallEventHandler(kTextServiceClass, kUnicodeNotFromInputMethod, mKeyboardUPP, (long)this, false);
-    NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::InstallTSMAEHandlers: AEInstallEventHandler[FromInputMethod] failed");
+  err = AEInstallEventHandler(kTextServiceClass, kUnicodeNotFromInputMethod, mKeyboardUPP, (long)this, false);
+  NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::InstallTSMAEHandlers: AEInstallEventHandler[FromInputMethod] failed");
 
-    mGetSelectedTextUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::UnicodeGetSelectedTextHandler);
-    NS_ASSERTION(mGetSelectedTextUPP!=NULL, "nsMacTSMMessagePump::InstallTSMAEHandlers: NewAEEventHandlerUPP[GetSelectedText] failed");
+  mGetSelectedTextUPP = NewAEEventHandlerUPP(nsMacTSMMessagePump::UnicodeGetSelectedTextHandler);
+  NS_ASSERTION(mGetSelectedTextUPP!=NULL, "nsMacTSMMessagePump::InstallTSMAEHandlers: NewAEEventHandlerUPP[GetSelectedText] failed");
 
-    err = AEInstallEventHandler(kTextServiceClass, kGetSelectedText, mGetSelectedTextUPP, (long)this, false);
-    NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::InstallTSMAEHandlers: AEInstallEventHandler[GetSelectedText] failed");
-
-  }
+  err = AEInstallEventHandler(kTextServiceClass, kGetSelectedText, mGetSelectedTextUPP, (long)this, false);
+  NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::InstallTSMAEHandlers: AEInstallEventHandler[GetSelectedText] failed");
 
 }
 
@@ -125,16 +116,13 @@ nsMacTSMMessagePump::~nsMacTSMMessagePump()
  	::DisposeAEEventHandlerUPP(mOffset2PosUPP);
  	::DisposeAEEventHandlerUPP(mUpdateUPP);
 
-  nsTSMStrategy tsmstrategy;
-  if (tsmstrategy.UseUnicodeForKeyboard()) {
-    err = AERemoveEventHandler(kTextServiceClass, kUnicodeNotFromInputMethod, mKeyboardUPP, false);
-    NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::RemoveTSMAEHandlers: AERemoveEventHandler[FromInputMethod] failed");
-    ::DisposeAEEventHandlerUPP(mKeyboardUPP);
+  err = AERemoveEventHandler(kTextServiceClass, kUnicodeNotFromInputMethod, mKeyboardUPP, false);
+  NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::RemoveTSMAEHandlers: AERemoveEventHandler[FromInputMethod] failed");
+  ::DisposeAEEventHandlerUPP(mKeyboardUPP);
 
-    err = AERemoveEventHandler(kTextServiceClass, kGetSelectedText, mGetSelectedTextUPP, false);
-    NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::RemoveTSMAEHandlers: AERemoveEventHandler[GetSelectedText] failed");
-    ::DisposeAEEventHandlerUPP(mGetSelectedTextUPP);
-  }
+  err = AERemoveEventHandler(kTextServiceClass, kGetSelectedText, mGetSelectedTextUPP, false);
+  NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::RemoveTSMAEHandlers: AERemoveEventHandler[GetSelectedText] failed");
+  ::DisposeAEEventHandlerUPP(mGetSelectedTextUPP);
 
 }
 
@@ -258,116 +246,6 @@ pascal OSErr nsMacTSMMessagePump::OffsetToPositionHandler(const AppleEvent *theA
 	if (err!=noErr) 
 		return err;
 	
-	return noErr;
-}
-pascal OSErr nsMacTSMMessagePump::UpdateHandler(const AppleEvent *theAppleEvent, AppleEvent *reply, long handlerRefcon)
-{
-	OSErr 					err;
-	DescType				returnedType;
-	nsMacEventHandler*		eventHandler;	
-	Size					actualSize;
-	AEDesc					text, hiliteRangeArray;
-	ScriptCode				textScript;
-	long					fixLength;
-	nsresult				res;
-	TextRangeArray*			hiliteRangePtr;
-
-
-	//
-	// refcon stores the nsMacEventHandler
-	//
-	err = AEGetParamPtr(theAppleEvent, keyAETSMDocumentRefcon, typeLongInteger, &returnedType,
-						&eventHandler, sizeof(eventHandler), &actualSize);
-	NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::UpdateHandler: AEGetParamPtr[TSMRefcon] failed.");
-	if (err!=noErr) 
-		return err;
-	
-	//
-	// IME update text
-	//
-	err = AEGetParamDesc(theAppleEvent, keyAETheData, typeChar, &text);
-	NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::UpdateHandler: AEGetParamDesc[Text] failed.");
-	if (err!=noErr) 
-		return err;
-	
-	//
-	// get the script of text for Unicode conversion
-	//
-	textScript=smUninterp;
-	AEDesc slr;
-	err = AEGetParamDesc(theAppleEvent, keyAETSMScriptTag, typeIntlWritingCode, &slr);
-	NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::UpdateHandler: AEGetParamDesc[keyAETSMScriptTag] failed.");
-	if (err!=noErr) 
-		return err;
-	
-
-	ScriptLanguageRecord scriptLangRec;
-	err = AEGetDescData(&slr, (void *) &scriptLangRec, sizeof(ScriptLanguageRecord));
-	if (err!=noErr) 
-		return err;
-	textScript = scriptLangRec.fScript;
-	NS_ASSERTION( (textScript < smUninterp), "Illegal script code");
-	
-	NS_ASSERTION(textScript == (ScriptCode)::GetScriptManagerVariable(smKeyScript) , "wrong script code");
-	//
-	// length of converted text
-	//
-	err = AEGetParamPtr(theAppleEvent, keyAEFixLength, typeLongInteger, &returnedType,
-						&fixLength, sizeof(fixLength), &actualSize);
-	NS_ASSERTION(err==noErr, "nsMacTSMMessagePump::UpdateHandler: AEGetParamPtr[fixlen] failed.");
-  	if (err!=noErr) 
-  		return err;
-
-  	//
-  	// extract the hilite ranges (optional param)
-  	//
-  	err = AEGetParamDesc(theAppleEvent, keyAEHiliteRange, typeTextRangeArray, &hiliteRangeArray);
-	NS_ASSERTION(err==noErr||err==errAEDescNotFound, "nsMacTSMMessagePump::UpdateHandler: AEGetParamPtr[fixlen] failed.");
-  	if (err==errAEDescNotFound) {
-  		hiliteRangePtr=NULL;
-  	} else if (err==noErr) { 
-		Size hiliteRangeSize = ::AEGetDescDataSize(&hiliteRangeArray);
-		hiliteRangePtr = (TextRangeArray *) NewPtr(hiliteRangeSize);
-		if (!hiliteRangePtr)
-			return MemError();
-		err = AEGetDescData(&hiliteRangeArray, (void *) hiliteRangePtr, hiliteRangeSize);
-		if (err!=noErr) {
-			DisposePtr((Ptr) hiliteRangePtr);
-			return err;
-		}
-  	} else { 
-  		return err;
-  	}
-
-	nsCAutoString mbcsText;
-	Size text_size = ::AEGetDescDataSize(&text);
-	mbcsText.SetCapacity(text_size+1);
-	char* mbcsTextPtr = mbcsText.BeginWriting();
-	err = AEGetDescData(&text, (void *) mbcsTextPtr, text_size);
-	if (err!=noErr) {
-		DisposePtr((Ptr) hiliteRangePtr);
-		return err;
-	}
-	mbcsTextPtr[text_size]=0;
-	
-	//
-	// must pass HandleUpdateInputArea a null-terminated multibyte string, the text size must include the terminator
-	//
-	res = eventHandler->HandleUpdateInputArea(mbcsTextPtr, text_size, textScript, fixLength, hiliteRangePtr);
-
-	NS_ASSERTION(NS_SUCCEEDED(res), "nsMacMessagePump::UpdateHandler: HandleUpdated failed.");
-	if (NS_FAILED(res))
-		err = paramErr;
-	
-	//
-	// clean up
-	//
-	if (hiliteRangePtr)
-		DisposePtr((Ptr) hiliteRangePtr);
-
-	(void)AEDisposeDesc(&text);
-	(void)AEDisposeDesc(&hiliteRangeArray);
-
 	return noErr;
 }
 
