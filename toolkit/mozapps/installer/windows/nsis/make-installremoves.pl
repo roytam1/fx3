@@ -1,4 +1,3 @@
-#
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -12,15 +11,15 @@
 # for the specific language governing rights and limitations under the
 # License.
 #
-# The Original Code is mozilla.org code.
+# The Original Code is Mozilla installer build scripts.
 #
 # The Initial Developer of the Original Code is
-# Netscape Communications Corporation.
-# Portions created by the Initial Developer are Copyright (C) 1998
-# the Initial Developer. All Rights Reserved.
+# Robert Strong <robert.bugzilla@gmail.com>
+#
+# Portions created by the Initial Developer are Copyright (C) 2005
+# the Mozilla Foundation <http://www.mozilla.org/>. All Rights Reserved.
 #
 # Contributor(s):
-#   IBM Corp.
 #
 # Alternatively, the contents of this file may be used under the terms of
 # either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -36,53 +35,25 @@
 #
 # ***** END LICENSE BLOCK *****
 
-DEPTH		= ../../../../..
-topsrcdir	= @top_srcdir@
-srcdir		= @srcdir@
-VPATH		= @srcdir@
+# Read a removed-files manifest and create an NSIS include file to delete the
+# files and directories specified in the first part of the installation phase
 
-include $(DEPTH)/config/autoconf.mk
+# deleteThisFile/deleteThisFolder instructions suitable for an install.js
+# script. This simply processes <> to stdout.
 
-MODULE		= plugin
-LIBRARY_NAME	= npnulos2
-RESFILE		= npnulos2.res
+print "\n\n$1\n\n";
 
-PACKAGE_FILE = npnul.pkg
+while (<>) {
+    m|^\s*(\S+)\s*$|;
+    my $file = $1;
+    next if ($file eq "");
 
-REQUIRES	= java \
-		  xpcom \
-		  pref \
-		  $(NULL)
+    $file =~ s/\//\\/g;
+    if ($file =~ m|\\$|) {
+        print "Dir: \\$file\n";
+    }
+    else {
+        print "File: $file\n";
+    }
+}
 
-CPPSRCS		= \
-		maindll.cpp \
-		plugin.cpp \
-		dbg.cpp \
-		dialogs.cpp \
-		npshell.cpp \
-		npos2.cpp \
-		utils.cpp \
-		$(NULL)
-
-# plugins should always be shared, even in the "static" build
-FORCE_SHARED_LIB = 1
-
-NO_DIST_INSTALL	= 1
-NO_INSTALL = 1
-
-include $(topsrcdir)/config/rules.mk
-
-EXTRA_DSO_LDOPTS += $(MOZ_COMPONENT_LIBS) \
-		$(NULL)
-
-install-plugin: $(SHARED_LIBRARY)
-ifdef SHARED_LIBRARY
-	$(INSTALL) $(SHARED_LIBRARY) $(DIST)/bin/plugins
-endif
-
-libs:: install-plugin
-
-install:: $(SHARED_LIBRARY)
-ifdef SHARED_LIBRARY
-	$(SYSINSTALL) $(IFLAGS2) $< $(DESTDIR)$(mozappdir)/plugins
-endif
