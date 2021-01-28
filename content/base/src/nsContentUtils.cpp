@@ -130,6 +130,7 @@ static NS_DEFINE_CID(kXTFServiceCID, NS_XTFSERVICE_CID);
 #include "nsXULAtoms.h"
 #include "nsIEventListenerManager.h"
 #include "nsAttrName.h"
+#include "nsIDOMUserDataHandler.h"
 
 // for ReportToConsole
 #include "nsIStringBundle.h"
@@ -2776,44 +2777,19 @@ nsContentUtils::HasNonEmptyAttr(nsIContent* aContent, PRInt32 aNameSpaceID,
     == nsIContent::ATTR_VALUE_NO_MATCH;
 }
 
-/**
- * Quick helper to determine whether there are any mutation listeners
- * of a given type that apply to the node passed in.
- *
- * @param aNode to check for listeners.
- *
- * @return true if there are mutation listeners.
- */
 /* static */
 PRBool
-NodeHasMutationListeners(nsINode* aNode)
-{
-  nsCOMPtr<nsIEventListenerManager> manager;
-  aNode->GetListenerManager(PR_FALSE, getter_AddRefs(manager));
-  if (manager) {
-    PRBool hasListeners = PR_FALSE;
-    manager->HasMutationListeners(&hasListeners);
-    return hasListeners;
-  }
-  return PR_FALSE;
-}
-
-/* static */
-PRBool
-nsContentUtils::HasMutationListeners(nsIContent* aContent,
-                                     nsIDocument* aDocument,
+nsContentUtils::HasMutationListeners(nsINode* aNode,
                                      PRUint32 aType)
 {
-  NS_PRECONDITION(!aContent || aContent->GetCurrentDoc() == aDocument,
-                  "Incorrect aDocument");
-  if (!aDocument) {
-    // We do not support event listeners on content not attached to documents.
+  nsIDocument* doc = aNode->GetOwnerDoc();
+  if (!doc) {
     return PR_FALSE;
   }
 
   // global object will be null for documents that don't have windows.
   nsCOMPtr<nsPIDOMWindow> window;
-  window = do_QueryInterface(aDocument->GetScriptGlobalObject());
+  window = do_QueryInterface(doc->GetScriptGlobalObject());
   if (window && !window->HasMutationListeners(aType)) {
     return PR_FALSE;
   }
@@ -2835,13 +2811,20 @@ nsContentUtils::HasMutationListeners(nsIContent* aContent,
   // If we have a window, we know a mutation listener is registered, but it
   // might not be in our chain.  If we don't have a window, we might have a
   // mutation listener.  Check quickly to see.
-  for (nsIContent* curr = aContent; curr; curr = curr->GetParent()) {
-    if (NodeHasMutationListeners(curr)) {
-      return PR_TRUE;
+  while (aNode) {
+    nsCOMPtr<nsIEventListenerManager> manager;
+    aNode->GetListenerManager(PR_FALSE, getter_AddRefs(manager));
+    if (manager) {
+      PRBool hasListeners = PR_FALSE;
+      manager->HasMutationListeners(&hasListeners);
+      if (hasListeners) {
+        return PR_TRUE;
+      }
     }
+    aNode = aNode->GetNodeParent();
   }
 
-  return NodeHasMutationListeners(aDocument);
+  return PR_FALSE;
 }
 
 /* static */
@@ -3074,4 +3057,121 @@ nsContentUtils::IsValidNodeName(nsIAtom *aLocalName, nsIAtom *aPrefix,
   // If the namespace is not the XML namespace then the prefix must not be xml.
   return aPrefix != nsGkAtoms::xmlns &&
          (aNamespaceID == kNameSpaceID_XML || aPrefix != nsGkAtoms::xml);
+}
+
+/* static */
+nsresult
+nsContentUtils::SetUserData(nsINode *aNode, nsIAtom *aKey,
+                            nsIVariant *aData, nsIDOMUserDataHandler *aHandler,
+                            nsIVariant **aResult)
+{
+  *aResult = nsnull;
+
+  nsresult rv;
+  void *data;
+  if (aData) {
+    rv = aNode->SetProperty(DOM_USER_DATA, aKey, aData,
+                            nsPropertyTable::SupportsDtorFunc,
+                            &data);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    NS_ADDREF(aData);
+  }
+  else {
+    data = aNode->UnsetProperty(DOM_USER_DATA, aKey);
+  }
+
+  // Take over ownership of the old data from the property table.
+  nsCOMPtr<nsIVariant> oldData = dont_AddRef(NS_STATIC_CAST(nsIVariant*, data));
+
+  if (aData && aHandler) {
+    rv = aNode->SetProperty(DOM_USER_DATA_HANDLER, aKey, aHandler,
+                            nsPropertyTable::SupportsDtorFunc);
+    if (NS_FAILED(rv)) {
+      // We failed to set the handler, remove the data.
+      aNode->DeleteProperty(DOM_USER_DATA, aKey);
+
+      return rv;
+    }
+
+    NS_ADDREF(aHandler);
+  }
+  else {
+    aNode->DeleteProperty(DOM_USER_DATA_HANDLER, aKey);
+  }
+
+  oldData.swap(*aResult);
+
+  return NS_OK;
+}
+
+struct nsHandlerData
+{
+  PRUint16 mOperation;
+  nsIDOMNode *mSource;
+  nsIDOMNode *mDest;
+};
+
+static void
+CallHandler(void *aObject, nsIAtom *aKey, void *aHandler, void *aData)
+{
+  nsHandlerData *handlerData = NS_STATIC_CAST(nsHandlerData*, aData);
+  nsCOMPtr<nsIDOMUserDataHandler> handler =
+    NS_STATIC_CAST(nsIDOMUserDataHandler*, aHandler);
+
+  nsINode *node = NS_STATIC_CAST(nsINode*, aObject);
+  nsCOMPtr<nsIVariant> data =
+    NS_STATIC_CAST(nsIVariant*, node->GetProperty(DOM_USER_DATA, aKey));
+  NS_ASSERTION(data, "Handler without data?");
+
+  nsAutoString key;
+  aKey->ToString(key);
+  handler->Handle(handlerData->mOperation, key, data, handlerData->mSource,
+                  handlerData->mDest);
+}
+
+/* static */
+void
+nsContentUtils::CallUserDataHandler(nsIDocument *aDocument, PRUint16 aOperation,
+                                    const nsINode *aNode, nsIDOMNode *aSource,
+                                    nsIDOMNode *aDest)
+{
+#ifdef DEBUG
+  // XXX Should we guard from QI'ing nodes that are being destroyed?
+  nsCOMPtr<nsINode> node = do_QueryInterface(NS_CONST_CAST(nsINode*, aNode));
+  NS_ASSERTION(node == aNode, "Use canonical nsINode pointer!");
+#endif
+
+  nsHandlerData handlerData = { aOperation, aSource, aDest };
+  aDocument->PropertyTable()->Enumerate(aNode, DOM_USER_DATA_HANDLER,
+                                        CallHandler, &handlerData);
+}
+
+static void
+CopyData(void *aObject, nsIAtom *aKey, void *aUserData, void *aData)
+{
+  nsPropertyTable *propertyTable = NS_STATIC_CAST(nsPropertyTable*, aData);
+  nsINode *node = NS_STATIC_CAST(nsINode*, aObject);
+  nsIDOMUserDataHandler *handler =
+    NS_STATIC_CAST(nsIDOMUserDataHandler*,
+                   propertyTable->GetProperty(node, DOM_USER_DATA_HANDLER,
+                                              aKey));
+
+  nsCOMPtr<nsIVariant> result;
+  nsContentUtils::SetUserData(node, aKey,
+                              NS_STATIC_CAST(nsIVariant*, aUserData), handler,
+                              getter_AddRefs(result));
+}
+
+/* static */
+void
+nsContentUtils::CopyUserData(nsIDocument *aOldDocument, const nsINode *aNode)
+{
+#ifdef DEBUG
+  nsCOMPtr<nsINode> node = do_QueryInterface(NS_CONST_CAST(nsINode*, aNode));
+  NS_ASSERTION(node == aNode, "Use canonical nsINode pointer!");
+#endif
+
+  nsPropertyTable *table = aOldDocument->PropertyTable();
+  table->Enumerate(aNode, DOM_USER_DATA, CopyData, table);
 }

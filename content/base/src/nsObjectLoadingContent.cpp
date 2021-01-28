@@ -289,6 +289,7 @@ nsObjectLoadingContent::nsObjectLoadingContent()
 
 nsObjectLoadingContent::~nsObjectLoadingContent()
 {
+  DestroyImageLoadingContent();
   if (mFrameLoader) {
     mFrameLoader->Destroy();
   }
@@ -704,6 +705,8 @@ nsObjectLoadingContent::LoadObject(const nsAString& aURI,
     Fallback(aNotify);
     return NS_OK;
   }
+
+  NS_TryToSetImmutable(uri);
 
   return LoadObject(uri, aNotify, aTypeHint, aForceLoad);
 }

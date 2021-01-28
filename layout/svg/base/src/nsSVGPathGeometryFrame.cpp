@@ -43,14 +43,13 @@
 #include "nsISVGRenderer.h"
 #include "nsISVGRendererRegion.h"
 #include "nsISVGValueUtils.h"
-#include "nsISVGContainerFrame.h"
+#include "nsSVGContainerFrame.h"
 #include "nsReadableUtils.h"
 #include "nsUnicharUtils.h"
 #include "nsSVGAtoms.h"
 #include "nsCRT.h"
 #include "prdtoa.h"
 #include "nsSVGMarkerFrame.h"
-#include "nsISVGMarkable.h"
 #include "nsIViewManager.h"
 #include "nsSVGMatrix.h"
 #include "nsSVGClipPathFrame.h"
@@ -280,10 +279,7 @@ nsSVGPathGeometryFrame::PaintSVG(nsISVGRendererCanvas* canvas)
   /* render */
   GetGeometry()->Render(this, canvas);
 
-  nsISVGMarkable *markable;
-  CallQueryInterface(this, &markable);
-
-  if (markable) {
+  if (IsMarkable()) {
     // Marker Property is added lazily and may have been removed by a restyle
     UpdateMarkerProperty();
     nsSVGMarkerProperty *property = GetMarkerProperty();
@@ -299,7 +295,7 @@ nsSVGPathGeometryFrame::PaintSVG(nsISVGRendererCanvas* canvas)
       float strokeWidth = GetStrokeWidth();
         
       nsVoidArray marks;
-      markable->GetMarkPoints(&marks);
+      GetMarkPoints(&marks);
         
       PRUint32 num = marks.Count();
         
@@ -348,10 +344,7 @@ nsSVGPathGeometryFrame::GetCoveredRegion()
 
   GetGeometry()->GetCoveredRegion(this, &region);
 
-  nsISVGMarkable *markable;
-  CallQueryInterface(this, &markable);
-
-  if (markable) {
+  if (IsMarkable()) {
     nsSVGMarkerProperty *property = GetMarkerProperty();
 
     if (!property ||
@@ -363,7 +356,7 @@ nsSVGPathGeometryFrame::GetCoveredRegion()
     float strokeWidth = GetStrokeWidth();
 
     nsVoidArray marks;
-    markable->GetMarkPoints(&marks);
+    GetMarkPoints(&marks);
 
     PRUint32 num = marks.Count();
 
@@ -525,13 +518,8 @@ nsSVGPathGeometryFrame::GetCanvasTM(nsIDOMSVGMatrix * *aCTM)
     return NS_NewSVGMatrix(aCTM);
   }
 
-  nsISVGContainerFrame *containerFrame;
-  mParent->QueryInterface(NS_GET_IID(nsISVGContainerFrame), (void**)&containerFrame);
-  if (!containerFrame) {
-    NS_ERROR("invalid container");
-    return NS_ERROR_FAILURE;
-  }
-
+  nsSVGContainerFrame *containerFrame = NS_STATIC_CAST(nsSVGContainerFrame*,
+                                                       mParent);
   nsCOMPtr<nsIDOMSVGMatrix> parentTM = containerFrame->GetCanvasTM();
   NS_ASSERTION(parentTM, "null TM");
 
@@ -620,6 +608,8 @@ nsSVGPathGeometryFrame::GetShapeRendering(PRUint16 *aShapeRendering)
 NS_IMETHODIMP
 nsSVGPathGeometryFrame::InitSVG()
 {
+  nsSVGPathGeometryFrameBase::InitSVG();
+
   // construct a pathgeometry object:
   nsISVGOuterSVGFrame* outerSVGFrame = nsSVGUtils::GetOuterSVGFrame(this);
   if (!outerSVGFrame) {
@@ -649,6 +639,9 @@ nsSVGPathGeometryFrame::GetGeometry()
 nsresult
 nsSVGPathGeometryFrame::UpdateGraphic(PRBool suppressInvalidation)
 {
+  if (GetStateBits() & NS_STATE_SVG_NONDISPLAY_CHILD)
+    return NS_OK;
+
   nsISVGOuterSVGFrame *outerSVGFrame = nsSVGUtils::GetOuterSVGFrame(this);
   if (!outerSVGFrame) {
     NS_ERROR("null outerSVGFrame");

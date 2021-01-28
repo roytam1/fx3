@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim:set ts=2 sw=2 sts=2 et cindent: */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -11,15 +13,14 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is Chimera code.
+ * The Original Code is the Metrics extension.
  *
- * The Initial Developer of the Original Code is
- * Netscape Communications Corporation.
- * Portions created by the Initial Developer are Copyright (C) 2002
+ * The Initial Developer of the Original Code is Google Inc.
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Simon Fraser <sfraser@netscape.com>
+ *  Brian Ryner <bryner@brianryner.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,13 +36,19 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nscore.h"
+// This file defines common macros for C++ unit tests
 
-// embedding app's factories for creating instances of interfaces
-// related to downloading.
+#define ASSERT_TRUE_RET(cond, ret) \
+  if (!cond) { \
+    fprintf(stderr, "FAILED: %s at %s:%d\n", #cond, __FILE__, __LINE__); \
+    return ret; \
+  }
 
-class nsIFactory;
+#define ASSERT_TRUE(cond) \
+  if (!cond) { \
+    fprintf(stderr, "FAILED: %s at %s:%d\n", #cond, __FILE__, __LINE__); \
+    return ; \
+  }
 
-nsresult NewDownloadListenerFactory(nsIFactory* *outFactory);
-                                    
-//nsresult NewHelperAppLauncherDialogFactory(nsIFactory* *outFactory);
+#define ASSERT_SUCCESS(res) ASSERT_TRUE(NS_SUCCEEDED(res))
+#define ASSERT_FALSE(cond) ASSERT_TRUE(! cond)

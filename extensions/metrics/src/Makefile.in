@@ -43,9 +43,8 @@ VPATH		= @srcdir@
 include $(DEPTH)/config/autoconf.mk
 
 MODULE		= metrics
-LIBRARY_NAME	= metrics
-SHORT_LIBNAME	= metrics
-IS_COMPONENT	= 1
+LIBRARY_NAME	= metrics_s
+SHORT_LIBNAME	= metrics_s
 
 XPI_NAME	= metrics
 
@@ -89,7 +88,6 @@ CPPSRCS		= \
 		nsLoadCollector.cpp \
 		nsMetricsConfig.cpp \
 		nsMetricsEventItem.cpp \
-		nsMetricsModule.cpp \
 		nsMetricsService.cpp \
 		nsProfileCollector.cpp \
 		nsWindowCollector.cpp \
@@ -97,11 +95,11 @@ CPPSRCS		= \
 		nsStringUtils.cpp \
 		$(NULL)
 
-SHARED_LIBRARY_LIBS += $(DIST)/lib/$(LIB_PREFIX)bz2.$(LIB_SUFFIX)
+# Create a static library to link into the component library and unit tests
+FORCE_STATIC_LIB = 1
 
-EXTRA_DSO_LDOPTS = $(XPCOM_GLUE_LDOPTS) \
-		   $(NSPR_LIBS) \
-		   $(NULL)
+# md5.c requires NSS headers
+LOCAL_INCLUDES = -I$(DIST)/public/nss -I$(DIST)/private/nss
 
 # Link against the static CRT
 ifeq ($(OS_ARCH)_$(GNU_CC), WINNT_)
@@ -115,5 +113,3 @@ include $(topsrcdir)/config/rules.mk
 
 export:: $(topsrcdir)/security/nss/lib/freebl/md5.c
 	$(INSTALL) $^ .
-
-LOCAL_INCLUDES += -I$(srcdir) -I$(DIST)/public/nss -I$(DIST)/private/nss

@@ -72,10 +72,6 @@ Abort(const char *aMsg);
 static void
 Break(const char *aMsg);
 
-#if defined(__APPLE__) && defined(TARGET_CARBON)
-#  include "MacTypes.h"
-#endif
-
 #if defined(XP_OS2)
 #  define INCL_WINDIALOGS  // need for WinMessageBox
 #  include <os2.h>
@@ -409,16 +405,16 @@ Break(const char *aMsg)
 
     // 2nd arg of CreateProcess is in/out
     char *msgCopy = (char*) _alloca(strlen(aMsg) + 1); 
-   strcpy(msgCopy, aMsg);
+    strcpy(msgCopy, aMsg);
 
     if(GetModuleFileName(GetModuleHandle("xpcom.dll"), executable, MAX_PATH) &&
        NULL != (pName = strrchr(executable, '\\')) &&
        NULL != strcpy(pName+1, "windbgdlg.exe") &&
        CreateProcess(executable, msgCopy, NULL, NULL, PR_FALSE,
                      DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
-                     NULL, NULL, &si, &pi) &&
-       WAIT_OBJECT_0 == WaitForSingleObject(pi.hProcess, INFINITE) &&
-       GetExitCodeProcess(pi.hProcess, &code)) {
+                     NULL, NULL, &si, &pi)) {
+      WaitForSingleObject(pi.hProcess, INFINITE);
+      GetExitCodeProcess(pi.hProcess, &code);
       CloseHandle(pi.hProcess);
     }
 
@@ -461,10 +457,14 @@ Break(const char *aMsg)
    asm("int $3");
 #elif defined(XP_BEOS)
    DEBUGGER(aMsg);
-#elif defined(__GNUC__) && (defined(__i386) || defined(__x86_64__))
+#elif defined(XP_MACOSX)
+   /* Note that we put this Mac OS X test above the GNUC/x86 test because the
+    * GNUC/x86 test is also true on Intel Mac OS X and we want the PPC/x86
+    * impls to be the same.
+    */
+   raise(SIGTRAP);
+#elif defined(__GNUC__) && (defined(__i386__) || defined(__i386) || defined(__x86_64__))
    asm("int $3");
-#elif defined(__APPLE__) && defined(TARGET_CARBON)
-   Debugger();
 #else
    // don't know how to break on this platform
 #endif

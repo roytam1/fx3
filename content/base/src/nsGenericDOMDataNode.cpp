@@ -274,10 +274,10 @@ nsGenericDOMDataNode::CloneNode(PRBool aDeep, nsIDOMNode *aSource,
   rv = CallQueryInterface(newContent, aResult);
 
   nsIDocument *ownerDoc = GetOwnerDoc();
-  if (NS_SUCCEEDED(rv) && ownerDoc && HasFlag(NODE_HAS_PROPERTIES)) {
-    ownerDoc->CallUserDataHandler(nsIDOMUserDataHandler::NODE_CLONED,
-                                  NS_STATIC_CAST(const nsIContent*, this),
-                                  aSource, *aResult);
+  if (NS_SUCCEEDED(rv) && ownerDoc && HasProperties()) {
+    nsContentUtils::CallUserDataHandler(ownerDoc,
+                                        nsIDOMUserDataHandler::NODE_CLONED,
+                                        this, aSource, *aResult);
   }
 
   return rv;
@@ -415,7 +415,6 @@ nsGenericDOMDataNode::AppendData(const nsAString& aData)
 
   PRBool haveMutationListeners =
     nsContentUtils::HasMutationListeners(this,
-      document,
       NS_EVENT_BITS_MUTATION_CHARACTERDATAMODIFIED);
 
   nsCOMPtr<nsIAtom> oldValue;
@@ -650,7 +649,7 @@ nsGenericDOMDataNode::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   }
 
   nsresult rv = NS_OK;
-  nsIDocument *oldOwnerDocument = GetOwnerDoc();
+  nsCOMPtr<nsIDocument> oldOwnerDocument = GetOwnerDoc();
   nsIDocument *newOwnerDocument;
   nsNodeInfoManager* nodeInfoManager;
 
@@ -669,16 +668,6 @@ nsGenericDOMDataNode::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   } else {
     newOwnerDocument = aParent->GetOwnerDoc();
     nodeInfoManager = aParent->NodeInfo()->NodeInfoManager();
-  }
-
-  if (oldOwnerDocument && oldOwnerDocument != newOwnerDocument) {
-    if (newOwnerDocument && HasFlag(NODE_HAS_PROPERTIES)) {
-      // Copy UserData to the new document.
-      oldOwnerDocument->CopyUserData(this, newOwnerDocument);
-    }
-
-    // Remove all properties.
-    oldOwnerDocument->PropertyTable()->DeleteAllPropertiesFor(this);
   }
 
   if (mNodeInfo->NodeInfoManager() != nodeInfoManager) {
@@ -701,6 +690,15 @@ nsGenericDOMDataNode::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
       NS_ENSURE_SUCCESS(rv, rv);
     }
     mNodeInfo.swap(newNodeInfo);
+  }
+
+  if (oldOwnerDocument && oldOwnerDocument != newOwnerDocument &&
+      HasProperties()) {
+    // Copy UserData to the new document.
+    nsContentUtils::CopyUserData(oldOwnerDocument, this);
+
+    // Remove all properties.
+    oldOwnerDocument->PropertyTable()->DeleteAllPropertiesFor(this);
   }
 
   NS_POSTCONDITION(aDocument == GetCurrentDoc(), "Bound to wrong document");
@@ -983,9 +981,8 @@ nsGenericDOMDataNode::SetText(const PRUnichar* aBuffer,
   nsIDocument *document = GetCurrentDoc();
   mozAutoDocUpdate updateBatch(document, UPDATE_CONTENT_MODEL, aNotify);
 
-  PRBool haveMutationListeners =
+  PRBool haveMutationListeners = aNotify &&
     nsContentUtils::HasMutationListeners(this,
-      document,
       NS_EVENT_BITS_MUTATION_CHARACTERDATAMODIFIED);
 
   nsCOMPtr<nsIAtom> oldValue;

@@ -268,7 +268,8 @@ function InitViewSortByMenu()
       || sortType == nsMsgViewSortType.byDate || sortType == nsMsgViewSortType.byPriority
       || sortType == nsMsgViewSortType.bySubject || sortType == nsMsgViewSortType.byLabel
       || sortType == nsMsgViewSortType.byRecipient || sortType == nsMsgViewSortType.byAccount
-      || sortType == nsMsgViewSortType.byStatus);
+      || sortType == nsMsgViewSortType.byStatus || sortType == nsMsgViewSortType.byFlagged
+      || sortType == nsMsgViewSortType.byAttachments);
 
   setSortByMenuItemCheckState("sortAscending", (sortOrder == nsMsgViewSortOrder.ascending));
   setSortByMenuItemCheckState("sortDescending", (sortOrder == nsMsgViewSortOrder.descending));
@@ -1384,11 +1385,6 @@ function MsgFindAgain(reverse)
     gFindBar.onFindPreviousCmd();
   else
     gFindBar.onFindAgainCmd();
-}
-
-function MsgCanFindAgain()
-{
-  return canFindAgainInPage();
 }
 
 function MsgFilters(emailAddress, folder)

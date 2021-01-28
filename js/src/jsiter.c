@@ -398,24 +398,27 @@ js_ValueToIterator(JSContext *cx, jsval v, uintN flags)
             return NULL;
     }
 
+    arg = BOOLEAN_TO_JSVAL((flags & JSITER_FOREACH) == 0);
+
     JS_PUSH_SINGLE_TEMP_ROOT(cx, obj, &tvr);
     if (!JS_GetMethodById(cx, obj, ATOM_TO_JSID(atom), &obj, &fval))
         goto bad;
+    if (JSVAL_IS_VOID(fval)) {
+        if (!js_DefaultIterator(cx, obj, 1, &arg, &rval))
+            goto bad;
+        if (JSVAL_IS_PRIMITIVE(rval))
+            goto bad_iterator;
+        iterobj = JSVAL_TO_OBJECT(rval);
+        JS_ASSERT(OBJ_GET_CLASS(cx, iterobj) == &js_IteratorClass);
+        iterobj->slots[JSSLOT_ITER_FLAGS] |= INT_TO_JSVAL(JSITER_HIDDEN);
+        goto out;
+    }
 
-    arg = BOOLEAN_TO_JSVAL((flags & JSITER_FOREACH) == 0);
     if (!js_InternalInvoke(cx, obj, fval, JSINVOKE_ITERATOR, 1, &arg, &rval))
         goto bad;
 
-    if (JSVAL_IS_PRIMITIVE(rval)) {
-        str = js_DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, NULL);
-        if (str) {
-            JS_ReportErrorNumberUC(cx, js_GetErrorMessage, NULL,
-                                   JSMSG_BAD_ITERATOR_RETURN,
-                                   JSSTRING_CHARS(str),
-                                   JSSTRING_CHARS(ATOM_TO_STRING(atom)));
-        }
-        goto bad;
-    }
+    if (JSVAL_IS_PRIMITIVE(rval))
+        goto bad_iterator;
 
     iterobj = JSVAL_TO_OBJECT(rval);
 
@@ -423,7 +426,7 @@ js_ValueToIterator(JSContext *cx, jsval v, uintN flags)
      * If __iterator__ is the default native method, the native iterator it
      * returns can be flagged as hidden from script access.  This flagging is
      * predicated on js_ValueToIterator being called only by the for-in loop
-     * code -- the js_FinishNativeIteration early-finalization optimization
+     * code -- the js_CloseNativeIteration early-finalization optimization
      * based on it will break badly if script can reach iterobj.
      */
     if (OBJ_GET_CLASS(cx, iterobj) == &js_IteratorClass &&
@@ -436,9 +439,20 @@ js_ValueToIterator(JSContext *cx, jsval v, uintN flags)
 out:
     JS_POP_TEMP_ROOT(cx, &tvr);
     return iterobj;
+
 bad:
     iterobj = NULL;
     goto out;
+
+bad_iterator:
+    str = js_DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, NULL);
+    if (str) {
+        JS_ReportErrorNumberUC(cx, js_GetErrorMessage, NULL,
+                               JSMSG_BAD_ITERATOR_RETURN,
+                               JSSTRING_CHARS(str),
+                               JSSTRING_CHARS(ATOM_TO_STRING(atom)));
+    }
+    goto bad;
 }
 
 JSBool

@@ -130,7 +130,7 @@ NS_NewDOMDocument(nsIDOMDocument** aInstancePtrResult,
     return rv;
   }
 
-  doc->nsIDocument::SetDocumentURI(aDocumentURI);
+  doc->nsDocument::SetDocumentURI(aDocumentURI);
   // Must set the principal first, since SetBaseURI checks it.
   doc->SetPrincipal(aPrincipal);
   doc->SetBaseURI(aBaseURI);
@@ -727,9 +727,10 @@ nsXMLDocument::CloneNode(PRBool aDeep, nsIDOMNode** aReturn)
   }
 
   rv = CallQueryInterface(newDoc, aReturn);
-  if (NS_SUCCEEDED(rv)) {
-    CallUserDataHandler(nsIDOMUserDataHandler::NODE_CLONED,
-                        NS_STATIC_CAST(nsIDocument*, this), this, *aReturn);
+  if (NS_SUCCEEDED(rv) && HasProperties()) {
+    nsContentUtils::CallUserDataHandler(this,
+                                        nsIDOMUserDataHandler::NODE_CLONED,
+                                        this, this, *aReturn);
   }
 
   return rv;
