@@ -63,9 +63,10 @@
                        type="autocomplete"
                        flex="1"
                        autocompletepopup="PopupAutoComplete"
-                       autocompletesearch="form-history"
+                       autocompletesearch="search-autocomplete"
                        autocompletesearchparam="searchbar-history"
                        completeselectedindex="true"
+                       showcommentcolumn="true"
                        tabscrolling="true"
                        xbl:inherits="disableautocomplete,searchengine,src">
             <xul:image align="center"
@@ -119,9 +120,6 @@
                Components.classes["@mozilla.org/observer-service;1"]
                          .getService(Components.interfaces.nsIObserverService);
           os.addObserver(this, "browser-search-engine-modified", false);
-
-          // make sure we're using the right autocomplete          
-          this._updateAutocompleteSearch();
         ]]></body>
       </method>
 
@@ -142,7 +140,7 @@
       <field name="_engines">null</field>
 
       <property name="currentEngine"
-                onset="this.searchService.currentEngine = val;">
+                onset="this.searchService.currentEngine = val; return val;">
         <getter><![CDATA[
           var currentEngine = this.searchService.currentEngine;
           // Return a dummy engine if there is no currentEngine
@@ -216,6 +214,10 @@
           else
             this.setAttribute("src", "");
 
+          // Update current engine display
+          if (this.hasAttribute("empty")) 
+            this._textbox._displayCurrentEngine();
+
           var name = this.currentEngine.name;
           var text = this._stringBundle.getFormattedString("searchtip", [name]);
           this.setAttribute("tooltiptext", text);
@@ -247,7 +249,7 @@
             // if no separators are present.
             var insertLocation = popup.firstChild;
             while (insertLocation.nextSibling &&
-                insertLocation.localName != "menuseparator") {
+                   insertLocation.localName != "menuseparator") {
               insertLocation = insertLocation.nextSibling;
             }
             if (insertLocation.localName != "menuseparator")
@@ -348,14 +350,9 @@
                       .classes["@mozilla.org/browser/search-service;1"]
                       .getService(Components.interfaces.nsIBrowserSearchService);
             if (searchService) {
-              // If the description file URI ends in "xml", assume an XML file;
-              // otherwise, assume text.  That's about the best we can do without
-              // loading the file itself.
-              const engineURI = aTarget.getAttribute("uri");
-              var type = Components.interfaces.nsISearchEngine.DATA_TEXT;
-              if (engineURI.search(/\.xml$/i))
-                type = Components.interfaces.nsISearchEngine.DATA_XML;
-              searchService.addEngine(engineURI, type,
+              // We only detect OpenSearch files
+              var type = Components.interfaces.nsISearchEngine.DATA_XML;
+              searchService.addEngine(aTarget.getAttribute("uri"), type,
                                       aTarget.getAttribute("src"));
             }
           }
@@ -378,28 +375,8 @@
           if (newIndex >= 0 && newIndex < this._engines.length)
             this.currentEngine = this._engines[newIndex];
 
-          this._updateAutocompleteSearch()
-
           aEvent.preventDefault();
           aEvent.stopPropagation();
-        ]]></body>
-      </method>
-
-      <method name="_updateAutocompleteSearch">
-        <body><![CDATA[
-          var autocompleteSearch = this.currentEngine.suggestionURI ?
-                                   "remote-url-suggestions" :
-                                   "form-history";
-          this._textbox.setAttribute("autocompletesearch", autocompleteSearch);
-          
-          this._textbox.mSearchNames = null;
-          // Resetting the input property causes the field to notify
-          // the autocomplete controller that the search service(s) it must
-          // use have changed. We have no means of notifying it about this
-          // change directly. 
-          this._textbox.mController.input = null;
-      
-          this._textbox.mController.input = this._textbox;
         ]]></body>
       </method>
 

@@ -89,7 +89,7 @@ static void FileSystemNotificationProc(FNMessage message, OptionBits flags, void
     [theTime appendFormat:@"%d:",(seconds / 3600)];
     seconds = seconds % 3600;
   }
-  
+
   NSString *elapsedMin = [NSString stringWithFormat:@"%d:",(seconds / 60)];
   if ([elapsedMin length] == 2)
     [theTime appendString:[padZero stringByAppendingString:elapsedMin]];
@@ -439,6 +439,15 @@ static void FileSystemNotificationProc(FNMessage message, OptionBits flags, void
         statusString = NSLocalizedString(@"DownloadInterrupted", nil);
       }
       else {
+        // If the download size was not known then lookup size from the file we downloaded
+        if (mDownloadSize < 0) {
+          [self checkFileExists];
+          if (mFileExists) {
+            NSDictionary* fattrs = [[NSFileManager defaultManager] fileAttributesAtPath:mDestPath traverseLink:NO];
+            mDownloadSize = (long long) [fattrs fileSize];
+          }
+        }
+
         statusString = [NSString stringWithFormat:NSLocalizedString(@"DownloadCompleted", nil),
           [[self class] formatTime:(int)mDownloadTime], [[self class] formatBytes:mDownloadSize]];
       }

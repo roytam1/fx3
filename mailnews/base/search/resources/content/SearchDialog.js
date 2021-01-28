@@ -83,6 +83,7 @@ var nsSearchResultsController =
         case "file_message_button":
         case "goto_folder_button":
         case "saveas_vf_button":
+        case "cmd_selectAll":
             return true;
         default:
             return false;
@@ -111,6 +112,8 @@ var nsSearchResultsController =
           case "saveas_vf_button":
               // need someway to see if there are any search criteria...
               return true;
+          case "cmd_selectAll":
+            return GetDBView() != null;              
           default:
             if (GetNumSelectedMessages() <= 0)
               enabled = false;
@@ -142,6 +145,13 @@ var nsSearchResultsController =
         case "saveas_vf_button":
             saveAsVirtualFolder();
             return true;
+
+        case "cmd_selectAll":
+            // move the focus to the search results pane
+            GetThreadTree().focus();
+            GetDBView().doCommand(nsMsgViewCommandType.selectAll)
+            return true;
+                            
         default:
             return false;
         }
@@ -304,7 +314,8 @@ function initializeSearchWindowWidgets()
     gFolderPicker = document.getElementById("searchableFolders");
     gSearchStopButton = document.getElementById("search-button");
     gStatusBar = document.getElementById('statusbar-icon');
-
+    hideMatchAllItem();
+    
     msgWindow = Components.classes[msgWindowContractID].createInstance(nsIMsgWindow);
     msgWindow.statusFeedback = gStatusFeedback;
     msgWindow.SetDOMWindow(window);
