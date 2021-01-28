@@ -46,7 +46,6 @@
 #include "nsIDOMKeyEvent.h"
 #include "nsIDOMEventTarget.h"
 #include "nsIDOMXPathResult.h"
-#include "nsIXTFXMLVisualWrapper.h"
 #include "nsIDocument.h"
 #include "nsXFormsModelElement.h"
 #include "nsPIDOMWindow.h"
@@ -192,7 +191,9 @@ nsXFormsControlStubBase::ResetBoundNode(const nsString &aBindAttribute,
     nsCOMPtr<nsIXTFElementWrapper> wrapper(do_QueryInterface(mElement));
     NS_ENSURE_STATE(wrapper);
 
-    return wrapper->SetIntrinsicState(kDisabledIntrinsicState);
+    PRInt32 iState;
+    GetDisabledIntrinsicState(&iState);
+    return wrapper->SetIntrinsicState(iState);
   }
 
   return NS_OK;
@@ -248,6 +249,22 @@ NS_IMETHODIMP
 nsXFormsControlStubBase::SetOnDeferredBindList(PRBool aPutOnList)
 {
   mOnDeferredBindList = aPutOnList;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXFormsControlStubBase::GetDefaultIntrinsicState(PRInt32 *aState)
+{
+  NS_ENSURE_ARG_POINTER(aState);
+  *aState = kDefaultIntrinsicState;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXFormsControlStubBase::GetDisabledIntrinsicState(PRInt32 *aState)
+{
+  NS_ENSURE_ARG_POINTER(aState);
+  *aState = kDisabledIntrinsicState;
   return NS_OK;
 }
 
@@ -622,7 +639,9 @@ nsXFormsControlStubBase::DocumentChanged(nsIDOMDocument *aNewDocument)
   if (aNewDocument && !mModel && mElement) {
     nsCOMPtr<nsIXTFElementWrapper> xtfWrap(do_QueryInterface(mElement));
     NS_ENSURE_STATE(xtfWrap);
-    xtfWrap->SetIntrinsicState(kDefaultIntrinsicState);
+    PRInt32 iState;
+    GetDefaultIntrinsicState(&iState);
+    xtfWrap->SetIntrinsicState(iState);
   }
 
   return ForceModelDetach(mHasParent && aNewDocument);
@@ -766,13 +785,6 @@ nsXFormsControlStubBase::BeforeSetAttribute(nsIAtom         *aName,
     AddRemoveSNBAttr(aName, aValue);
   }
 }
-
-NS_IMPL_ISUPPORTS_INHERITED3(nsXFormsControlStub,
-                             nsXFormsXMLVisualStub,
-                             nsIXFormsContextControl,
-                             nsIXFormsControl,
-                             nsIXFormsControlBase)
-
 
 NS_IMPL_ISUPPORTS_INHERITED3(nsXFormsBindableControlStub,
                              nsXFormsBindableStub,

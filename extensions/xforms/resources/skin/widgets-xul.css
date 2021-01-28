@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* ***** BEGIN LICENSE BLOCK *****
+/*
+ * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Mozilla Public License Version
@@ -15,12 +15,12 @@
  * The Original Code is Mozilla XForms support.
  *
  * The Initial Developer of the Original Code is
- * Novell, Inc.
- * Portions created by the Initial Developer are Copyright (C) 2005
+ * Alexander Surkov.
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *  Allan Beaufour <abeaufour@novell.com>
+ *  Alexander Surkov <surkov@dc.baikal.ru>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -34,41 +34,51 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
- * ***** END LICENSE BLOCK ***** */
-
-#include "nsIXFormsRangeAccessors.h"
-#include "nsXFormsRangeConditionAccessors.h"
-
-/**
- * Implementation for the accessors for a range element,
- * nsIXFormsRangeAccessors.
- *
+ * ***** END LICENSE BLOCK *****
  */
-class nsXFormsRangeAccessors : public nsXFormsRangeConditionAccessors,
-                               public nsIXFormsRangeAccessors
-{
-public:
-  NS_DECL_ISUPPORTS_INHERITED
-  NS_DECL_NSIXFORMSRANGEACCESSORS
-  NS_FORWARD_NSIXFORMSRANGECONDITIONACCESSORS(nsXFormsRangeConditionAccessors::)
-  NS_FORWARD_NSIXFORMSACCESSORS(nsXFormsAccessors::)
 
-  // Constructor
-  nsXFormsRangeAccessors(nsIDelegateInternal* aDelegate,
-                         nsIDOMElement* aElement)
-    : nsXFormsRangeConditionAccessors(aDelegate, aElement)
-  {
-  }
+@namespace url(http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul);
+@namespace mozType url(http://www.mozilla.org/projects/xforms/2005/type);
 
-  // nsIClassInfo overrides
-  NS_IMETHOD GetInterfaces(PRUint32 *aCount, nsIID * **aArray);
+/* calendar-compact styles */
 
-protected:
-  /**
-   * Gets the value of an attribute on the element (mElement).
-   *
-   * @param aAttr        The attribute
-   * @param aVal         The returned value ("DOMNull"s it if it's not there or empty)
-   */
-  nsresult AttributeGetter(const nsAString &aAttr, nsAString &aVal);
-};
+box[mozType|calendar] {
+  margin: 2px;
+  border: 1px outset black !important;
+}
+
+box[mozType|calendar] toolbarbutton:focus {
+  border: 1px dotted ThreeDDarkShadow !important;
+  -moz-border-top-colors: none !important;
+  -moz-border-right-colors: none !important;
+  -moz-border-bottom-colors: none !important;
+  -moz-border-left-colors: none !important;
+}
+
+.prevMonth, .nextMonth {
+  color: gray;
+}
+
+/* calendar-full styles */
+
+menulist[anonid="months-list"] {
+  margin-right: 0px;
+}
+
+.toolbarbutton-dn {
+  list-style-image: url('chrome://global/skin/arrow/arrow-dn.gif');
+  padding: 0px;
+  -moz-image-region: rect(1px, 9px, 9px, 1px);
+}
+.toolbarbutton-up {
+  list-style-image: url('chrome://global/skin/arrow/arrow-up.gif');
+  padding: 0px;
+  -moz-image-region: rect(1px, 9px, 9px, 1px);
+}
+
+.toolbarbutton-dn:hover {
+  list-style-image: url('chrome://global/skin/arrow/arrow-dn-hov.gif');
+}
+.toolbarbutton-up:hover {
+  list-style-image: url('chrome://global/skin/arrow/arrow-up-hov.gif');
+}

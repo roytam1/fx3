@@ -79,6 +79,7 @@
 #include "nsXFormsControlStub.h"
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
+#include "nsIEventStateManager.h"
 
 #define XFORMS_LAZY_INSTANCE_BINDING \
   "chrome://xforms/content/xforms.xml#xforms-lazy-instance"
@@ -828,13 +829,15 @@ nsXFormsModelElement::InitializeInstances()
             // document has finished loading.
             mPendingInlineSchemas.AppendString(id);
           } else {
-            nsCOMPtr<nsISchema> schema;
-            // no need to observe errors via the callback.  instead, rely on
-            // this method returning a failure code when it encounters errors.
-            rv = mSchemas->ProcessSchemaElement(el, nsnull,
-                                                getter_AddRefs(schema));
-            if (NS_SUCCEEDED(rv))
-              mSchemaCount++;
+            if (!IsDuplicateSchema(el)) {
+              nsCOMPtr<nsISchema> schema;
+              // no need to observe errors via the callback.  instead, rely on
+              // this method returning a failure code when it encounters errors.
+              rv = mSchemas->ProcessSchemaElement(el, nsnull,
+                                                  getter_AddRefs(schema));
+              if (NS_SUCCEEDED(rv))
+                mSchemaCount++;
+            }
           }
         } else {
           nsCAutoString uriSpec;
@@ -1110,8 +1113,13 @@ nsXFormsModelElement::SetStates(nsIXFormsControl *aControl,
     ns = mMDG.GetNodeState(aNode);
     NS_ENSURE_STATE(ns);
     iState = ns->GetIntrinsicState();
+    nsCOMPtr<nsIContent> content(do_QueryInterface(element));
+    NS_ENSURE_STATE(content);
+    PRInt32 rangeState = content->IntrinsicState() &
+                           (NS_EVENT_STATE_INRANGE | NS_EVENT_STATE_OUTOFRANGE);
+    iState = ns->GetIntrinsicState() | rangeState;
   } else {
-    iState = kDefaultIntrinsicState;
+    aControl->GetDefaultIntrinsicState(&iState);
   }
   
   nsresult rv = xtfWrap->SetIntrinsicState(iState);
@@ -1321,19 +1329,26 @@ nsXFormsModelElement::Refresh()
 #ifdef DEBUG
   printf("nsXFormsModelElement::Refresh()\n");
 #endif
-  nsPostRefresh postRefresh = nsPostRefresh();
-
-  if (!mDocumentLoaded) {
-    return NS_OK;
-  }
 
   // XXXbeaufour: Can we somehow suspend redraw / "screen update" while doing
   // the refresh? That should save a lot of time, and avoid flickering of
   // controls.
 
-  // Kick off refreshing on root node
-  nsresult rv = RefreshSubTree(mFormControls.FirstChild(), PR_FALSE);
-  NS_ENSURE_SUCCESS(rv, rv);
+  // Using brackets here to provide a scope for the
+  // nsPostRefresh.  We want to make sure that nsPostRefresh's destructor
+  // runs (and thus processes the postrefresh and containerpostrefresh lists)
+  // before we clear the dispatch flags
+  {
+    nsPostRefresh postRefresh = nsPostRefresh();
+  
+    if (!mDocumentLoaded) {
+      return NS_OK;
+    }
+  
+    // Kick off refreshing on root node
+    nsresult rv = RefreshSubTree(mFormControls.FirstChild(), PR_FALSE);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
 
   // Clear refresh structures
   mChangedNodes.Clear();
@@ -2068,13 +2083,14 @@ nsXFormsModelElement::FinishConstruction()
       node->GetLocalName(localName);
       if (nsURI.EqualsLiteral(NS_NAMESPACE_XML_SCHEMA) &&
           localName.EqualsLiteral("schema")) {
-        // we don't have to check if the schema was already added because
-        // nsSchemaLoader::ProcessSchemaElement takes care of that.
-        nsCOMPtr<nsISchema> schema;
-        nsresult rv = mSchemas->ProcessSchemaElement(element, nsnull,
-                                                     getter_AddRefs(schema));
-        if (!NS_SUCCEEDED(rv)) {
-          nsXFormsUtils::ReportError(NS_LITERAL_STRING("schemaProcessError"), node);
+        if (!IsDuplicateSchema(element)) {
+          nsCOMPtr<nsISchema> schema;
+          nsresult rv = mSchemas->ProcessSchemaElement(element, nsnull,
+                                                       getter_AddRefs(schema));
+          if (!NS_SUCCEEDED(rv)) {
+            nsXFormsUtils::ReportError(NS_LITERAL_STRING("schemaProcessError"),
+                                       node);
+          }
         }
       }
     }
@@ -2524,6 +2540,26 @@ nsXFormsModelElement::GetHasDOMContentFired(PRBool *aLoaded)
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsXFormsModelElement::ForceRebind(nsIXFormsControl* aControl)
+{
+  if (!aControl) {
+    return NS_OK;
+  }
+
+  nsXFormsControlListItem* controlItem = mFormControls.FindControl(aControl);
+  NS_ENSURE_STATE(controlItem);
+
+  PRBool rebindChildren;
+  nsresult rv = aControl->Bind(&rebindChildren);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = aControl->Refresh();
+  // XXX: no rv-check, see bug 336608
+
+  // Refresh children
+  return RefreshSubTree(controlItem->FirstChild(), rebindChildren);
+}
 
 /* static */ void
 nsXFormsModelElement::Startup()
@@ -2672,13 +2708,15 @@ nsXFormsModelElement::HandleLoad(nsIDOMEvent* aEvent)
       if (!el) {
         rv = NS_ERROR_UNEXPECTED;
       } else {
-        nsCOMPtr<nsISchema> schema;
-        // no need to observe errors via the callback.  instead, rely on
-        // this method returning a failure code when it encounters errors.
-        rv = mSchemas->ProcessSchemaElement(el, nsnull,
-                                            getter_AddRefs(schema));
-        if (NS_SUCCEEDED(rv))
-          mSchemaCount++;
+        if (!IsDuplicateSchema(el)) {
+          nsCOMPtr<nsISchema> schema;
+          // no need to observe errors via the callback.  instead, rely on
+          // this method returning a failure code when it encounters errors.
+          rv = mSchemas->ProcessSchemaElement(el, nsnull,
+                                              getter_AddRefs(schema));
+          if (NS_SUCCEEDED(rv))
+            mSchemaCount++;
+        }
       }
       if (NS_FAILED(rv)) {
         // this is a fatal error
@@ -2706,6 +2744,38 @@ nsXFormsModelElement::HandleUnload(nsIDOMEvent* aEvent)
   // due to fastback changes, had to move this notification out from under
   // model's WillChangeDocument override.
   return nsXFormsUtils::DispatchEvent(mElement, eEvent_ModelDestruct);
+}
+
+PRBool
+nsXFormsModelElement::IsDuplicateSchema(nsIDOMElement *aSchemaElement)
+{
+  nsCOMPtr<nsISchemaCollection> schemaColl = do_QueryInterface(mSchemas);
+  if (!schemaColl)
+    return PR_FALSE;
+
+  const nsAFlatString& empty = EmptyString();
+  nsAutoString targetNamespace;
+  aSchemaElement->GetAttributeNS(empty,
+                                 NS_LITERAL_STRING("targetNamespace"),
+                                 targetNamespace);
+  targetNamespace.Trim(" \r\n\t");
+
+  nsCOMPtr<nsISchema> schema;
+  schemaColl->GetSchema(targetNamespace, getter_AddRefs(schema));
+  if (!schema)
+    return PR_FALSE;
+
+  // A schema with the same target namespace already exists in the
+  // schema collection and the first instance has already been processed.
+  // Report an error to the JS console and dispatch the LinkError event,
+  // but do not consider it a fatal error.
+  const nsPromiseFlatString& flat = PromiseFlatString(targetNamespace);
+  const PRUnichar *strings[] = { flat.get() };
+  nsXFormsUtils::ReportError(NS_LITERAL_STRING("duplicateSchema"),
+                             strings, 1, aSchemaElement, aSchemaElement,
+                             nsnull);
+  nsXFormsUtils::DispatchEvent(mElement, eEvent_LinkError);
+  return PR_TRUE;
 }
 
 nsresult
