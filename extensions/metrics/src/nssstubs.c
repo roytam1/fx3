@@ -1,3 +1,5 @@
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim:set ts=2 sw=2 sts=2 et cindent: */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -11,14 +13,14 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is Google Safe Browsing.
+ * The Original Code is the Metrics extension.
  *
  * The Initial Developer of the Original Code is Google Inc.
  * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Brett Wilson <brettw@gmail.com>
+ *  Brian Ryner <bryner@brianryner.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -34,41 +36,32 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nsIDocNavStartProgressListener.h"
-#include "nsIObserver.h"
-#include "nsIWebProgressListener.h"
-#include "nsCOMArray.h"
-#include "nsCOMPtr.h"
-#include "nsWeakReference.h"
+/**
+ * This file contains trivial implementations of the NSS PORT_* functions
+ * that md5.c uses.
+ */
 
-// Forward declare template types.
-class nsITimer;
-class nsIRequest;
+#include "prmem.h"
+#include "prerror.h"
 
-class nsDocNavStartProgressListener : public nsIDocNavStartProgressListener,
-                                      public nsIWebProgressListener,
-                                      public nsIObserver,
-                                      public nsSupportsWeakReference
+void*
+PORT_Alloc(size_t bytes)
 {
-public:
-  nsDocNavStartProgressListener();
-  virtual ~nsDocNavStartProgressListener();
+  /* Always allocate a non-zero amount of bytes */
+  return (void *)PR_Malloc(bytes ? bytes : 1);
+}
 
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIDOCNAVSTARTPROGRESSLISTENER
-  NS_DECL_NSIWEBPROGRESSLISTENER
-  NS_DECL_NSIOBSERVER
+void
+PORT_Free(void *ptr)
+{
+  if (ptr) {
+    PR_Free(ptr);
+  }
+}
 
-protected:
-
-  PRBool mEnabled;
-  PRUint32 mDelay;
-  nsCOMPtr<nsIDocNavStartProgressCallback> mCallback;
-
-  // queue of pending requests; should we use nsDeque instead?
-  nsCOMArray<nsIRequest> mRequests;
-  nsCOMArray<nsITimer> mTimers;
-
-  nsresult AttachListeners();
-  nsresult DetachListeners();
-};
+void
+PORT_SetError(int value)
+{
+  PR_SetError(value, 0);
+  return;
+}

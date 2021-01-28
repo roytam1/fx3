@@ -1302,7 +1302,7 @@ nsXFormsUtils::FindParentContext(nsIDOMElement           *aElement,
 
 /* static */ PRBool
 nsXFormsUtils::CheckSameOrigin(nsIDocument *aBaseDocument, nsIURI *aTestURI,
-                               PRUint8 aType)
+                               ConnectionType aType)
 {
   nsresult rv;
 
@@ -1346,7 +1346,9 @@ nsXFormsUtils::CheckSameOrigin(nsIDocument *aBaseDocument, nsIURI *aTestURI,
     rv = permMgr->TestPermission(principalURI, "xforms-xd", &perm);
 
     if (NS_SUCCEEDED(rv) && perm != nsIPermissionManager::UNKNOWN_ACTION) {
-      if (perm == kXFormsActionLoadSend || perm == aType)
+      // Safe cast, as we only have few ConnectionTypes.
+      PRInt32 permSigned = perm;
+      if (permSigned == kXFormsActionLoadSend || permSigned == aType)
         return PR_TRUE;
     }
   }
@@ -1579,7 +1581,7 @@ nsXFormsUtils::ReportError(const nsString& aMessageName, const PRUnichar **aPara
   }
 
 
-  // Log the message to JavaScript Console
+  // Log the message to Error Console
 #ifdef DEBUG
   printf("ERR: %s\n", NS_ConvertUTF16toUTF8(msg).get());
 #endif
