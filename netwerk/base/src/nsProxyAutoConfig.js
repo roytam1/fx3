@@ -82,9 +82,9 @@ nsProxyAutoConfig.prototype = {
         Components.utils.evalInSandbox(pacUtils, this._sandBox);
 
         // add predefined functions to pac
-        this._sandBox.myIpAddress = myIpAddress;
-        this._sandBox.dnsResolve = dnsResolve;
-        this._sandBox.alert = proxyAlert;
+        this._sandBox.importFunction(myIpAddress);
+        this._sandBox.importFunction(dnsResolve);
+        this._sandBox.importFunction(proxyAlert, "alert");
 
         // evaluate loaded js file
         Components.utils.evalInSandbox(pacText, this._sandBox);

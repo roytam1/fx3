@@ -241,11 +241,6 @@ typedef struct
 /*-----------------------------------------------------------------
  * Globals
  *-----------------------------------------------------------------*/
-static NS_DEFINE_CID(kPrefServiceCID, NS_PREF_CID);
-
-static NS_DEFINE_CID(kCharsetConverterManagerCID, NS_ICHARSETCONVERTERMANAGER_CID);
-static NS_DEFINE_CID(kStringBundleServiceCID, NS_STRINGBUNDLESERVICE_CID);
-
 nsPrefMigration* nsPrefMigration::mInstance = nsnull;
 
 nsPrefMigration *
@@ -289,7 +284,7 @@ nsPrefMigration::getPrefService()
   // get the prefs service
   nsresult rv = NS_OK;
 
-  nsCOMPtr<nsIPref> pIMyService(do_GetService(kPrefServiceCID, &rv));
+  nsCOMPtr<nsIPref> pIMyService(do_GetService(NS_PREF_CONTRACTID, &rv));
   if(NS_FAILED(rv)) return rv;
 
   return NS_GetProxyForObject(NS_PROXY_TO_MAIN_THREAD, NS_GET_IID(nsIPref),
@@ -447,7 +442,7 @@ NS_IMETHODIMP
 nsPrefMigration::ShowSpaceDialog(PRInt32 *choice)
 {
   nsresult rv;
-  nsCOMPtr<nsIStringBundleService> bundleService = do_GetService(kStringBundleServiceCID, &rv);
+  nsCOMPtr<nsIStringBundleService> bundleService = do_GetService(NS_STRINGBUNDLE_CONTRACTID, &rv);
   if (NS_FAILED(rv)) return rv;
 
   nsCOMPtr<nsIStringBundle> bundle;
@@ -2214,7 +2209,7 @@ nsPrefMigration::DetermineOldPath(nsIFileSpec *profilePath, const char *oldPathN
 	if (NS_FAILED(rv)) return rv;
 	
 	/* get the string bundle, and get the appropriate localized string out of it */
-	nsCOMPtr<nsIStringBundleService> bundleService = do_GetService(kStringBundleServiceCID, &rv);
+	nsCOMPtr<nsIStringBundleService> bundleService = do_GetService(NS_STRINGBUNDLE_CONTRACTID, &rv);
 	if (NS_FAILED(rv)) return rv;
 
     nsCOMPtr<nsIStringBundle> bundle;
@@ -2304,7 +2299,7 @@ ConvertStringToUTF8(const char* aCharset, const char* inString, char** outString
   nsresult rv;
   // convert result to unicode
   nsCOMPtr<nsICharsetConverterManager> ccm = 
-           do_GetService(kCharsetConverterManagerCID, &rv);
+           do_GetService(NS_CHARSETCONVERTERMANAGER_CONTRACTID, &rv);
 
   if(NS_SUCCEEDED(rv)) {
     nsCOMPtr <nsIUnicodeDecoder> decoder; // this may be cached
@@ -2456,7 +2451,7 @@ nsPrefConverter::ConvertPrefsToUTF8()
 
   nsCStringArray prefsToMigrate;
 
-  nsCOMPtr<nsIPref> prefs(do_GetService(kPrefServiceCID, &rv));
+  nsCOMPtr<nsIPref> prefs(do_GetService(NS_PREF_CONTRACTID, &rv));
   if(NS_FAILED(rv)) return rv;
   if (!prefs) return NS_ERROR_FAILURE;
 

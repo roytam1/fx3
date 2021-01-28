@@ -1777,9 +1777,11 @@ NS_METHOD nsWindow::Show(PRBool bState)
             break;
           default :
             mode = SW_SHOWNORMAL;
+#ifndef WINCE
             // Don't take focus if the active window is not one of ours (e.g. bug 259816)
             if (!GetNSWindowPtr(::GetForegroundWindow()))
               mode = SW_SHOWNOACTIVATE;
+#endif
         }
         ::ShowWindow(mWnd, mode);
         if (mode == SW_SHOWNOACTIVATE)
@@ -3306,7 +3308,7 @@ UINT nsWindow::MapFromNativeToDOM(UINT aNativeKeyCode)
 {
   switch (aNativeKeyCode) {
     case VK_OEM_1:     return NS_VK_SEMICOLON;     // 0xBA, For the US standard keyboard, the ';:' key
-    case VK_OEM_PLUS:  return NS_VK_EQUALS;        // 0xBB, For any country/region, the '+' key
+    case VK_OEM_PLUS:  return NS_VK_ADD;           // 0xBB, For any country/region, the '+' key
     case VK_OEM_MINUS: return NS_VK_SUBTRACT;      // 0xBD, For any country/region, the '-' key
   }
 
@@ -3414,13 +3416,11 @@ BOOL nsWindow::OnKeyDown(UINT aVirtualKeyCode, UINT aScanCode, LPARAM aKeyData)
   BOOL gotMsg = nsToolkit::mPeekMessage(&msg, mWnd, WM_KEYFIRST, WM_KEYLAST, PM_NOREMOVE | PM_NOYIELD);
   // Enter and backspace are always handled here to avoid for example the
   // confusion between ctrl-enter and ctrl-J.
-  // Ctrl+[Add, Subtract, Equals] are always handled here to make text zoom shortcuts work
-  // on different keyboard layouts (Equals is needed because many layouts return it when
-  // pressing Ctrl++ and that's why it's also accepted as a shortcut for increasing zoom).
+  // Ctrl+[Add, Subtract] are always handled here to make text zoom shortcuts work
+  // on different keyboard layouts.
   if (virtualKeyCode == NS_VK_RETURN || virtualKeyCode == NS_VK_BACK ||
       (mIsControlDown && !mIsAltDown && !mIsShiftDown &&
-       (virtualKeyCode == NS_VK_ADD || virtualKeyCode == NS_VK_SUBTRACT ||
-        virtualKeyCode == NS_VK_EQUALS)) ||
+       (virtualKeyCode == NS_VK_ADD || virtualKeyCode == NS_VK_SUBTRACT)) ||
       ((mIsControlDown || mIsAltDown) && KeyboardLayout::IsPrintableCharKey (aVirtualKeyCode)))
   {
     // Remove a possible WM_CHAR or WM_SYSCHAR messages from the message queue.

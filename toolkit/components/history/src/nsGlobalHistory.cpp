@@ -136,7 +136,6 @@ nsIPrefBranch* nsGlobalHistory::gPrefBranch = nsnull;
 // CIDs
 
 static NS_DEFINE_CID(kRDFServiceCID,        NS_RDFSERVICE_CID);
-static NS_DEFINE_CID(kStringBundleServiceCID, NS_STRINGBUNDLESERVICE_CID);
 
 // closure structures for RemoveMatchingRows
 struct matchExpiration_t {
@@ -2642,7 +2641,7 @@ nsGlobalHistory::Init()
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr<nsIStringBundleService> bundleService =
-    do_GetService(kStringBundleServiceCID, &rv);
+    do_GetService(NS_STRINGBUNDLE_CONTRACTID, &rv);
   
   if (NS_SUCCEEDED(rv)) {
     rv = bundleService->CreateBundle("chrome://global/locale/history/history.properties", getter_AddRefs(mBundle));
@@ -2673,9 +2672,8 @@ nsGlobalHistory::OpenDB()
   rv = NS_GetSpecialDirectory(NS_APP_HISTORY_50_FILE, getter_AddRefs(historyFile));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  static NS_DEFINE_CID(kMorkCID, NS_MORK_CID);
   nsCOMPtr<nsIMdbFactoryFactory> factoryfactory =
-      do_CreateInstance(kMorkCID, &rv);
+      do_CreateInstance(NS_MORK_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = factoryfactory->GetMdbFactory(&gMdbFactory);

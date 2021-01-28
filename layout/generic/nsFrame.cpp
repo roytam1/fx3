@@ -954,12 +954,36 @@ nsFrame::DisplayBorderBackgroundOutline(nsDisplayListBuilder*   aBuilder,
   return DisplayOutlineUnconditional(aBuilder, aLists);
 }
 
+PRBool
+nsIFrame::GetAbsPosClipRect(const nsStyleDisplay* aDisp, nsRect* aRect)
+{
+  NS_PRECONDITION(aRect, "Must have aRect out parameter");
+
+  if (!aDisp->IsAbsolutelyPositioned() ||
+      !(aDisp->mClipFlags & NS_STYLE_CLIP_RECT))
+    return PR_FALSE;
+
+  // Start with the 'auto' values and then factor in user specified values
+  aRect->SetRect(nsPoint(0, 0), GetSize());
+  if (0 == (NS_STYLE_CLIP_TOP_AUTO & aDisp->mClipFlags)) {
+    aRect->y += aDisp->mClip.y;
+  }
+  if (0 == (NS_STYLE_CLIP_LEFT_AUTO & aDisp->mClipFlags)) {
+    aRect->x += aDisp->mClip.x;
+  }
+  if (0 == (NS_STYLE_CLIP_RIGHT_AUTO & aDisp->mClipFlags)) {
+    aRect->width = aDisp->mClip.width;
+  }
+  if (0 == (NS_STYLE_CLIP_BOTTOM_AUTO & aDisp->mClipFlags)) {
+    aRect->height = aDisp->mClip.height;
+  }
+  return PR_TRUE;
+}
+
 static PRBool ApplyAbsPosClipping(nsDisplayListBuilder* aBuilder,
                                   const nsStyleDisplay* aDisp, nsIFrame* aFrame,
                                   nsRect* aRect) {
-  // REVIEW: from nsContainerFrame.cpp SyncFrameViewGeometryDependentProperties
-  if (!aDisp->IsAbsolutelyPositioned() ||
-      !(aDisp->mClipFlags & NS_STYLE_CLIP_RECT))
+  if (!aFrame->GetAbsPosClipRect(aDisp, aRect))
     return PR_FALSE;
   
   // A moving frame should not be allowed to clip a non-moving frame.
@@ -976,21 +1000,7 @@ static PRBool ApplyAbsPosClipping(nsDisplayListBuilder* aBuilder,
           GetFirstChild(nsLayoutAtoms::fixedList) &&
       aBuilder->IsMovingFrame(aFrame))
     return PR_FALSE;
-    
-  // Start with the 'auto' values and then factor in user specified values
-  aRect->SetRect(aBuilder->ToReferenceFrame(aFrame), aFrame->GetSize());
-  if (0 == (NS_STYLE_CLIP_TOP_AUTO & aDisp->mClipFlags)) {
-    aRect->y += aDisp->mClip.y;
-  }
-  if (0 == (NS_STYLE_CLIP_LEFT_AUTO & aDisp->mClipFlags)) {
-    aRect->x += aDisp->mClip.x;
-  }
-  if (0 == (NS_STYLE_CLIP_RIGHT_AUTO & aDisp->mClipFlags)) {
-    aRect->width = aDisp->mClip.width;
-  }
-  if (0 == (NS_STYLE_CLIP_BOTTOM_AUTO & aDisp->mClipFlags)) {
-    aRect->height = aDisp->mClip.height;
-  }
+
   return PR_TRUE;
 }
 
@@ -1277,14 +1287,19 @@ nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder*   aBuilder,
   if (aChild->GetStateBits() & NS_FRAME_IS_UNFLOWABLE)
     return NS_OK;
   
-  // XXX we really need IsFrameOfType() here
   nsIAtom* childType = aChild->GetType();
+  const nsStyleDisplay* disp = aChild->GetStyleDisplay();
   // PR_TRUE if this is a real or pseudo stacking context
   PRBool pseudoStackingContext =
     (aFlags & DISPLAY_CHILD_FORCE_PSEUDO_STACKING_CONTEXT) != 0;
+  // XXX we REALLY need a "are you an inline-block sort of thing?" here!!!
   if ((aFlags & DISPLAY_CHILD_INLINE) &&
       (aChild->IsContainingBlock() ||
-       childType == nsLayoutAtoms::listControlFrame)) {
+       childType == nsLayoutAtoms::tableOuterFrame ||
+       childType == nsLayoutAtoms::listControlFrame ||
+       disp->mDisplay == NS_STYLE_DISPLAY_INLINE_BOX ||
+       disp->mDisplay == NS_STYLE_DISPLAY_INLINE_GRID ||
+       disp->mDisplay == NS_STYLE_DISPLAY_INLINE_STACK)) {
     // child is a block or table-like frame in an inline context, i.e.,
     // it acts like inline-block or inline-table. Therefore it is a
     // pseudo-stacking-context.
@@ -1350,7 +1365,6 @@ nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder*   aBuilder,
   }
 #endif
 
-  const nsStyleDisplay* disp = aChild->GetStyleDisplay();
   PRBool isComposited = disp->mOpacity != 1.0f;
   PRBool isPositioned = disp->IsPositioned();
   if (isComposited || isPositioned) {
@@ -3127,7 +3141,7 @@ nsIFrame::IsLeaf() const
 
 void
 nsIFrame::Invalidate(const nsRect& aDamageRect,
-                     PRBool        aImmediate) const
+                     PRBool        aImmediate)
 {
   if (aDamageRect.IsEmpty()) {
     return;
@@ -3142,23 +3156,26 @@ nsIFrame::Invalidate(const nsRect& aDamageRect,
     if (suppressed)
       return;
   }
-
-  nsRect damageRect(aDamageRect);
-
-  PRUint32 flags = aImmediate ? NS_VMREFRESH_IMMEDIATE : NS_VMREFRESH_NO_SYNC;
-  if (HasView()) {
-    nsIView* view = GetView();
-    view->GetViewManager()->UpdateView(view, damageRect, flags);
-  } else {
-    nsRect    rect(damageRect);
-    nsPoint   offset;
   
-    nsIView *view;
-    GetOffsetFromView(offset, &view);
-    NS_ASSERTION(view, "no view");
-    rect += offset;
-    view->GetViewManager()->UpdateView(view, rect, flags);
-  }
+  InvalidateInternal(aDamageRect, 0, 0, nsnull, aImmediate);
+}
+
+void
+nsIFrame::InvalidateInternal(const nsRect& aDamageRect, nscoord aX, nscoord aY,
+                             nsIFrame* aForChild, PRBool aImmediate)
+{
+  GetParent()->
+    InvalidateInternal(aDamageRect, aX + mRect.x, aY + mRect.y, this, aImmediate);
+}
+
+void
+nsIFrame::InvalidateRoot(const nsRect& aDamageRect,
+                         nscoord aX, nscoord aY, PRBool aImmediate)
+{
+  PRUint32 flags = aImmediate ? NS_VMREFRESH_IMMEDIATE : NS_VMREFRESH_NO_SYNC;
+  nsIView* view = GetView();
+  NS_ASSERTION(view, "This can only be called on frames with views");
+  view->GetViewManager()->UpdateView(view, aDamageRect + nsPoint(aX, aY), flags);
 }
 
 static nsRect ComputeOutlineRect(const nsIFrame* aFrame, PRBool* aAnyOutline,

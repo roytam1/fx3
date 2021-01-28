@@ -642,13 +642,6 @@ public:
                                         nsXPIDLString& aResult);
 
   /**
-   * Returns a list containing all elements in the document that are
-   * of type nsIContent::eHTML_FORM_CONTROL.
-   */
-  static already_AddRefed<nsContentList>
-  GetFormControlElements(nsIDocument *aDocument);
-
-  /**
    * Returns true if aDocument is a chrome document
    */
   static PRBool IsChromeDoc(nsIDocument *aDocument);
@@ -864,6 +857,18 @@ public:
    *              and UserDataHandlers for
    */
   static void CopyUserData(nsIDocument *aOldDocument, const nsINode *aNode);
+
+  /**
+   * Creates a DocumentFragment from text using a context node to resolve
+   * namespaces.
+   *
+   * @param aContextNode the node which is used to resolve namespaces
+   * @param aFragment the string which is parsed to a DocumentFragment
+   * @param aReturn [out] the created DocumentFragment
+   */
+  static nsresult CreateContextualFragment(nsIDOMNode* aContextNode,
+                                           const nsAString& aFragment,
+                                           nsIDOMDocumentFragment** aReturn);
 
 private:
   static nsresult doReparentContentWrapper(nsIContent *aChild,

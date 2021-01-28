@@ -477,12 +477,13 @@ SessionStoreService.prototype = {
       this._closedWindows.unshift(this._lastWindowClosed);
       this._closedWindows.splice(this._getPref("sessionstore.max_windows_undo", DEFAULT_MAX_WINDOWS_UNDO));
       
+      // clear this window from the list
+      delete this._windows[aWindow.__SSi];
+      
       // save the state without this window to disk
       this.saveStateDelayed();
     }
     
-    // clear this window from the list
-    delete this._windows[aWindow.__SSi];
     delete aWindow.__SSi;
   },
 
@@ -1252,6 +1253,15 @@ SessionStoreService.prototype = {
       }
     }
     
+    // mark the tabs as loading (at this point about:blank
+    // has completed loading in all tabs, so it won't interfere)
+    for (t = 0; t < aTabs.length; t++) {
+      var tab = aTabs[t]._tab;
+      tab.setAttribute("busy", "true");
+      tabbrowser.updateIcon(tab);
+      tabbrowser.setTabTitleLoading(tab);
+    }
+    
     // make sure to restore the selected tab first (if any)
     if (aSelectTab-- && aTabs[aSelectTab]) {
         aTabs.unshift(aTabs.splice(aSelectTab, 1)[0]);
@@ -1315,7 +1325,7 @@ SessionStoreService.prototype = {
     });
     Array.filter(tab.attributes, function(aAttr) {
       return (_this.xulAttributes.indexOf(aAttr.name) > -1);
-	  }).forEach(tab.removeAttribute, tab);
+    }).forEach(tab.removeAttribute, tab);
     if (tabData.xultab) {
       tabData.xultab.split(" ").forEach(function(aAttr) {
         if (/^([^\s=]+)=(.*)/.test(aAttr)) {

@@ -73,8 +73,6 @@
 
 static NS_DEFINE_CID(kRDFServiceCID,              NS_RDFSERVICE_CID);
 static NS_DEFINE_CID(kRDFInMemoryDataSourceCID,   NS_RDFINMEMORYDATASOURCE_CID);
-static NS_DEFINE_CID(kCharsetConverterManagerCID, NS_ICHARSETCONVERTERMANAGER_CID);
-static NS_DEFINE_CID(kPrefCID,                    NS_PREF_CID);
 
 static const char kURINC_RelatedLinksRoot[] = "NC:RelatedLinks";
 
@@ -215,7 +213,7 @@ RelatedLinksStreamListener::Init()
     }
 
 		nsICharsetConverterManager *charsetConv;
-		rv = CallGetService(kCharsetConverterManagerCID, &charsetConv);
+		rv = CallGetService(NS_CHARSETCONVERTERMANAGER_CONTRACTID, &charsetConv);
 		if (NS_SUCCEEDED(rv))
 		{
 			rv = charsetConv->GetUnicodeDecoderRaw("UTF-8",
@@ -633,7 +631,7 @@ RelatedLinksHandlerImpl::Init()
 		gRDFService->GetResource(NS_LITERAL_CSTRING(NC_NAMESPACE_URI "child"),
                              &kNC_Child);
 
-		nsCOMPtr<nsIPref> prefServ(do_GetService(kPrefCID, &rv));
+		nsCOMPtr<nsIPref> prefServ(do_GetService(NS_PREF_CONTRACTID, &rv));
 		mRLServerURL = new nsString();
 		if (NS_SUCCEEDED(rv) && (prefServ))
 		{

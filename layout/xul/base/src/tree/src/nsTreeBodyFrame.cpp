@@ -725,7 +725,7 @@ nsTreeBodyFrame::InvalidateRange(PRInt32 aStart, PRInt32 aEnd)
     return InvalidateRow(aStart);
 
   PRInt32 last = GetLastVisibleRow();
-  if (aEnd < mTopRowIndex || aStart > last)
+  if (aStart > aEnd || aEnd < mTopRowIndex || aStart > last)
     return NS_OK;
 
   if (aStart < mTopRowIndex)
@@ -736,6 +736,34 @@ nsTreeBodyFrame::InvalidateRange(PRInt32 aStart, PRInt32 aEnd)
 
   nsRect rangeRect(mInnerBox.x, mInnerBox.y+mRowHeight*(aStart-mTopRowIndex), mInnerBox.width, mRowHeight*(aEnd-aStart+1));
   nsIFrame::Invalidate(rangeRect, PR_FALSE);
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsTreeBodyFrame::InvalidateColumnRange(PRInt32 aStart, PRInt32 aEnd, nsITreeColumn* aCol)
+{
+  if (mUpdateBatchNest)
+    return NS_OK;
+
+  nsTreeColumn* col = NS_STATIC_CAST(nsTreeColumn*, aCol);
+  if (col) {
+    if (aStart == aEnd)
+      return InvalidateCell(aStart, col);
+
+    PRInt32 last = GetLastVisibleRow();
+    if (aStart > aEnd || aEnd < mTopRowIndex || aStart > last)
+      return NS_OK;
+
+    if (aStart < mTopRowIndex)
+      aStart = mTopRowIndex;
+
+    if (aEnd > last)
+      aEnd = last;
+
+    nsRect rangeRect(col->GetX(), mInnerBox.y+mRowHeight*(aStart-mTopRowIndex), col->GetWidth(), mRowHeight*(aEnd-aStart+1));
+    nsIFrame::Invalidate(rangeRect, PR_FALSE);
+  }
 
   return NS_OK;
 }
@@ -1103,6 +1131,9 @@ nsTreeBodyFrame::GetCoordsForCellItem(PRInt32 aRow, nsITreeColumn* aCol, const n
     // interfere with our computations.
     AdjustForBorderPadding(cellContext, cellRect);
 
+    nsCOMPtr<nsIRenderingContext> rc;
+    presContext->PresShell()->CreateRenderingContext(this, getter_AddRefs(rc));
+
     // Now we'll start making our way across the cell, starting at the edge of 
     // the cell and proceeding until we hit the right edge. |cellX| is the 
     // working X value that we will increment as we crawl from left to right.
@@ -1119,25 +1150,16 @@ nsTreeBodyFrame::GetCoordsForCellItem(PRInt32 aRow, nsITreeColumn* aCol, const n
       cellX += mIndentation * level;
       remainWidth -= mIndentation * level;
 
-      PRBool hasTwisty = PR_FALSE;
-      PRBool isContainer = PR_FALSE;
-      mView->IsContainer(aRow, &isContainer);
-      if (isContainer) {
-        PRBool isContainerEmpty = PR_FALSE;
-        mView->IsContainerEmpty(aRow, &isContainerEmpty);
-        if (!isContainerEmpty)
-          hasTwisty = PR_TRUE;
-      }
-
       // Find the twisty rect by computing its size. 
+      nsRect imageRect;
+      nsRect twistyRect(cellRect);
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
+      GetTwistyRect(aRow, currCol, imageRect, twistyRect, presContext,
+                    *rc, twistyContext);
 
-      // |GetImageSize| returns the rect of the twisty image, including the
-      // borders and padding.
-      nsRect twistyImageRect = GetImageSize(aRow, currCol, PR_TRUE, twistyContext);
       if (NS_LITERAL_CSTRING("twisty").Equals(aElement)) {
-        // If we're looking for the twisty Rect, just return the result of |GetImageSize|
-        theRect = twistyImageRect;
+        // If we're looking for the twisty Rect, just return the size
+        theRect = twistyRect;
         break;
       }
       
@@ -1145,11 +1167,11 @@ nsTreeBodyFrame::GetCoordsForCellItem(PRInt32 aRow, nsITreeColumn* aCol, const n
       // can find the offset of the next element in the cell. 
       nsMargin twistyMargin;
       twistyContext->GetStyleMargin()->GetMargin(twistyMargin);
-      twistyImageRect.Inflate(twistyMargin);
+      twistyRect.Inflate(twistyMargin);
 
       // Adjust our working X value with the twisty width (image size, margins,
       // borders, padding. 
-      cellX += twistyImageRect.width;
+      cellX += twistyRect.width;
     }
 
     // Cell Image
@@ -1198,8 +1220,6 @@ nsTreeBodyFrame::GetCoordsForCellItem(PRInt32 aRow, nsITreeColumn* aCol, const n
     
     textRect.height = height + bp.top + bp.bottom;
 
-    nsCOMPtr<nsIRenderingContext> rc;
-    presContext->PresShell()->CreateRenderingContext(this, getter_AddRefs(rc));
     rc->SetFont(fm);
     nscoord width;
     rc->GetWidth(cellText, width);
@@ -1236,6 +1256,143 @@ nsTreeBodyFrame::GetRowAt(PRInt32 aX, PRInt32 aY)
     return -1;
 
   return row;
+}
+
+void
+nsTreeBodyFrame::AdjustForCellText(nsAutoString& aText,
+                                   PRInt32 aRowIndex,  nsTreeColumn* aColumn,
+                                   nsIRenderingContext& aRenderingContext,
+                                   nsRect& aTextRect)
+{
+  nscoord width;
+  aRenderingContext.GetWidth(aText, width);
+
+  nscoord maxWidth = aTextRect.width;
+
+  if (aColumn->Overflow()) {
+    nsTreeColumn* nextColumn = aColumn->GetNext();
+    while (nextColumn && width > maxWidth) {
+      while (nextColumn && nextColumn->GetWidth() == 0)
+        nextColumn = nextColumn->GetNext();
+
+      if (nextColumn) {
+        nsAutoString nextText;
+        mView->GetCellText(aRowIndex, nextColumn, nextText);
+
+        if (nextText.Length() == 0) {
+          maxWidth += nextColumn->GetWidth();
+          nextColumn = nextColumn->GetNext();
+        }
+        else {
+          nextColumn = nsnull;
+        }
+      }
+    }
+  }
+
+  if (width > maxWidth) {
+    // See if the width is even smaller than the ellipsis
+    // If so, clear the text completely.
+    nscoord ellipsisWidth;
+    aRenderingContext.GetWidth(ELLIPSIS, ellipsisWidth);
+
+    nscoord width = aTextRect.width;
+    if (ellipsisWidth > width)
+      aText.SetLength(0);
+    else if (ellipsisWidth == width)
+      aText.AssignLiteral(ELLIPSIS);
+    else {
+      // We will be drawing an ellipsis, thank you very much.
+      // Subtract out the required width of the ellipsis.
+      // This is the total remaining width we have to play with.
+      width -= ellipsisWidth;
+
+      // Now we crop.
+      switch (aColumn->GetCropStyle()) {
+        default:
+        case 0: {
+          // Crop right.
+          nscoord cwidth;
+          nscoord twidth = 0;
+          int length = aText.Length();
+          int i;
+          for (i = 0; i < length; ++i) {
+            PRUnichar ch = aText[i];
+            aRenderingContext.GetWidth(ch,cwidth);
+            if (twidth + cwidth > width)
+              break;
+            twidth += cwidth;
+          }
+          aText.Truncate(i);
+          aText.AppendLiteral(ELLIPSIS);
+        }
+        break;
+
+        case 2: {
+          // Crop left.
+          nscoord cwidth;
+          nscoord twidth = 0;
+          int length = aText.Length();
+          int i;
+          for (i=length-1; i >= 0; --i) {
+            PRUnichar ch = aText[i];
+            aRenderingContext.GetWidth(ch,cwidth);
+            if (twidth + cwidth > width)
+              break;
+            twidth += cwidth;
+          }
+
+          nsAutoString copy;
+          aText.Right(copy, length-1-i);
+          aText.AssignLiteral(ELLIPSIS);
+          aText += copy;
+        }
+        break;
+
+        case 1:
+        {
+          // Crop center.
+          nsAutoString leftStr, rightStr;
+          nscoord cwidth, twidth = 0;
+          int length = aText.Length();
+          int rightPos = length - 1;
+          for (int leftPos = 0; leftPos < rightPos; ++leftPos) {
+            PRUnichar ch = aText[leftPos];
+            aRenderingContext.GetWidth(ch, cwidth);
+            twidth += cwidth;
+            if (twidth > width)
+              break;
+            leftStr.Append(ch);
+
+            ch = aText[rightPos];
+            aRenderingContext.GetWidth(ch, cwidth);
+            twidth += cwidth;
+            if (twidth > width)
+              break;
+            rightStr.Insert(ch, 0);
+            --rightPos;
+          }
+          aText = leftStr + NS_LITERAL_STRING(ELLIPSIS) + rightStr;
+        }
+        break;
+      }
+    }
+  }
+  else {
+    switch (aColumn->GetTextAlignment()) {
+      case NS_STYLE_TEXT_ALIGN_RIGHT: {
+        aTextRect.x += aTextRect.width - width;
+      }
+      break;
+      case NS_STYLE_TEXT_ALIGN_CENTER: {
+        aTextRect.x += (aTextRect.width - width) / 2;
+      }
+      break;
+    }
+  }
+
+  aRenderingContext.GetWidth(aText, width);
+  aTextRect.width = width;
 }
 
 nsIAtom*
@@ -1295,17 +1452,23 @@ nsTreeBodyFrame::GetItemWithinCellAt(nscoord aX, const nsRect& aCellRect,
         hasTwisty = PR_TRUE;
     }
 
+    nsPresContext* presContext = GetPresContext();
+    nsCOMPtr<nsIRenderingContext> rc;
+    presContext->PresShell()->CreateRenderingContext(this, getter_AddRefs(rc));
+
     // Resolve style for the twisty.
     nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
+
+    nsRect imageSize;
+    GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect, presContext,
+                  *rc, twistyContext);
 
     // We will treat a click as hitting the twisty if it happens on the margins, borders, padding,
     // or content of the twisty object.  By allowing a "slop" into the margin, we make it a little
     // bit easier for a user to hit the twisty.  (We don't want to be too picky here.)
-    nsRect imageSize = GetImageSize(aRowIndex, aColumn, PR_TRUE, twistyContext);
     nsMargin twistyMargin;
     twistyContext->GetStyleMargin()->GetMargin(twistyMargin);
-    imageSize.Inflate(twistyMargin);
-    twistyRect.width = imageSize.width;
+    twistyRect.Inflate(twistyMargin);
 
     // Now we test to see if aX is actually within the twistyRect.  If it is, and if the item should
     // have a twisty, then we return "twisty".  If it is within the rect but we shouldn't have a twisty,
@@ -1338,9 +1501,33 @@ nsTreeBodyFrame::GetItemWithinCellAt(nscoord aX, const nsRect& aCellRect,
     return nsCSSAnonBoxes::moztreeimage;
   }
 
-  // Just assume "text".
-  // XXX For marquee selection, we'll have to make this more precise and do text measurement.
-  return nsCSSAnonBoxes::moztreecelltext;
+  currX += iconRect.width;
+  remainingWidth -= iconRect.width;    
+
+  nsAutoString cellText;
+  mView->GetCellText(aRowIndex, aColumn, cellText);
+
+  nsRect textRect(currX, cellRect.y, remainingWidth, cellRect.height);
+
+  nsStyleContext* textContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreecelltext);
+
+  nsMargin textMargin;
+  textContext->GetStyleMargin()->GetMargin(textMargin);
+  textRect.Deflate(textMargin);
+
+  AdjustForBorderPadding(textContext, textRect);
+
+  nsCOMPtr<nsIRenderingContext> renderingContext;
+  GetPresContext()->PresShell()->CreateRenderingContext(this, getter_AddRefs(renderingContext));
+
+  renderingContext->SetFont(textContext->GetStyleFont()->mFont, nsnull);
+
+  AdjustForCellText(cellText, aRowIndex, aColumn, *renderingContext, textRect);
+
+  if (aX >= textRect.x && aX < textRect.x + textRect.width)
+    return nsCSSAnonBoxes::moztreecelltext;
+  else
+    return nsCSSAnonBoxes::moztreecell;
 }
 
 void
@@ -1413,16 +1600,17 @@ nsTreeBodyFrame::GetCellWidth(PRInt32 aRow, nsTreeColumn* aCol,
       // Find the twisty rect by computing its size.
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
 
-      // |GetImageSize| returns the rect of the twisty image, including the 
-      // borders and padding.
-      nsRect twistyImageRect = GetImageSize(aRow, aCol, PR_TRUE, twistyContext);
-      
+      nsRect imageSize;
+      nsRect twistyRect(cellRect);
+      GetTwistyRect(aRow, aCol, imageSize, twistyRect, GetPresContext(),
+                    *aRenderingContext, twistyContext);
+
       // Add in the margins of the twisty element.
       nsMargin twistyMargin;
       twistyContext->GetStyleMargin()->GetMargin(twistyMargin);
-      twistyImageRect.Inflate(twistyMargin);
+      twistyRect.Inflate(twistyMargin);
 
-      aDesiredSize += twistyImageRect.width;
+      aDesiredSize += twistyRect.width;
     }
 
     nsStyleContext* imageContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreeimage);
@@ -1654,6 +1842,14 @@ nsTreeBodyFrame::PrefillPropertyArray(PRInt32 aRowIndex, nsTreeColumn* aCol)
       selection->GetCurrentIndex(&currentIndex);
       if (aRowIndex == currentIndex)
         mScratchArray->AppendElement(nsXULAtoms::current);
+  
+      // active
+      if (aCol) {
+        nsCOMPtr<nsITreeColumn> currentColumn;
+        selection->GetCurrentColumn(getter_AddRefs(currentColumn));
+        if (aCol == currentColumn)
+          mScratchArray->AppendElement(nsXULAtoms::active);
+      }
     }
 
     // container or leaf
@@ -1730,6 +1926,56 @@ nsTreeBodyFrame::PrefillPropertyArray(PRInt32 aRowIndex, nsTreeColumn* aCol)
                                         nsXULAtoms::_true, eCaseMatters))
       mScratchArray->AppendElement(nsXULAtoms::insertafter);
   }
+}
+
+nsITheme*
+nsTreeBodyFrame::GetTwistyRect(PRInt32 aRowIndex,
+                               nsTreeColumn* aColumn,
+                               nsRect& aImageRect,
+                               nsRect& aTwistyRect,
+                               nsPresContext* aPresContext,
+                               nsIRenderingContext& aRenderingContext,
+                               nsStyleContext* aTwistyContext)
+{
+  // The twisty rect extends all the way to the end of the cell.  This is incorrect.  We need to
+  // determine the twisty rect's true width.  This is done by examining the style context for
+  // a width first.  If it has one, we use that.  If it doesn't, we use the image's natural width.
+  // If the image hasn't loaded and if no width is specified, then we just bail. If there is
+  // a -moz-appearance involved, adjust the rect by the minimum widget size provided by
+  // the theme implementation.
+  aImageRect = GetImageSize(aRowIndex, aColumn, PR_TRUE, aTwistyContext);
+  if (aImageRect.height > aTwistyRect.height)
+    aImageRect.height = aTwistyRect.height;
+  if (aImageRect.width > aTwistyRect.width)
+    aImageRect.width = aTwistyRect.width;
+  else
+    aTwistyRect.width = aImageRect.width;
+
+  PRBool useTheme = PR_FALSE;
+  nsITheme *theme = nsnull;
+  const nsStyleDisplay* twistyDisplayData = aTwistyContext->GetStyleDisplay();
+  if (twistyDisplayData->mAppearance) {
+    theme = aPresContext->GetTheme();
+    if (theme && theme->ThemeSupportsWidget(aPresContext, nsnull, twistyDisplayData->mAppearance))
+      useTheme = PR_TRUE;
+  }
+
+  if (useTheme) {
+    nsSize minTwistySize(0,0);
+    PRBool canOverride = PR_TRUE;
+    theme->GetMinimumWidgetSize(&aRenderingContext, this, twistyDisplayData->mAppearance,
+                                &minTwistySize, &canOverride);
+
+    // GMWS() returns size in pixels, we need to convert it back to twips
+    float p2t = aPresContext->ScaledPixelsToTwips();
+    minTwistySize.width = NSIntPixelsToTwips(minTwistySize.width, p2t);
+    minTwistySize.height = NSIntPixelsToTwips(minTwistySize.height, p2t);
+
+    if (aTwistyRect.width < minTwistySize.width || !canOverride)
+      aTwistyRect.width = minTwistySize.width;
+  }
+
+  return useTheme ? theme : nsnull;
 }
 
 nsresult
@@ -2732,11 +2978,14 @@ nsTreeBodyFrame::PaintCell(PRInt32              aRowIndex,
       // the twisty. But we need to leave a place for it.
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
 
-      nsRect twistySize = GetImageSize(aRowIndex, aColumn, PR_TRUE, twistyContext);
+      nsRect imageSize;
+      nsRect twistyRect(aCellRect);
+      GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect, aPresContext,
+                    aRenderingContext, twistyContext);
 
       nsMargin twistyMargin;
       twistyContext->GetStyleMargin()->GetMargin(twistyMargin);
-      twistySize.Inflate(twistyMargin);
+      twistyRect.Inflate(twistyMargin);
 
       aRenderingContext.PushState();
 
@@ -2761,7 +3010,7 @@ nsTreeBodyFrame::PaintCell(PRInt32              aRowIndex,
       PRInt32 currentParent = aRowIndex;
       for (PRInt32 i = level; i > 0; i--) {
         if (i <= maxLevel) {
-          lineX = currX + twistySize.width + mIndentation / 2;
+          lineX = currX + twistyRect.width + mIndentation / 2;
 
           nscoord srcX = lineX - (level - i + 1) * mIndentation;
           if (srcX <= cellRect.x + cellRect.width) {
@@ -2867,15 +3116,6 @@ nsTreeBodyFrame::PaintTwisty(PRInt32              aRowIndex,
   // Resolve style for the twisty.
   nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
 
-  PRBool useTheme = PR_FALSE;
-  nsITheme *theme = nsnull;
-  const nsStyleDisplay* twistyDisplayData = twistyContext->GetStyleDisplay();
-  if ( twistyDisplayData->mAppearance ) {
-    theme = aPresContext->GetTheme();
-    if (theme && theme->ThemeSupportsWidget(aPresContext, nsnull, twistyDisplayData->mAppearance))
-      useTheme = PR_TRUE;
-  }
-  
   // Obtain the margins for the twisty and then deflate our rect by that 
   // amount.  The twisty is assumed to be contained within the deflated rect.
   nsRect twistyRect(aTwistyRect);
@@ -2883,33 +3123,10 @@ nsTreeBodyFrame::PaintTwisty(PRInt32              aRowIndex,
   twistyContext->GetStyleMargin()->GetMargin(twistyMargin);
   twistyRect.Deflate(twistyMargin);
 
-  // The twisty rect extends all the way to the end of the cell.  This is incorrect.  We need to
-  // determine the twisty rect's true width.  This is done by examining the style context for
-  // a width first.  If it has one, we use that.  If it doesn't, we use the image's natural width.
-  // If the image hasn't loaded and if no width is specified, then we just bail. If there is
-  // a -moz-appearance involved, adjust the rect by the minimum widget size provided by
-  // the theme implementation.
-  nsRect imageSize = GetImageSize(aRowIndex, aColumn, PR_TRUE, twistyContext);
-  if (imageSize.height > twistyRect.height)
-    imageSize.height = twistyRect.height;
-  if (imageSize.width > twistyRect.width)
-    imageSize.width = twistyRect.width;
-  else
-    twistyRect.width = imageSize.width;
-  if ( useTheme ) {
-    nsSize minTwistySize(0,0);
-    PRBool canOverride = PR_TRUE;
-    theme->GetMinimumWidgetSize(&aRenderingContext, this, twistyDisplayData->mAppearance, &minTwistySize, &canOverride);
-    
-    // GMWS() returns size in pixels, we need to convert it back to twips
-    float p2t = aPresContext->ScaledPixelsToTwips();
-    minTwistySize.width = NSIntPixelsToTwips(minTwistySize.width, p2t);
-    minTwistySize.height = NSIntPixelsToTwips(minTwistySize.height, p2t);
+  nsRect imageSize;
+  nsITheme* theme = GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect,
+                                  aPresContext, aRenderingContext, twistyContext);
 
-    if ( twistyRect.width < minTwistySize.width || !canOverride )
-      twistyRect.width = minTwistySize.width;
-  }
-  
   // Subtract out the remaining width.  This is done even when we don't actually paint a twisty in 
   // this cell, so that cells in different rows still line up.
   nsRect copyRect(twistyRect);
@@ -2921,14 +3138,14 @@ nsTreeBodyFrame::PaintTwisty(PRInt32              aRowIndex,
     // Paint our borders and background for our image rect.
     PaintBackgroundLayer(twistyContext, aPresContext, aRenderingContext, twistyRect, aDirtyRect);
 
-    if ( useTheme ) {
+    if (theme) {
       // yeah, I know it says we're drawing a background, but a twisty is really a fg
       // object since it doesn't have anything that gecko would want to draw over it. Besides,
       // we have to prevent imagelib from drawing it.
       nsRect dirty;
       dirty.IntersectRect(twistyRect, aDirtyRect);
       theme->DrawWidgetBackground(&aRenderingContext, this, 
-                                  twistyDisplayData->mAppearance, twistyRect, dirty);
+                                  twistyContext->GetStyleDisplay()->mAppearance, twistyRect, dirty);
     }
     else {
       // Time to paint the twisty.
@@ -3135,112 +3352,7 @@ nsTreeBodyFrame::PaintText(PRInt32              aRowIndex,
   // Set our font.
   aRenderingContext.SetFont(fontMet);
 
-  nscoord width;
-  aRenderingContext.GetWidth(text, width);
-
-  if (width > textRect.width) {
-    // See if the width is even smaller than the ellipsis
-    // If so, clear the text completely.
-    nscoord ellipsisWidth;
-    aRenderingContext.GetWidth(ELLIPSIS, ellipsisWidth);
-
-    nscoord width = textRect.width;
-    if (ellipsisWidth > width)
-      text.SetLength(0);
-    else if (ellipsisWidth == width)
-      text.AssignLiteral(ELLIPSIS);
-    else {
-      // We will be drawing an ellipsis, thank you very much.
-      // Subtract out the required width of the ellipsis.
-      // This is the total remaining width we have to play with.
-      width -= ellipsisWidth;
-
-      // Now we crop.
-      switch (aColumn->GetCropStyle()) {
-        default:
-        case 0: {
-          // Crop right.
-          nscoord cwidth;
-          nscoord twidth = 0;
-          int length = text.Length();
-          int i;
-          for (i = 0; i < length; ++i) {
-            PRUnichar ch = text[i];
-            aRenderingContext.GetWidth(ch,cwidth);
-            if (twidth + cwidth > width)
-              break;
-            twidth += cwidth;
-          }
-          text.Truncate(i);
-          text.AppendLiteral(ELLIPSIS);
-        }
-        break;
-
-        case 2: {
-          // Crop left.
-          nscoord cwidth;
-          nscoord twidth = 0;
-          int length = text.Length();
-          int i;
-          for (i=length-1; i >= 0; --i) {
-            PRUnichar ch = text[i];
-            aRenderingContext.GetWidth(ch,cwidth);
-            if (twidth + cwidth > width)
-              break;
-            twidth += cwidth;
-          }
-
-          nsAutoString copy;
-          text.Right(copy, length-1-i);
-          text.AssignLiteral(ELLIPSIS);
-          text += copy;
-        }
-        break;
-
-        case 1:
-        {
-          // Crop center.
-          nsAutoString leftStr, rightStr;
-          nscoord cwidth, twidth = 0;
-          int length = text.Length();
-          int rightPos = length - 1;
-          for (int leftPos = 0; leftPos < rightPos; ++leftPos) {
-            PRUnichar ch = text[leftPos];
-            aRenderingContext.GetWidth(ch, cwidth);
-            twidth += cwidth;
-            if (twidth > width)
-              break;
-            leftStr.Append(ch);
-
-            ch = text[rightPos];
-            aRenderingContext.GetWidth(ch, cwidth);
-            twidth += cwidth;
-            if (twidth > width)
-              break;
-            rightStr.Insert(ch, 0);
-            --rightPos;
-          }
-          text = leftStr + NS_LITERAL_STRING(ELLIPSIS) + rightStr;
-        }
-        break;
-      }
-    }
-  }
-  else {
-    switch (aColumn->GetTextAlignment()) {
-      case NS_STYLE_TEXT_ALIGN_RIGHT: {
-        textRect.x += textRect.width - width;
-      }
-      break;
-      case NS_STYLE_TEXT_ALIGN_CENTER: {
-        textRect.x += (textRect.width - width) / 2;
-      }
-      break;
-    }
-  }
-
-  aRenderingContext.GetWidth(text, width);
-  textRect.width = width;
+  AdjustForCellText(text, aRowIndex, aColumn, aRenderingContext, textRect);
 
   // Subtract out the remaining width.
   nsRect copyRect(textRect);
@@ -3264,13 +3376,13 @@ nsTreeBodyFrame::PaintText(PRInt32              aRowIndex,
   if (decorations & (NS_FONT_DECORATION_OVERLINE | NS_FONT_DECORATION_UNDERLINE)) {
     fontMet->GetUnderline(offset, size);
     if (decorations & NS_FONT_DECORATION_OVERLINE)
-      aRenderingContext.FillRect(textRect.x, textRect.y, width, size);
+      aRenderingContext.FillRect(textRect.x, textRect.y, textRect.width, size);
     if (decorations & NS_FONT_DECORATION_UNDERLINE)
-      aRenderingContext.FillRect(textRect.x, textRect.y + baseline - offset, width, size);
+      aRenderingContext.FillRect(textRect.x, textRect.y + baseline - offset, textRect.width, size);
   }
   if (decorations & NS_FONT_DECORATION_LINE_THROUGH) {
     fontMet->GetStrikeout(offset, size);
-    aRenderingContext.FillRect(textRect.x, textRect.y + baseline - offset, width, size);
+    aRenderingContext.FillRect(textRect.x, textRect.y + baseline - offset, textRect.width, size);
   }
 #ifdef MOZ_TIMELINE
   NS_TIMELINE_START_TIMER("Render Outline Text");
@@ -3468,11 +3580,14 @@ nsTreeBodyFrame::PaintDropFeedback(const nsRect&        aDropFeedbackRect,
 
     if (primaryCol){
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
-      nsRect twistySize = GetImageSize(mSlots->mDropRow, primaryCol, PR_TRUE, twistyContext);
+      nsRect imageSize;
+      nsRect twistyRect;
+      GetTwistyRect(mSlots->mDropRow, primaryCol, imageSize, twistyRect, aPresContext,
+                    aRenderingContext, twistyContext);
       nsMargin twistyMargin;
       twistyContext->GetStyleMargin()->GetMargin(twistyMargin);
-      twistySize.Inflate(twistyMargin);
-      currX += twistySize.width;
+      twistyRect.Inflate(twistyMargin);
+      currX += twistyRect.width;
     }
 
     const nsStylePosition* stylePosition = feedbackContext->GetStylePosition();

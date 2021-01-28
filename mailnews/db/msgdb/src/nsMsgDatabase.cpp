@@ -76,8 +76,6 @@
 #include "MailNewsTypes2.h"
 #include "nsMsgUtils.h"
 
-static NS_DEFINE_CID(kCMorkFactory, NS_MORK_CID);
-
 #if defined(XP_MAC) && defined(CompareString)
 	#undef CompareString
 #endif
@@ -90,8 +88,6 @@ static NS_DEFINE_CID(kCMorkFactory, NS_MORK_CID);
 #if defined(DEBUG_sspitzer_) || defined(DEBUG_seth_)
 #define DEBUG_MSGKEYSET 1
 #endif
-
-static NS_DEFINE_CID(kCollationFactoryCID, NS_COLLATIONFACTORY_CID);
 
 #define MSG_HASH_SIZE 512
 
@@ -176,7 +172,7 @@ NS_IMETHODIMP nsMsgDBService::OpenFolderDB(nsIMsgFolder *aFolder, PRBool aCreate
 
 // This method is called when the caller is trying to create a db without 
 // having a corresponding nsIMsgFolder object.  This happens in a few
-// situatins, including imap folder discovery, compacting local folders, 
+// situations, including imap folder discovery, compacting local folders, 
 // and copying local folders.
 NS_IMETHODIMP nsMsgDBService::OpenMailDBFromFileSpec(nsIFileSpec *aFolderName, PRBool aCreate, PRBool aLeaveInvalidDB, nsIMsgDatabase** pMessageDB)
 {
@@ -995,7 +991,7 @@ NS_IMETHODIMP nsMsgDatabase::QueryInterface(REFNSIID aIID, void** aResult)
   static nsIMdbFactory *gMDBFactory = nsnull;
   if (!gMDBFactory)
   {
-    nsCOMPtr <nsIMdbFactoryFactory> factoryfactory = do_CreateInstance(kCMorkFactory);
+    nsCOMPtr <nsIMdbFactoryFactory> factoryfactory = do_CreateInstance(NS_MORK_CONTRACTID);
     if (factoryfactory)
       factoryfactory->GetMdbFactory(&gMDBFactory);
   }
@@ -2193,8 +2189,9 @@ NS_IMETHODIMP nsMsgDatabase::SetStringProperty(nsMsgKey aKey, const char *aPrope
   rv = msgHdr->SetStringProperty(aProperty, aValue);
   NS_ENSURE_SUCCESS(rv,rv);
 
-  // if this is the junk score property notify
-  if (!strcmp(aProperty, "junkscore"))
+  // if this is the junk score property notify, as long as we're not going
+  // from no value to non junk
+  if (!strcmp(aProperty, "junkscore") && !(oldValue.IsEmpty() && !strcmp(aValue, "0")))
     NotifyJunkScoreChanged(nsnull);
 
   PRUint32 flags;
@@ -3217,7 +3214,7 @@ nsresult nsMsgDatabase::GetCollationKeyGenerator()
         // or generate a locale from a stored locale name ("en_US", "fr_FR") 
         //err = localeFactory->NewLocale(&localeName, &locale); 
         
-        nsCOMPtr <nsICollationFactory> f = do_CreateInstance(kCollationFactoryCID, &err);
+        nsCOMPtr <nsICollationFactory> f = do_CreateInstance(NS_COLLATIONFACTORY_CONTRACTID, &err);
         if (NS_SUCCEEDED(err) && f)
         {
           // get a collation interface instance 

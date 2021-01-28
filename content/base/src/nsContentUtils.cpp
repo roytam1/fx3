@@ -76,6 +76,10 @@
 #include "nsIDocShell.h"
 #include "nsIDocShellTreeItem.h"
 #include "nsParserCIID.h"
+#include "nsIParser.h"
+#include "nsIFragmentContentSink.h"
+#include "nsIContentSink.h"
+#include "nsHTMLParts.h"
 #include "nsIParserService.h"
 #include "nsIServiceManager.h"
 #include "nsIAttribute.h"
@@ -139,6 +143,7 @@ static NS_DEFINE_CID(kXTFServiceCID, NS_XTFSERVICE_CID);
 
 static const char kJSStackContractID[] = "@mozilla.org/js/xpc/ContextStack;1";
 static NS_DEFINE_CID(kParserServiceCID, NS_PARSERSERVICE_CID);
+static NS_DEFINE_CID(kCParserCID, NS_PARSER_CID);
 
 nsIDOMScriptObjectFactory *nsContentUtils::sDOMScriptObjectFactory = nsnull;
 nsIXPConnect *nsContentUtils::sXPConnect;
@@ -1502,8 +1507,7 @@ nsContentUtils::GenerateStateKey(nsIContent* aContent,
     aContent->GetCurrentDoc()->FlushPendingNotifications(Flush_Content);
 
     nsContentList *htmlForms = htmlDocument->GetForms();
-    nsRefPtr<nsContentList> htmlFormControls =
-      GetFormControlElements(aDocument);
+    nsContentList *htmlFormControls = htmlDocument->GetFormControls();
 
     NS_ENSURE_TRUE(htmlForms && htmlFormControls, NS_ERROR_OUT_OF_MEMORY);
 
@@ -2220,6 +2224,39 @@ nsCxPusher::~nsCxPusher()
   Pop();
 }
 
+static PRBool
+IsContextOnStack(nsIJSContextStack *aStack, JSContext *aContext)
+{
+  JSContext *ctx = nsnull;
+  aStack->Peek(&ctx);
+  if (!ctx)
+    return PR_FALSE;
+  if (ctx == aContext)
+    return PR_TRUE;
+
+  nsCOMPtr<nsIJSContextStackIterator>
+    iterator(do_CreateInstance("@mozilla.org/js/xpc/ContextStackIterator;1"));
+  NS_ENSURE_TRUE(iterator, PR_FALSE);
+
+  nsresult rv = iterator->Reset(aStack);
+  NS_ENSURE_SUCCESS(rv, PR_FALSE);
+
+  PRBool done;
+  while (NS_SUCCEEDED(iterator->Done(&done)) && !done) {
+    rv = iterator->Prev(&ctx);
+    NS_ASSERTION(NS_SUCCEEDED(rv), "Broken iterator implementation");
+
+    if (!ctx) {
+      continue;
+    }
+
+    if (nsJSUtils::GetDynamicScriptContext(ctx) && ctx == aContext)
+      return PR_TRUE;
+  }
+
+  return PR_FALSE;
+}
+
 void
 nsCxPusher::Push(nsISupports *aCurrentTarget)
 {
@@ -2265,13 +2302,9 @@ nsCxPusher::Push(nsISupports *aCurrentTarget)
     }
 
     if (mStack) {
-      JSContext *current = nsnull;
-      mStack->Peek(&current);
-
-      if (current) {
-        // If there's a context on the stack, that means that a script
-        // is running at the moment.
-
+      if (IsContextOnStack(mStack, cx)) {
+        // If the context is on the stack, that means that a script
+        // is running at the moment in the context.
         mScriptIsRunning = PR_TRUE;
       }
 
@@ -2303,7 +2336,7 @@ nsCxPusher::Pop()
   mStack->Pop(&unused);
 
   if (!mScriptIsRunning) {
-    // No JS is running, but executing the event handler might have
+    // No JS is running in the context, but executing the event handler might have
     // caused some JS to run. Tell the script context that it's done.
 
     mScx->ScriptEvaluated(PR_TRUE);
@@ -2420,21 +2453,6 @@ nsContentUtils::ReportToConsole(PropertiesFile aFile,
   NS_ENSURE_SUCCESS(rv, rv);
 
   return sConsoleService->LogMessage(errorObject);
-}
-
-static PRBool MatchFormControls(nsIContent* aContent, PRInt32 aNamespaceID,
-                                nsIAtom* aAtom, const nsAString& aData)
-{
-  return aContent->IsNodeOfType(nsINode::eHTML_FORM_CONTROL);
-}
-
-/* static */ already_AddRefed<nsContentList>
-nsContentUtils::GetFormControlElements(nsIDocument *aDocument)
-{
-  nsContentList *list = new nsContentList(aDocument,
-                                          MatchFormControls, EmptyString());
-  NS_IF_ADDREF(list);
-  return list;
 }
 
 PRBool
@@ -3174,4 +3192,167 @@ nsContentUtils::CopyUserData(nsIDocument *aOldDocument, const nsINode *aNode)
 
   nsPropertyTable *table = aOldDocument->PropertyTable();
   table->Enumerate(aNode, DOM_USER_DATA, CopyData, table);
+}
+
+/* static */
+nsresult
+nsContentUtils::CreateContextualFragment(nsIDOMNode* aContextNode,
+                                         const nsAString& aFragment,
+                                         nsIDOMDocumentFragment** aReturn)
+{
+  NS_ENSURE_ARG(aContextNode);
+  *aReturn = nsnull;
+
+  // Create a new parser for this entire operation
+  nsresult rv;
+  nsCOMPtr<nsIParser> parser = do_CreateInstance(kCParserCID, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsCOMPtr<nsIDocument> document;
+  nsCOMPtr<nsIDOMDocument> domDocument;
+
+  aContextNode->GetOwnerDocument(getter_AddRefs(domDocument));
+  document = do_QueryInterface(domDocument);
+
+  // If we don't have a document here, we can't get the right security context
+  // for compiling event handlers... so just bail out.
+  NS_ENSURE_TRUE(document, NS_ERROR_NOT_AVAILABLE);
+
+  nsVoidArray tagStack;
+  nsCOMPtr<nsIDOMNode> parent = aContextNode;
+  while (parent && (parent != domDocument)) {
+    PRUint16 nodeType;
+    parent->GetNodeType(&nodeType);
+    if (nsIDOMNode::ELEMENT_NODE == nodeType) {
+      nsAutoString tagName, uriStr;
+      parent->GetNodeName(tagName);
+
+      // see if we need to add xmlns declarations
+      nsCOMPtr<nsIContent> content = do_QueryInterface(parent);
+      if (!content) {
+        rv = NS_ERROR_FAILURE;
+        break;
+      }
+
+      PRUint32 count = content->GetAttrCount();
+      PRBool setDefaultNamespace = PR_FALSE;
+      if (count > 0) {
+        PRUint32 index;
+        nsAutoString nameStr, prefixStr, valueStr;
+
+        for (index = 0; index < count; index++) {
+          const nsAttrName* name = content->GetAttrNameAt(index);
+          if (name->NamespaceEquals(kNameSpaceID_XMLNS)) {
+            content->GetAttr(kNameSpaceID_XMLNS, name->LocalName(), uriStr);
+
+            // really want something like nsXMLContentSerializer::SerializeAttr
+            tagName.Append(NS_LITERAL_STRING(" xmlns")); // space important
+            if (name->GetPrefix()) {
+              tagName.Append(PRUnichar(':'));
+              name->LocalName()->ToString(nameStr);
+              tagName.Append(nameStr);
+            } else {
+              setDefaultNamespace = PR_TRUE;
+            }
+            tagName.Append(NS_LITERAL_STRING("=\"") + uriStr +
+              NS_LITERAL_STRING("\""));
+          }
+        }
+      }
+
+      if (!setDefaultNamespace) {
+        nsINodeInfo* info = content->NodeInfo();
+        if (!info->GetPrefixAtom() &&
+            info->NamespaceID() != kNameSpaceID_None) {
+          // We have no namespace prefix, but have a namespace ID.  Push
+          // default namespace attr in, so that our kids will be in our
+          // namespace.
+          nsAutoString uri;
+          info->GetNamespaceURI(uri);
+          tagName.Append(NS_LITERAL_STRING(" xmlns=\"") + uri +
+                         NS_LITERAL_STRING("\""));
+        }
+      }
+
+      // XXX Wish we didn't have to allocate here
+      PRUnichar* name = ToNewUnicode(tagName);
+      if (name) {
+        tagStack.AppendElement(name);
+        nsCOMPtr<nsIDOMNode> temp = parent;
+        rv = temp->GetParentNode(getter_AddRefs(parent));
+        if (NS_FAILED(rv)) {
+          break;
+        }
+      } else {
+        rv = NS_ERROR_OUT_OF_MEMORY;
+        break;
+      }
+    } else {
+      nsCOMPtr<nsIDOMNode> temp = parent;
+      rv = temp->GetParentNode(getter_AddRefs(parent));
+      if (NS_FAILED(rv)) {
+        break;
+      }
+    }
+  }
+
+  if (NS_SUCCEEDED(rv)) {
+    nsCAutoString contentType;
+    PRBool bCaseSensitive = PR_TRUE;
+    nsAutoString buf;
+    document->GetContentType(buf);
+    LossyCopyUTF16toASCII(buf, contentType);
+    bCaseSensitive = document->IsCaseSensitive();
+
+    nsCOMPtr<nsIHTMLDocument> htmlDoc(do_QueryInterface(domDocument));
+    PRBool bHTML = htmlDoc && !bCaseSensitive;
+    nsCOMPtr<nsIFragmentContentSink> sink;
+    if (bHTML) {
+      rv = NS_NewHTMLFragmentContentSink(getter_AddRefs(sink));
+    } else {
+      rv = NS_NewXMLFragmentContentSink(getter_AddRefs(sink));
+    }
+    if (NS_SUCCEEDED(rv)) {
+      sink->SetTargetDocument(document);
+      nsCOMPtr<nsIContentSink> contentsink(do_QueryInterface(sink));
+      parser->SetContentSink(contentsink);
+
+      nsDTDMode mode = eDTDMode_autodetect;
+      if (bHTML) {
+        switch (htmlDoc->GetCompatibilityMode()) {
+          case eCompatibility_NavQuirks:
+            mode = eDTDMode_quirks;
+            break;
+          case eCompatibility_AlmostStandards:
+            mode = eDTDMode_almost_standards;
+            break;
+          case eCompatibility_FullStandards:
+            mode = eDTDMode_full_standards;
+            break;
+          default:
+            NS_NOTREACHED("unknown mode");
+            break;
+        }
+      } else {
+        mode = eDTDMode_full_standards;
+      }
+      rv = parser->ParseFragment(aFragment, nsnull, tagStack,
+                                 !bHTML, contentType, mode);
+
+      if (NS_SUCCEEDED(rv)) {
+        rv = sink->GetFragment(aReturn);
+      }
+    }
+  }
+
+  // XXX Ick! Delete strings we allocated above.
+  PRInt32 count = tagStack.Count();
+  for (PRInt32 i = 0; i < count; i++) {
+    PRUnichar* str = (PRUnichar*)tagStack.ElementAt(i);
+    if (str) {
+      nsCRT::free(str);
+    }
+  }
+
+  return NS_OK;
 }

@@ -73,8 +73,6 @@
 // also, our default primary sort
 #define GENERATED_NAME_COLUMN_ID "GeneratedName" 
 
-static NS_DEFINE_CID(kCollationFactoryCID, NS_COLLATIONFACTORY_CID);
-
 NS_IMPL_ISUPPORTS4(nsAbView, nsIAbView, nsITreeView, nsIAbListener, nsIObserver)
 
 nsAbView::nsAbView()
@@ -574,6 +572,11 @@ NS_IMETHODIMP nsAbView::IsEditable(PRInt32 row, nsITreeColumn* col, PRBool* _ret
     return NS_ERROR_NOT_IMPLEMENTED;
 }
 
+NS_IMETHODIMP nsAbView::IsSelectable(PRInt32 row, nsITreeColumn* col, PRBool* _retval)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
+}
+
 NS_IMETHODIMP nsAbView::SetCellValue(PRInt32 row, nsITreeColumn* col, const nsAString& value)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
@@ -783,7 +786,7 @@ nsresult nsAbView::GenerateCollationKeysForCard(const PRUnichar *colID, AbCard *
     rv = localeSvc->GetApplicationLocale(getter_AddRefs(locale));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsCOMPtr <nsICollationFactory> factory = do_CreateInstance(kCollationFactoryCID, &rv); 
+    nsCOMPtr <nsICollationFactory> factory = do_CreateInstance(NS_COLLATIONFACTORY_CONTRACTID, &rv); 
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = factory->CreateCollation(locale, getter_AddRefs(mCollationKeyGenerator));

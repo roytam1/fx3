@@ -1425,7 +1425,10 @@ function ctrlNumberTabSelection(event)
   if (index < 0)
     return;
 
-  if (index >= gBrowser.tabContainer.childNodes.length)
+  // [Ctrl]+[9] always selects the last tab
+  if (index == 8)
+    index = gBrowser.tabContainer.childNodes.length - 1;
+  else if (index >= gBrowser.tabContainer.childNodes.length)
     return;
 
   var oldTab = gBrowser.selectedTab;
@@ -1875,7 +1878,7 @@ function BrowserCloseTabOrWindow()
   }
 #endif
 
-  if (gBrowser.localName == 'tabbrowser' && gBrowser.tabContainer.childNodes.length > 1) {
+  if (gBrowser.localName == "tabbrowser" && (gBrowser.tabContainer.childNodes.length > 1 || !gPrefService.getBoolPref("browser.tabs.autoHide"))) {
     // Just close up a tab.
     gBrowser.removeCurrentTab();
     return;

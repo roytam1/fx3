@@ -92,7 +92,6 @@ static const char* kLoadAsData = "loadAsData";
 
 // CIDs
 static NS_DEFINE_CID(kIDOMDOMImplementationCID, NS_DOM_IMPLEMENTATION_CID);
-static NS_DEFINE_CID(kCharsetConverterManagerCID, NS_ICHARSETCONVERTERMANAGER_CID);
 
 // State
 #define XML_HTTP_REQUEST_UNINITIALIZED  (1 << 0)  // 0
@@ -1109,7 +1108,7 @@ nsXMLHttpRequest::Open(const nsACString& method, const nsACString& url)
       ::JS_ValueToBoolean(cx, argv[2], &asyncBool);
       async = (PRBool)asyncBool;
 
-      if (argc > 3) {
+      if (argc > 3 && !JSVAL_IS_NULL(argv[3]) && !JSVAL_IS_VOID(argv[3])) {
         JSString* userStr = ::JS_ValueToString(cx, argv[3]);
 
         if (userStr) {
@@ -1118,7 +1117,7 @@ nsXMLHttpRequest::Open(const nsACString& method, const nsACString& url)
                       ::JS_GetStringLength(userStr));
         }
 
-        if (argc > 4) {
+        if (argc > 4 && !JSVAL_IS_NULL(argv[4]) && !JSVAL_IS_VOID(argv[4])) {
           JSString* passwdStr = JS_ValueToString(cx, argv[4]);
 
           if (passwdStr) {
@@ -1145,7 +1144,7 @@ nsXMLHttpRequest::GetStreamForWString(const PRUnichar* aStr,
 
   // We want to encode the string as utf-8, so get the right encoder
   nsCOMPtr<nsICharsetConverterManager> charsetConv =
-           do_GetService(kCharsetConverterManagerCID, &rv);
+           do_GetService(NS_CHARSETCONVERTERMANAGER_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
 
   rv = charsetConv->GetUnicodeEncoderRaw("UTF-8",

@@ -55,5 +55,6 @@ xpi:
 	bin/components/sqlpgsql.xpt \
 	bin/components/sqlsqlite.xpt \
 	bin/components/sqlmysql.xpt \
+	bin/components/sqlodbc.xpt \
 	bin/components/$(LIB_PREFIX)sql$(DLL_SUFFIX) \
 	bin/chrome/sql.jar

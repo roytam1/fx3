@@ -230,6 +230,11 @@ protected:
   // coordinate system of this frame.
   PRInt32 GetRowAt(nscoord aX, nscoord aY);
 
+  void AdjustForCellText(nsAutoString& aText,
+                         PRInt32 aRowIndex,  nsTreeColumn* aColumn,
+                         nsIRenderingContext& aRenderingContext,
+                         nsRect& aTextRect);
+
   // A helper used when hit testing.
   nsIAtom* GetItemWithinCellAt(nscoord aX, const nsRect& aCellRect,
                                PRInt32 aRowIndex, nsTreeColumn* aColumn);
@@ -238,6 +243,15 @@ protected:
   // coordinate system of this frame.
   void GetCellAt(nscoord aX, nscoord aY, PRInt32* aRow, nsTreeColumn** aCol,
                  nsIAtom** aChildElt);
+
+  // Retrieve the area for the twisty for a cell.
+  nsITheme* GetTwistyRect(PRInt32 aRowIndex,
+                          nsTreeColumn* aColumn,
+                          nsRect& aImageRect,
+                          nsRect& aTwistyRect,
+                          nsPresContext* aPresContext,
+                          nsIRenderingContext& aRenderingContext,
+                          nsStyleContext* aTwistyContext);
 
   // Fetch an image from the image cache.
   nsresult GetImage(PRInt32 aRowIndex, nsTreeColumn* aCol, PRBool aUseContext,

@@ -1339,6 +1339,7 @@ static JSStdName standard_class_names[] = {
 #if JS_HAS_GENERATORS
     {js_InitIteratorClasses,    EAGER_ATOM_AND_CLASP(Iterator)},
     {js_InitIteratorClasses,    EAGER_ATOM_AND_CLASP(Generator)},
+    {js_InitIteratorClasses,    EAGER_ATOM_AND_CLASP(GeneratorExit)},
 #endif
 
     {NULL,                      0, NULL, NULL}
@@ -3603,6 +3604,12 @@ JS_PUBLIC_API(uintN)
 JS_GetFunctionFlags(JSFunction *fun)
 {
     return fun->flags;
+}
+
+JS_PUBLIC_API(uint16)
+JS_GetFunctionArity(JSFunction *fun)
+{
+    return fun->nargs;
 }
 
 JS_PUBLIC_API(JSBool)

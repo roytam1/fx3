@@ -600,7 +600,7 @@ _cairo_atsui_font_old_show_glyphs (void		       *abstract_font,
     int i, bits_per_comp, alpha;
     void *extra = NULL;
 
-    cairo_rectangle_t rect = {dest_x, dest_y, width, height};
+    cairo_rectangle_fixed_t rect = {dest_x, dest_y, width, height};
     _cairo_surface_acquire_dest_image(generic_surface,
 				      &rect,
 				      &destImageSurface,

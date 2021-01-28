@@ -2077,7 +2077,6 @@ js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result)
 #define LOAD_BRANCH_CALLBACK(cx)    (onbranch = (cx)->branchCallback)
 
     LOAD_BRANCH_CALLBACK(cx);
-    ok = JS_TRUE;
 #define CHECK_BRANCH(len)                                                     \
     JS_BEGIN_MACRO                                                            \
         if (len <= 0 && onbranch) {                                           \
@@ -2136,6 +2135,19 @@ js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result)
         JS_ASSERT(JS_UPTRDIFF(sp, fp->spbase) <= depth * sizeof(jsval));
         newsp = fp->spbase - depth;
         mark = NULL;
+    }
+
+    /*
+     * To support generator_throw and to catch ignored exceptions, fail right
+     * away if cx->throwing is set.
+     */
+    ok = !cx->throwing;
+    if (!ok) {
+#ifdef DEBUG_NOT_THROWING
+        printf("JS INTERPRETER CALLED WITH PENDING EXCEPTION %lx\n",
+               (unsigned long) cx->exception);
+#endif
+        goto out;
     }
 
 #ifdef JS_THREADED_INTERP
@@ -5453,7 +5465,8 @@ interrupt:
             ok = OBJ_GET_ATTRIBUTES(cx, obj, id, NULL, &attrs);
             if (!ok)
                 goto out;
-            if (!(attrs & JSPROP_READONLY)) {
+            if (!(attrs & (JSPROP_READONLY | JSPROP_PERMANENT |
+                           JSPROP_GETTER | JSPROP_SETTER))) {
                 /* Define obj[id] to contain rval and to be permanent. */
                 ok = OBJ_DEFINE_PROPERTY(cx, obj, id, rval, NULL, NULL,
                                          JSPROP_PERMANENT, NULL);
@@ -5961,14 +5974,14 @@ interrupt:
                  * on the right of 'in' in a for-in loop, and there could be
                  * other live refs still.
                  *
-                 * js_FinishNativeIterator checks whether the iterator is not
+                 * js_CloseNativeIterator checks whether the iterator is not
                  * native, and also detects the case of a native iterator that
                  * has already escaped, even though a for-in loop caused it to
                  * be created.  See jsiter.c.
                  */
                 if (rval != sp[-3]) {
                     SAVE_SP_AND_PC(fp);
-                    js_FinishNativeIterator(cx, JSVAL_TO_OBJECT(rval));
+                    js_CloseNativeIterator(cx, JSVAL_TO_OBJECT(rval));
                 }
                 sp[-2] = JSVAL_NULL;
             }
@@ -5987,7 +6000,7 @@ interrupt:
 
           BEGIN_CASE(JSOP_YIELD)
             ASSERT_NOT_THROWING(cx);
-            fp->rval = POP_OPND();
+            fp->rval = FETCH_OPND(-1);
             fp->flags |= JSFRAME_YIELDING;
             pc += JSOP_YIELD_LENGTH;
             SAVE_SP_AND_PC(fp);
@@ -6069,7 +6082,6 @@ interrupt:
 #endif /* !JS_THREADED_INTERP */
 
 out:
-
     if (!ok) {
         /*
          * Has an exception been raised?  Also insist that we are not in an

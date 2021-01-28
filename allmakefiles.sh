@@ -225,6 +225,8 @@ intl/lwbrk/src/Makefile
 intl/lwbrk/public/Makefile
 intl/lwbrk/tests/Makefile
 intl/unicharutil/Makefile
+intl/unicharutil/util/Makefile
+intl/unicharutil/util/internal/Makefile
 intl/unicharutil/idl/Makefile
 intl/unicharutil/src/Makefile
 intl/unicharutil/public/Makefile
@@ -1085,6 +1087,7 @@ calendar/xpi/Makefile
 "
 
 MAKEFILES_sunbird="
+calendar/locales/Makefile
 calendar/sunbird/Makefile
 calendar/sunbird/app/Makefile
 calendar/sunbird/base/Makefile
@@ -1103,6 +1106,9 @@ extensions/sql/base/src/Makefile
 extensions/sql/base/resources/Makefile
 extensions/sql/pgsql/public/Makefile
 extensions/sql/pgsql/src/Makefile
+extensions/sql/odbc/Makefile
+extensions/sql/odbc/public/Makefile
+extensions/sql/odbc/src/Makefile
 extensions/sql/build/Makefile
 extensions/sql/build/src/Makefile
 extensions/sql/sqltest/Makefile

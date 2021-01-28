@@ -480,6 +480,28 @@ nsBlockFrame::GetType() const
   return nsLayoutAtoms::blockFrame;
 }
 
+void
+nsBlockFrame::InvalidateInternal(const nsRect& aDamageRect,
+                                 nscoord aX, nscoord aY, nsIFrame* aForChild,
+                                 PRBool aImmediate)
+{
+  // Optimize by suppressing invalidation of areas that are clipped out
+  // with CSS 'clip'.
+  const nsStyleDisplay* disp = GetStyleDisplay();
+  nsRect absPosClipRect;
+  if (GetAbsPosClipRect(disp, &absPosClipRect)) {
+    // Restrict the invalidated area to abs-pos clip rect
+    // abs-pos clipping clips everything in the frame
+    nsRect r;
+    if (r.IntersectRect(aDamageRect, absPosClipRect - nsPoint(aX, aY))) {
+      nsBlockFrameSuper::InvalidateInternal(r, aX, aY, aForChild, aImmediate);
+    }
+    return;
+  }
+
+  nsBlockFrameSuper::InvalidateInternal(aDamageRect, aX, aY, aForChild, aImmediate);
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // Child frame enumeration
 
@@ -7086,6 +7108,7 @@ nsBlockFrame::CheckFloats(nsBlockReflowState& aState)
 
   if (!equal || lineFloats.Count() != storedFloats.Count()) {
     NS_WARNING("nsBlockFrame::CheckFloats: Explicit float list is out of sync with float cache");
+#if defined(DEBUG_roc)
     nsIFrameDebug::RootFrameList(GetPresContext(), stdout, 0);
     for (i = 0; i < lineFloats.Count(); ++i) {
       printf("Line float: %p\n", lineFloats.ElementAt(i));
@@ -7093,6 +7116,7 @@ nsBlockFrame::CheckFloats(nsBlockReflowState& aState)
     for (i = 0; i < storedFloats.Count(); ++i) {
       printf("Stored float: %p\n", storedFloats.ElementAt(i));
     }
+#endif
   }
 #endif
 

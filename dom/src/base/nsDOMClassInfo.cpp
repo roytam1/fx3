@@ -67,6 +67,7 @@
 // General helper includes
 #include "nsGlobalWindow.h"
 #include "nsIContent.h"
+#include "nsIAttribute.h"
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
 #include "nsIDOM3Document.h"
@@ -584,7 +585,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(Element, nsElementSH,
                            ELEMENT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(Attr, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(Attr, nsAttributeSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(Text, nsNodeSH,
                            NODE_SCRIPTABLE_FLAGS)
@@ -798,8 +799,6 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            ELEMENT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(XULCommandDispatcher, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA_WITH_NAME(XULAttr, Attr, nsDOMGenericSH,
-                                     DOM_DEFAULT_SCRIPTABLE_FLAGS)
 #endif
   NS_DEFINE_CLASSINFO_DATA(XULControllers, nsNonDOMObjectSH,
                            DEFAULT_SCRIPTABLE_FLAGS)
@@ -2377,10 +2376,6 @@ nsDOMClassInfo::Init()
   DOM_CLASSINFO_MAP_BEGIN(XULCommandDispatcher, nsIDOMXULCommandDispatcher)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMXULCommandDispatcher)
   DOM_CLASSINFO_MAP_END
-
-  DOM_CLASSINFO_MAP_BEGIN_NO_CLASS_IF(XULAttr, nsIDOMAttr)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMAttr)
-  DOM_CLASSINFO_MAP_END
 #endif
 
   DOM_CLASSINFO_MAP_BEGIN_NO_CLASS_IF(XULControllers, nsIControllers)
@@ -3352,10 +3347,20 @@ nsDOMClassInfo::PostCreate(nsIXPConnectWrappedNative *wrapper,
   }
 #endif
 
+  // Look up the name of our constructor in the current global scope. We do
+  // this because triggering this lookup can cause us to call
+  // nsWindowSH::NewResolve, which will end up in nsWindowSH::GlobalResolve.
+  // GlobalResolve does some prototype magic (which satisfies the if condition
+  // above) in order to make sure that prototype delegation works correctly.
+  // Consider if a site sets HTMLElement.prototype.foopy = function () { ... }
+  // Now, calling document.body.foopy() needs to ensure that looking up foopy
+  // on document.body's prototype will find the right function. This
+  // LookupProperty accomplishes that.
+  // XXX This shouldn't need to go through the JS engine. Instead, we should
+  // be calling nsWindowSH::GlobalResolve directly.
   JSObject *global = GetGlobalJSObject(cx, obj);
-
   jsval val;
-  if (!::JS_GetProperty(cx, global, mData->mName, &val)) {
+  if (!::JS_LookupProperty(cx, global, mData->mName, &val)) {
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -3779,6 +3784,8 @@ void InvalidateContextAndWrapperCache()
 // static helper that determines if a security manager check is needed
 // by checking if the callee's context is the same as the caller's
 // context
+// Note: See documentNeedsSecurityCheck for information about the control
+// flow in this function.
 
 static inline PRBool
 needsSecurityCheck(JSContext *cx, nsIXPConnectWrappedNative *wrapper)
@@ -3818,29 +3825,30 @@ needsSecurityCheck(JSContext *cx, nsIXPConnectWrappedNative *wrapper)
   JSStackFrame *fp = nsnull;
   JSObject *fp_obj = nsnull;
 
+  cached_win_needs_check = PR_FALSE;
+
   do {
     fp = ::JS_FrameIterator(cx, &fp);
 
-    if(!fp) {
-      break;
+    if (!fp) {
+      cached_win_cx = nsnull;
+      return cached_win_needs_check;
     }
 
     fp_obj = ::JS_GetFrameFunctionObject(cx, fp);
+    cached_win_needs_check = PR_TRUE;
   } while (!fp_obj);
 
-  if (fp_obj) {
-    JSObject *global = GetGlobalJSObject(cx, fp_obj);
+  JSObject *global = GetGlobalJSObject(cx, fp_obj);
 
-    JSObject *wrapper_obj = nsnull;
-    wrapper->GetJSObject(&wrapper_obj);
+  JSObject *wrapper_obj = nsnull;
+  wrapper->GetJSObject(&wrapper_obj);
 
-    if (global != wrapper_obj) {
-      return PR_TRUE;
-    }
+  if (global != wrapper_obj) {
+    return PR_TRUE;
   }
 
   cached_win_needs_check = PR_FALSE;
-
   return PR_FALSE;
 }
 
@@ -4692,14 +4700,19 @@ public:
 
   nsresult Install(JSContext *cx, JSObject *target, jsval thisAsVal)
   {
-    if (!::JS_DefineUCProperty(cx, target,
-                               NS_REINTERPRET_CAST(const jschar *, mClassName),
-                               nsCRT::strlen(mClassName), thisAsVal, nsnull,
-                               nsnull, 0)) {
-      return NS_ERROR_UNEXPECTED;
-    }
-    
-    return NS_OK;
+    PRBool doSecurityCheckInAddProperty =
+      nsDOMClassInfo::sDoSecurityCheckInAddProperty;
+    nsDOMClassInfo::sDoSecurityCheckInAddProperty = PR_FALSE;
+
+    JSBool ok =
+      ::JS_DefineUCProperty(cx, target,
+                            NS_REINTERPRET_CAST(const jschar *, mClassName),
+                            nsCRT::strlen(mClassName), thisAsVal, nsnull,
+                            nsnull, 0);
+
+    nsDOMClassInfo::sDoSecurityCheckInAddProperty =
+      doSecurityCheckInAddProperty;
+    return ok ? NS_OK : NS_ERROR_UNEXPECTED;
   }
 
 private:
@@ -6611,8 +6624,12 @@ nsNodeSH::PreCreate(nsISupports *nativeObj, JSContext *cx, JSObject *globalObj,
     if (!native_parent) {
       native_parent = doc;
     }
-  } else if (node->IsNodeOfType(nsINode::eCONTENT)) {
-    // For non-XUL content, use the document as scope parent.
+  } else if (!node->IsNodeOfType(nsINode::eDOCUMENT)) {
+    NS_ASSERTION(node->IsNodeOfType(nsINode::eCONTENT) ||
+                 node->IsNodeOfType(nsINode::eATTRIBUTE),
+                 "Unexpected node type");
+                 
+    // For attributes and non-XUL content, use the document as scope parent.
     native_parent = doc;
 
     // But for HTML form controls, use the form as scope parent.
@@ -6632,11 +6649,8 @@ nsNodeSH::PreCreate(nsISupports *nativeObj, JSContext *cx, JSObject *globalObj,
       }
     }
   } else {
-    NS_ASSERTION(node->IsNodeOfType(nsINode::eDOCUMENT),
-                 "Unexpected node");
-    // We're called for a document object (since node is not eCONTENT),
-    // set the parent to be the document's global object, if there
-    // is one
+    // We're called for a document object; set the parent to be the
+    // document's global object, if there is one
 
     // Get the scope object from the document.
     native_parent = doc->GetScopeObject();
@@ -6862,8 +6876,15 @@ nsEventReceiverSH::RegisterCompileHandler(nsIXPConnectWrappedNative *wrapper,
   NS_ENSURE_TRUE(script_cx, NS_ERROR_UNEXPECTED);
 
   nsCOMPtr<nsIDOMEventReceiver> receiver(do_QueryWrappedNative(wrapper));
-  NS_ENSURE_TRUE(receiver, NS_ERROR_UNEXPECTED);
-
+  if (!receiver) {
+    // Doesn't do events
+#ifdef DEBUG
+    nsCOMPtr<nsIAttribute> attr = do_QueryWrappedNative(wrapper);
+    NS_WARN_IF_FALSE(attr, "Non-attr doesn't QI to nsIDOMEventReceiver?");
+#endif
+    return NS_OK;
+  }
+  
   nsCOMPtr<nsIEventListenerManager> manager;
   receiver->GetListenerManager(PR_TRUE, getter_AddRefs(manager));
   NS_ENSURE_TRUE(manager, NS_ERROR_UNEXPECTED);
@@ -7370,7 +7391,6 @@ documentNeedsSecurityCheck(JSContext *cx, nsIXPConnectWrappedNative *wrapper)
 
   cached_doc_cx = cx;
   cached_doc_wrapper = wrapper;
-  cached_doc_needs_check = PR_TRUE;
   
   // Get the JS object from the wrapper
   JSObject *wrapper_obj = nsnull;
@@ -7397,26 +7417,33 @@ documentNeedsSecurityCheck(JSContext *cx, nsIXPConnectWrappedNative *wrapper)
   JSObject *function_obj = nsnull;
   JSStackFrame *fp = nsnull;
 
+  // Initialize to false to handle the case where there's no JS running
+  // on the current context (e.g., we're getting here from a property
+  // access from the JS API).  Since the scope chain is immutable, it's
+  // OK to keep skipping the check.
+
+  cached_doc_needs_check = PR_FALSE;
+
   do {
     fp = ::JS_FrameIterator(cx, &fp);
-
     if (!fp) {
-      if (!function_obj) {
-        // No JS is running (there's no frame on the JS stack with a
-        // function object), someone is just accessing properties on a
-        // JS object using the JS API, no need to do security checks
-        // then.
+      // Clear cached_doc_cx so that we don't really cache this return
+      // value. If we hit this case, then we didn't really have enough
+      // information about the currently running code to make any long-term
+      // decisions.
 
-        // Since the scope chain is immutable, it's OK to keep
-        // skipping the check
-        cached_doc_needs_check = PR_FALSE;
-        return PR_FALSE;
-      }
-
-      break;
+      cached_doc_cx = nsnull;
+      return cached_doc_needs_check;
     }
 
     function_obj = ::JS_GetFrameFunctionObject(cx, fp);
+
+    // Since we're here, we know that there is some JS running. Now, we
+    // need to default to being paranoid, and can only skip the security
+    // check if we find that the currently-running function is from the
+    // same scope.
+
+    cached_doc_needs_check = PR_TRUE;
   } while (!function_obj);
 
   // Get the global object that the calling function comes from.
@@ -10038,5 +10065,14 @@ nsNonDOMObjectSH::GetFlags(PRUint32 *aFlags)
   // to do something like implement nsISecurityCheckedComponent in a meaningful
   // way.
   *aFlags = nsIClassInfo::MAIN_THREAD_ONLY;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsAttributeSH::GetFlags(PRUint32 *aFlags)
+{
+  // Just like nsNodeSH, but without CONTENT_NODE
+  *aFlags = DOMCLASSINFO_STANDARD_FLAGS;
+
   return NS_OK;
 }

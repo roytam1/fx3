@@ -68,9 +68,6 @@
 
 #define NS_REPLACEMENT_CHAR  PRUnichar(0x003F) // question mark
 
-static NS_DEFINE_CID(kCharsetConverterManagerCID, NS_ICHARSETCONVERTERMANAGER_CID);
-static NS_DEFINE_CID(kPrefCID, NS_PREF_CID);
-static NS_DEFINE_CID(kLocaleServiceCID, NS_LOCALESERVICE_CID); 
 
 #define NS_MAX_FONT_WEIGHT 900
 #define NS_MIN_FONT_WEIGHT 100
@@ -214,7 +211,7 @@ static nsFontCleanupObserver *gFontCleanupObserver;
 static nsresult
 InitGlobals(void)
 {
-  CallGetService(kPrefCID, &gPref);
+  CallGetService(NS_PREF_CONTRACTID, &gPref);
   if (!gPref) {
     FreeGlobals();
     return NS_ERROR_FAILURE;
