@@ -62,6 +62,7 @@
 #include "nsIDocument.h"
 #include "nsIScriptGlobalObject.h"
 #include "nsIScriptContext.h"
+#include "nsDOMJSUtils.h"
 
 #include "nsIXPConnect.h"
 
@@ -1405,6 +1406,7 @@ _getstringidentifier(const NPUTF8* name)
   if (!cx)
     return NULL;
 
+  JSAutoRequest ar(cx);
   return doGetIdentifier(cx, name);
 }
 
@@ -1421,6 +1423,8 @@ _getstringidentifiers(const NPUTF8** names, int32_t nameCount,
   stack->GetSafeJSContext(&cx);
   if (!cx)
     return;
+
+  JSAutoRequest ar(cx);
 
   for (int32_t i = 0; i < nameCount; ++i) {
     identifiers[i] = doGetIdentifier(cx, names[i]);

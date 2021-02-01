@@ -58,6 +58,7 @@
 #include "nsIBaseWindow.h"
 #include "nsIDocShell.h"
 #include "nsIDocShellTreeItem.h"
+#include "nsIScriptRuntime.h"
 #include "nsCOMArray.h"
 
 #include "nsGUIEvent.h"
@@ -1373,7 +1374,23 @@ nsDocument::SetHeaderData(nsIAtom* aHeaderField, const nsAString& aData)
   if (aHeaderField == nsHTMLAtoms::headerContentLanguage) {
     CopyUTF16toUTF8(aData, mContentLanguage);
   }
-  
+
+  // Set the default script-type on the root element.
+  if (aHeaderField == nsHTMLAtoms::headerContentScriptType) {
+    nsIContent *root = GetRootContent();
+    if (root) {
+      // Get the script-type ID for this value.
+      nsresult rv;
+      nsCOMPtr<nsIScriptRuntime> runtime;
+      rv = NS_GetScriptRuntime(aData, getter_AddRefs(runtime));
+      if (NS_FAILED(rv) || runtime == nsnull) {
+        NS_WARNING("The script-type is unknown");
+      } else {
+        root->SetScriptTypeID(runtime->GetScriptTypeID());
+      }
+    }
+  }
+
   if (aHeaderField == nsHTMLAtoms::headerDefaultStyle) {
     // switch alternate style sheets based on default
     // XXXldb What if we don't have all the sheets yet?  Should this use
@@ -3606,9 +3623,36 @@ nsDocument::IsSameNode(nsIDOMNode* aOther, PRBool* aReturn)
 NS_IMETHODIMP
 nsDocument::IsEqualNode(nsIDOMNode* aOther, PRBool* aReturn)
 {
-  NS_NOTYETIMPLEMENTED("nsDocument::IsEqualNode()");
+  NS_ENSURE_ARG_POINTER(aOther);
 
-  return NS_ERROR_NOT_IMPLEMENTED;
+  *aReturn = PR_FALSE;
+
+  // Node type check by QI.  We also reuse this later.
+  nsCOMPtr<nsIDocument> aOtherDoc = do_QueryInterface(aOther);
+  if (!aOtherDoc) {
+    return NS_OK;
+  }
+
+  // Child nodes check.
+  PRUint32 childCount = GetChildCount();
+  if (childCount != aOtherDoc->GetChildCount()) {
+    return NS_OK;
+  }
+
+  for (PRUint32 i = 0; i < childCount; i++) {
+    nsIContent* aChild1 = GetChildAt(i);
+    nsIContent* aChild2 = aOtherDoc->GetChildAt(i);
+    if (!nsNode3Tearoff::AreNodesEqual(aChild1, aChild2)) {
+      return NS_OK;
+    }
+  }
+
+  /* Checks not needed:  Prefix, namespace URI, local name, node name,
+     node value, attributes.
+   */
+
+  *aReturn = PR_TRUE;
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -5069,4 +5113,18 @@ nsDocument::UpdateLinkMap()
     NotifyURIVisitednessChanged(mVisitednessChangedURIs[i]);
   }
   mVisitednessChangedURIs.Clear();
+}
+
+NS_IMETHODIMP
+nsDocument::GetScriptTypeID(PRUint32 *aScriptType)
+{
+    NS_ERROR("No default script type here - ask some element");
+    return nsIProgrammingLanguage::UNKNOWN;
+}
+
+NS_IMETHODIMP
+nsDocument::SetScriptTypeID(PRUint32 aScriptType)
+{
+    NS_ERROR("Can't change default script type for a document");
+    return NS_ERROR_NOT_IMPLEMENTED;
 }

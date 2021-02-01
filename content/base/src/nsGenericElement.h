@@ -57,6 +57,7 @@
 #include "nsGenericDOMNodeList.h"
 #include "nsContentUtils.h"
 #include "nsAttrAndChildArray.h"
+#include "mozFlushType.h"
 
 class nsIDOMAttr;
 class nsIDOMEventListener;
@@ -123,6 +124,17 @@ public:
 
   static nsresult SetTextContent(nsIContent *aContent,
                                  const nsAString &aTextContent);
+
+  /**
+   * Determines whether two nodes are equal.
+   *
+   * @param aContent1 The first node to compare.
+   * @param aContent2 The second node to compare.
+   *
+   * @return PR_TRUE if the nodes are equal.
+   */
+  static PRBool AreNodesEqual(nsIContent* aContent1,
+                              nsIContent* aContent2);
 
 protected:
   virtual ~nsNode3Tearoff() {};
@@ -361,6 +373,9 @@ public:
   virtual void SetMayHaveFrame(PRBool aMayHaveFrame);
   virtual PRBool MayHaveFrame() const;
 
+  virtual PRUint32 GetScriptTypeID() const;
+  virtual nsresult SetScriptTypeID(PRUint32 aLang);
+
   /**
    * This calls Clone to do the actual cloning so that we end up with the
    * right class for the clone.
@@ -475,9 +490,11 @@ public:
    * (like onclick) and with the value as JS   
    * @param aEventName the event listener name
    * @param aValue the JS to attach
+   * @param aDefer indicates if deferred execution is allowed
    */
   nsresult AddScriptEventListener(nsIAtom* aEventName,
-                                  const nsAString& aValue);
+                                  const nsAString& aValue,
+                                  PRBool aDefer = PR_TRUE);
 
   /**
    * Trigger a link with uri aLinkURI.  If aClick is false, this triggers a
@@ -652,6 +669,34 @@ public:
                                 nsIContent* aTarget,
                                 PRBool aFullDispatch,
                                 nsEventStatus* aStatus);
+
+  /**
+   * Get the primary frame for this content without flushing (see
+   * GetPrimaryFrameFor)
+   *
+   * @return the primary frame 
+   */
+  nsIFrame* GetPrimaryFrame();
+
+  /**
+   * Get the primary frame for this content with flushing (see
+   * GetPrimaryFrameFor).
+   *
+   * @param aType the kind of flush to do, typically Flush_Frames or
+   *              Flush_Layout
+   * @return the primary frame
+   */
+  nsIFrame* GetPrimaryFrame(mozFlushType aType);
+
+  /**
+   * Get the primary frame for a piece of content without flushing.
+   *
+   * @param aContent the content to get the primary frame for
+   * @param aDocument the document for this content
+   * @return the primary frame
+   */
+  static nsIFrame* GetPrimaryFrameFor(nsIContent* aContent,
+                                      nsIDocument* aDocument);
 
   /**
    * Struct that stores info on an attribute.  The name and value must

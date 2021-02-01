@@ -81,6 +81,7 @@
 #include "nsIObserverService.h"
 #include "nsIContent.h"
 #include "nsAutoPtr.h"
+#include "nsDOMJSUtils.h"
 #include "nsAboutProtocolUtils.h"
 #include "nsIClassInfo.h"
 #include "nsIURIFixup.h"
@@ -100,6 +101,7 @@ JSRuntime       *nsScriptSecurityManager::sRuntime   = 0;
 static inline const PRUnichar *
 JSValIDToString(JSContext *cx, const jsval idval)
 {
+    JSAutoRequest ar(cx);
     JSString *str = JS_ValueToString(cx, idval);
     if(!str)
         return nsnull;
@@ -114,6 +116,7 @@ GetScriptContext(JSContext *cx)
 
 inline void SetPendingException(JSContext *cx, const char *aMsg)
 {
+    JSAutoRequest ar(cx);
     JSString *str = JS_NewStringCopyZ(cx, aMsg);
     if (str)
         JS_SetPendingException(cx, STRING_TO_JSVAL(str));
@@ -121,6 +124,7 @@ inline void SetPendingException(JSContext *cx, const char *aMsg)
 
 inline void SetPendingException(JSContext *cx, const PRUnichar *aMsg)
 {
+    JSAutoRequest ar(cx);
     JSString *str = JS_NewUCStringCopyZ(cx,
                         NS_REINTERPRET_CAST(const jschar*, aMsg));
     if (str)
@@ -519,6 +523,8 @@ nsScriptSecurityManager::CheckConnect(JSContext* cx,
 
     nsresult rv = CheckLoadURIFromScript(cx, aTargetURI);
     if (NS_FAILED(rv)) return rv;
+
+    JSAutoRequest ar(cx);
 
     JSString* propertyName = ::JS_InternString(cx, aPropertyName);
     if (!propertyName)
@@ -2769,6 +2775,7 @@ nsScriptSecurityManager::CheckComponentPermissions(JSContext *cx,
 
     // Look up the policy for this class.
     // while this isn't a property we'll treat it as such, using ACCESS_CALL_METHOD
+    JSAutoRequest ar(cx);
     jsval cidVal = STRING_TO_JSVAL(::JS_InternString(cx, cid.get()));
 
     ClassInfoData nameData(nsnull, "ClassID");
@@ -3418,6 +3425,8 @@ nsScriptSecurityManager::InitDomainPolicy(JSContext* cx,
         end = PL_strchr(start, '.');
         if (end)
             *end = '\0';
+
+        JSAutoRequest ar(cx);
 
         JSString* propertyKey = ::JS_InternString(cx, start);
         if (!propertyKey)

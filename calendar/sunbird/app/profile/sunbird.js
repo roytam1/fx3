@@ -35,6 +35,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#filter substitution
+
 // SYNTAX HINTS:  dashes are delimiters.  Use underscores instead.
 //  The first character after a period must be alphabetic.
 
@@ -90,9 +92,9 @@ pref("extensions.blocklist.interval", 86400);
 pref("extensions.blocklist.url", "https://addons.mozilla.org/blocklist/1/%APP_ID%/%APP_VERSION%/");
 pref("extensions.blocklist.detailsURL", "http://www.mozilla.com/blocklist/");
 
-pref("general.useragent.locale", "chrome://global/locale/intl.properties");
-pref("general.useragent.contentlocale", "chrome://browser-region/locale/region.properties");
-#expand pref("general.useragent.extra.sunbird", "Mozilla Sunbird/__APP_VERSION__");
+pref("general.useragent.locale", "@AB_CD@");
+pref("general.skins.selectedSkin", "classic/1.0");
+pref("general.useragent.extra.sunbird", "@APP_UA_NAME@/@APP_VERSION@");
 
 // Scripts & Windows prefs
 pref("dom.disable_open_during_load",        true);
@@ -156,3 +158,4 @@ pref("security.warn_entering_weak.show_once", true);
 pref("security.warn_leaving_secure.show_once", true);
 pref("security.warn_viewing_mixed.show_once", true);
 pref("security.warn_submit_insecure.show_once", true);
+

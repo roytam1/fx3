@@ -439,8 +439,7 @@ MicrosummaryService.prototype = {
 
     var genName = doc.documentElement.getAttribute("name");
     var fileName = sanitizeName(genName) + ".xml";
-    var file = this._dirs.get("ProfD", Ci.nsIFile);
-    file.append("microsummary-generators");
+    var file = this._dirs.get("UsrMicsumGens", Ci.nsIFile);
     file.append(fileName);
     file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, PERMS_FILE);
 
@@ -1584,11 +1583,6 @@ function getPageFromEvent(event) {
   else if (event.currentTarget && event.currentTarget.nodeName &&
            event.currentTarget.nodeName == "iframe") {
     // this was a hidden iframe page load
-
-    // Make sure this event doesn't reach any other load handlers
-    // intended for visible document frames in the browser window.
-    event.preventDefault();
-    event.stopPropagation();
 
     var iframe = event.currentTarget;
 

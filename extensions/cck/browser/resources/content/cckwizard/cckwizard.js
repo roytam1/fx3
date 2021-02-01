@@ -1762,7 +1762,7 @@ function CCKWriteInstallRDF(destdir)
     str = str.replace(/%descriptionline%/g, descriptionline);
     str = str.replace(/%description%/g, htmlEscape(document.getElementById("description").value));
   } else {
-    str = str.replace(/%descrptionline%/g, "");
+    str = str.replace(/%descriptionline%/g, "");
   }
 
   var creator = document.getElementById("creator").value;
@@ -2384,18 +2384,18 @@ function Validate(field, message)
 {
   var gIDTest = /^(\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}|[a-z0-9-\._]*\@[a-z0-9-\._]+)$/i;
   
-  for (var i=0; i < arguments.length; i+=2) {
+  for (var i=0; i < arguments.length; i++) {
     /* special case ID */
     if (document.getElementById(arguments[i]).id == "id") {
       if (!gIDTest.test(document.getElementById(arguments[i]).value)) {
         var bundle = document.getElementById("bundle_cckwizard");
-        gPromptService.alert(window, bundle.getString("windowTitle"), arguments[i+1]);
+        gPromptService.alert(window, bundle.getString("windowTitle"), bundle.getString(arguments[i] + ".error"));
         return false;
       }
     } else {
       if (document.getElementById(arguments[i]).value == '') {
         var bundle = document.getElementById("bundle_cckwizard");
-        gPromptService.alert(window, bundle.getString("windowTitle"), arguments[i+1]);
+        gPromptService.alert(window, bundle.getString("windowTitle"), bundle.getString(arguments[i] + ".error"));
         return false;
       }
     }
@@ -2405,11 +2405,11 @@ function Validate(field, message)
 
 function ValidateNoSpace(field, message)
 {
-  for (var i=0; i < arguments.length; i+=2) {
+  for (var i=0; i < arguments.length; i++) {
     var str = document.getElementById(arguments[i]).value;
     if ((str == '') || (str.match(" "))) {
       var bundle = document.getElementById("bundle_cckwizard");
-      gPromptService.alert(window, bundle.getString("windowTitle"), arguments[i+1]);
+      gPromptService.alert(window, bundle.getString("windowTitle"), bundle.getString(arguments[i] + ".error"));
       return false;
     }
   }

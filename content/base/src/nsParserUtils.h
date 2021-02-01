@@ -63,7 +63,7 @@ public:
                           nsAString& aValue);
 
   static PRBool
-  IsJavaScriptLanguage(const nsString& aName, const char* *aVersion);
+  IsJavaScriptLanguage(const nsString& aName, PRUint32 *aVerFlags);
 
   static void
   SplitMimeType(const nsAString& aValue, nsString& aType,

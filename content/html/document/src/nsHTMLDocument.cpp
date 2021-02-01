@@ -2381,6 +2381,8 @@ nsHTMLDocument::ScriptWriteCommon(PRBool aNewlineTerminate)
     NS_ENSURE_TRUE(argv, NS_ERROR_UNEXPECTED);
 
     if (argc == 1) {
+      JSAutoRequest ar(cx);
+
       JSString *jsstr = JS_ValueToString(cx, argv[0]);
       NS_ENSURE_TRUE(jsstr, NS_ERROR_OUT_OF_MEMORY);
 
@@ -2395,6 +2397,8 @@ nsHTMLDocument::ScriptWriteCommon(PRBool aNewlineTerminate)
       nsAutoString string_buffer;
 
       for (i = 0; i < argc; ++i) {
+        JSAutoRequest ar(cx);
+
         JSString *str = JS_ValueToString(cx, argv[i]);
         NS_ENSURE_TRUE(str, NS_ERROR_OUT_OF_MEMORY);
 
@@ -3673,13 +3677,16 @@ nsHTMLDocument::SetDesignMode(const nsAString & aDesignMode)
     return NS_ERROR_FAILURE;
 
   nsresult rv = NS_OK;
-  nsCOMPtr<nsIPrincipal> subject;
-  nsIScriptSecurityManager *secMan = nsContentUtils::GetSecurityManager();
-  rv = secMan->GetSubjectPrincipal(getter_AddRefs(subject));
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (subject) {
-     rv = secMan->CheckSameOriginPrincipal(subject, NodePrincipal());
-     NS_ENSURE_SUCCESS(rv, rv);
+
+  if (!nsContentUtils::IsCallerTrustedForWrite()) {
+    nsCOMPtr<nsIPrincipal> subject;
+    nsIScriptSecurityManager *secMan = nsContentUtils::GetSecurityManager();
+    rv = secMan->GetSubjectPrincipal(getter_AddRefs(subject));
+    NS_ENSURE_SUCCESS(rv, rv);
+    if (subject) {
+      rv = secMan->CheckSameOriginPrincipal(subject, NodePrincipal());
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
   }
 
   nsCOMPtr<nsIEditingSession> editSession = do_GetInterface(docshell);

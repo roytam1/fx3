@@ -356,7 +356,6 @@ pref("profile.allow_automigration", false);   // setting to false bypasses autom
 
 // Customizable toolbar stuff
 pref("custtoolbar.personal_toolbar_folder", "");
-pref("browser.throbber.url","chrome://browser-region/locale/region.properties");
 
 // pref to control the alert notification 
 pref("alerts.slideIncrement", 1);
@@ -456,18 +455,15 @@ pref("browser.send_pings", true);
 #ifdef MOZ_FEEDS
 // XXXben This is just here for demo purposes until web registration works!
 // XXXben Needs Localization!
-pref("browser.contentHandlers.types.0.title", "Netvibes");
-pref("browser.contentHandlers.types.0.uri", "http://www.netvibes.com/subscribe.php?url=%s");
+pref("browser.contentHandlers.types.0.title", "Bloglines");
+pref("browser.contentHandlers.types.0.uri", "http://www.bloglines.com/login?r=/sub/%s");
 pref("browser.contentHandlers.types.0.type", "application/vnd.mozilla.maybe.feed");
-pref("browser.contentHandlers.types.1.title", "My Yahoo");
-pref("browser.contentHandlers.types.1.uri", "http://add.my.yahoo.com/rss?url=%s");
+pref("browser.contentHandlers.types.1.title", "iGoogle/Google Reader");
+pref("browser.contentHandlers.types.1.uri", "http://fusion.google.com/add?feedurl=%s");
 pref("browser.contentHandlers.types.1.type", "application/vnd.mozilla.maybe.feed");
-pref("browser.contentHandlers.types.2.title", "Bloglines");
-pref("browser.contentHandlers.types.2.uri", "http://www.bloglines.com/login?r=/sub/%s");
+pref("browser.contentHandlers.types.2.title", "My Yahoo");
+pref("browser.contentHandlers.types.2.uri", "http://add.my.yahoo.com/rss?url=%s");
 pref("browser.contentHandlers.types.2.type", "application/vnd.mozilla.maybe.feed");
-pref("browser.contentHandlers.types.3.title", "iGoogle/Google Reader");
-pref("browser.contentHandlers.types.3.uri", "http://fusion.google.com/add?feedurl=%s");
-pref("browser.contentHandlers.types.3.type", "application/vnd.mozilla.maybe.feed");
 #endif
 
 #ifdef MOZ_SAFE_BROWSING

@@ -847,8 +847,6 @@ intl/locale/public/Makefile
 MAKEFILES_inspector="
 extensions/inspector/Makefile
 extensions/inspector/base/Makefile
-extensions/inspector/base/public/Makefile
-extensions/inspector/base/src/Makefile
 extensions/inspector/build/Makefile
 extensions/inspector/build/src/Makefile
 extensions/inspector/resources/Makefile
@@ -1544,6 +1542,14 @@ for extension in $MOZ_EXTENSIONS; do
             extensions/python/xpcom/src/module/Makefile
             extensions/python/xpcom/test/Makefile
             extensions/python/xpcom/test/test_component/Makefile
+            " ;;
+        python/dom ) MAKEFILES_extensions="$MAKEFILES_extensions
+            extensions/python/dom/Makefile
+            extensions/python/dom/test/Makefile
+            extensions/python/dom/test/pyxultest/Makefile
+            extensions/python/dom/src/Makefile
+            extensions/python/dom/nsdom/Makefile
+            extensions/python/dom/nsdom/test/Makefile
             " ;;
         sql ) MAKEFILES_extensions="$MAKEFILES_extensions
             $MAKEFILES_sql"

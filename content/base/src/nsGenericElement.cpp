@@ -484,12 +484,123 @@ nsNode3Tearoff::IsSameNode(nsIDOMNode* aOther,
   return NS_OK;
 }
 
+PRBool
+nsNode3Tearoff::AreNodesEqual(nsIContent* aContent1,
+                              nsIContent* aContent2)
+{
+  // We use nsIContent instead of nsINode for the attributes of elements.
+
+  NS_PRECONDITION(aContent1 && aContent2, "Who called AreNodesEqual?");
+
+  nsAutoString string1, string2;
+
+  // Prefix, namespace URI, local name, node name check.
+  if (!aContent1->NodeInfo()->Equals(aContent2->NodeInfo())) {
+    return PR_FALSE;
+  }
+
+  if (aContent1->Tag() == nsLayoutAtoms::documentTypeNodeName) {
+    nsCOMPtr<nsIDOMDocumentType> docType1 = do_QueryInterface(aContent1);
+    nsCOMPtr<nsIDOMDocumentType> docType2 = do_QueryInterface(aContent2);
+
+    NS_ASSERTION(docType1 && docType2, "Why don't we have a document type node?");
+
+    // Public ID
+    docType1->GetPublicId(string1);
+    docType2->GetPublicId(string2);
+
+    if (!string1.Equals(string2)) {
+      return PR_FALSE;
+    }
+
+    // System ID
+    docType1->GetSystemId(string1);
+    docType2->GetSystemId(string2);
+
+    if (!string1.Equals(string2)) {
+      return PR_FALSE;
+    }
+
+    // Internal subset
+    docType1->GetInternalSubset(string1);
+    docType2->GetInternalSubset(string2);
+
+    if (!string1.Equals(string2)) {
+      return PR_FALSE;
+    }
+  }
+
+  if (aContent1->IsNodeOfType(nsINode::eELEMENT)) {
+    // aContent1 is an element.  Do the check on attributes.
+    PRUint32 attrCount = aContent1->GetAttrCount();
+    if (attrCount != aContent2->GetAttrCount()) {
+      return PR_FALSE;
+    }
+
+    // Iterate over attributes.
+    for (PRUint32 i = 0; i < attrCount; ++i) {
+      const nsAttrName* attrName1 = aContent1->GetAttrNameAt(i);
+#ifdef DEBUG
+      PRBool hasAttr =
+#endif
+      aContent1->GetAttr(attrName1->NamespaceID(),
+                         attrName1->LocalName(),
+                         string1);
+      NS_ASSERTION(hasAttr, "Why don't we have an attr?");
+
+      if (!aContent2->AttrValueIs(attrName1->NamespaceID(),
+                                  attrName1->LocalName(),
+                                  string1,
+                                  eCaseMatters)) {
+        return PR_FALSE;
+      }
+    }
+  } else {
+    // aContent1 is not an element.  Node value check.
+    nsCOMPtr<nsIDOMNode> domNode1 = do_QueryInterface(aContent1);
+    nsCOMPtr<nsIDOMNode> domNode2 = do_QueryInterface(aContent2);
+    NS_ASSERTION(domNode1 && domNode2, "How'd we get nsIContent without nsIDOMNode?");
+    domNode1->GetNodeValue(string1);
+    domNode2->GetNodeValue(string2);
+    if (!string1.Equals(string2)) {
+      return PR_FALSE;
+    }
+  }
+
+  // Child nodes count.
+  PRUint32 childCount = aContent1->GetChildCount();
+  if (childCount != aContent2->GetChildCount()) {
+    return PR_FALSE;
+  }
+
+  // Iterate over child nodes.
+  for (PRUint32 i = 0; i < childCount; ++i) {
+    nsIContent* child1 = aContent1->GetChildAt(i);
+    nsIContent* child2 = aContent2->GetChildAt(i);
+    if (!AreNodesEqual(child1, child2)) {
+      return PR_FALSE;
+    }
+  }
+
+  return PR_TRUE;
+}
+
 NS_IMETHODIMP
 nsNode3Tearoff::IsEqualNode(nsIDOMNode* aOther, PRBool* aReturn)
 {
-  NS_NOTYETIMPLEMENTED("nsNode3Tearoff::IsEqualNode()");
+  NS_ENSURE_ARG_POINTER(aOther);
 
-  return NS_ERROR_NOT_IMPLEMENTED;
+  *aReturn = PR_FALSE;
+
+  // Since we implement nsIContent, aOther must as well.
+  nsCOMPtr<nsIContent> aOtherContent = do_QueryInterface(aOther);
+  // Documents and attributes don't implement nsIContent.
+  if (!aOtherContent) {
+    return NS_OK;
+  }
+
+  *aReturn = nsNode3Tearoff::AreNodesEqual(mContent, aOtherContent);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -744,6 +855,20 @@ nsDOMEventRTTearoff::GetSystemEventGroup(nsIDOMEventGroup **aGroup)
   return manager->GetSystemEventGroupLM(aGroup);
 }
 
+NS_IMETHODIMP
+nsDOMEventRTTearoff::GetScriptTypeID(PRUint32 *aLang)
+{
+    *aLang = mContent->GetScriptTypeID();
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMEventRTTearoff::SetScriptTypeID(PRUint32 aLang)
+{
+    return mContent->SetScriptTypeID(aLang);
+}
+
+
 // nsIDOMEventTarget
 NS_IMETHODIMP
 nsDOMEventRTTearoff::AddEventListener(const nsAString& aType,
@@ -874,6 +999,9 @@ nsGenericElement::nsDOMSlots::IsEmpty()
 nsGenericElement::nsGenericElement(nsINodeInfo *aNodeInfo)
   : nsIXMLContent(aNodeInfo)
 {
+  // Set the default scriptID to JS - but skip SetScriptTypeID as it
+  // does extra work we know isn't necessary here...
+  SetFlags(nsIProgrammingLanguage::JAVASCRIPT << NODE_SCRIPT_TYPE_OFFSET);
 }
 
 nsGenericElement::~nsGenericElement()
@@ -2190,6 +2318,29 @@ nsGenericElement::MayHaveFrame() const
   return HasFlag(NODE_MAY_HAVE_FRAME);
 }
 
+PRUint32
+nsGenericElement::GetScriptTypeID() const
+{
+    PtrBits flags = GetFlags();
+
+    /* 4 bits reserved for script-type ID. */
+    return (flags >> NODE_SCRIPT_TYPE_OFFSET) & 0x000F;
+}
+
+nsresult
+nsGenericElement::SetScriptTypeID(PRUint32 aLang)
+{
+    if ((aLang & 0x000F) != aLang) {
+        NS_ERROR("script ID too large!");
+        return NS_ERROR_FAILURE;
+    }
+    /* SetFlags will just mask in the specific flags set, leaving existing
+       ones alone.  So we must clear all the bits first */
+    UnsetFlags(0x000FU << NODE_SCRIPT_TYPE_OFFSET);
+    SetFlags(aLang << NODE_SCRIPT_TYPE_OFFSET);
+    return NS_OK;
+}
+
 nsresult
 nsGenericElement::InsertChildAt(nsIContent* aKid,
                                 PRUint32 aIndex,
@@ -2406,6 +2557,46 @@ nsGenericElement::DispatchClickEvent(nsPresContext* aPresContext,
   event.isMeta = aSourceEvent->isMeta;
 
   return DispatchEvent(aPresContext, &event, aTarget, aFullDispatch, aStatus);
+}
+
+nsIFrame*
+nsGenericElement::GetPrimaryFrame()
+{
+  nsIDocument* doc = GetCurrentDoc();
+  if (!doc) {
+    return nsnull;
+  }
+
+  return GetPrimaryFrameFor(this, doc);
+}
+
+nsIFrame*
+nsGenericElement::GetPrimaryFrame(mozFlushType aType)
+{
+  nsIDocument* doc = GetCurrentDoc();
+  if (!doc) {
+    return nsnull;
+  }
+
+  // Cause a flush, so we get up-to-date frame
+  // information
+  doc->FlushPendingNotifications(aType);
+
+  return GetPrimaryFrameFor(this, doc);
+}
+
+/* static */
+nsIFrame*
+nsGenericElement::GetPrimaryFrameFor(nsIContent* aContent,
+                                     nsIDocument* aDocument)
+{
+  // Get presentation shell 0
+  nsIPresShell *presShell = aDocument->GetShellAt(0);
+  if (!presShell) {
+    return nsnull;
+  }
+
+  return presShell->GetPrimaryFrameFor(aContent);
 }
 
 //----------------------------------------------------------------------
@@ -2977,7 +3168,8 @@ nsGenericElement::TriggerLink(nsPresContext* aPresContext,
 
 nsresult
 nsGenericElement::AddScriptEventListener(nsIAtom* aEventName,
-                                         const nsAString& aValue)
+                                         const nsAString& aValue,
+                                         PRBool aDefer)
 {
   NS_PRECONDITION(aEventName, "Must have event name!");
   nsCOMPtr<nsISupports> target;
@@ -2992,8 +3184,11 @@ nsGenericElement::AddScriptEventListener(nsIAtom* aEventName,
   if (manager) {
     nsIDocument *ownerDoc = GetOwnerDoc();
 
+    defer = defer && aDefer; // only defer if everyone agrees...
+
+    PRUint32 lang = GetScriptTypeID();
     rv =
-      manager->AddScriptEventListener(target, aEventName, aValue, defer,
+      manager->AddScriptEventListener(target, aEventName, aValue, lang, defer,
                                       !nsContentUtils::IsChromeDoc(ownerDoc));
   }
 
@@ -3494,6 +3689,7 @@ nsGenericElement::List(FILE* out, PRInt32 aIndent) const
     fputs(NS_LossyConvertUTF16toASCII(buffer).get(), out);
   }
 
+  fprintf(out, " intrinsicstate=[%08x]", IntrinsicState());
   fprintf(out, " refcount=%d<", mRefCnt.get());
 
   fputs("\n", out);
