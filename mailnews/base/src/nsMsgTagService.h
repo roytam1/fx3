@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -12,13 +12,15 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is the Mozilla SVG Cairo Renderer project.
+ * The Original Code is mozilla.org code.
  *
- * The Initial Developer of the Original Code is Crocodile Clips Ltd..
- * Portions created by the Initial Developer are Copyright (C) 2004
+ * The Initial Developer of the Original Code is
+ * Netscape Communications Corporation.
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
+ *   David Bienvenu <bienvenu@mozilla.org>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -34,15 +36,41 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#ifndef __NS_SVGCAIRO_REGION_H__
-#define __NS_SVGCAIRO_REGION_H__
+#ifndef nsMsgTagService_h__
+#define nsMsgTagService_h__
 
-class nsISVGRendererRegion;
+#include "nsIMsgTagService.h"
+#include "nsIPrefBranch.h"
 
-//----------------------------------------------------------------------
-// region constructors:
+class nsMsgTagEntry
+{
+public:
+  nsMsgTagEntry(const char *key, const PRUnichar *tag, PRUint32 color);
+  nsString m_tag;
+  nsCString m_key;
+  PRUint32 m_color;
+};
 
-nsresult NS_NewSVGCairoRectRegion(nsISVGRendererRegion** result,
-                                  float x, float y, float width, float height);
+class nsMsgTagService : public nsIMsgTagService
+{
+public:
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSIMSGTAGSERVICE
 
-#endif // __NS_SVGCAIRO_REGION_H__
+  nsMsgTagService();
+
+private:
+  ~nsMsgTagService();
+
+protected:
+  nsresult getPrefService() ;
+  nsresult SetUnicharPref(const char *prefName,
+                              const nsAString &prefValue);
+  nsresult GetUnicharPref(const char *prefName,
+                              nsAString &prefValue);
+  nsresult MigrateLabelsToTags();
+
+  nsCOMPtr<nsIPrefBranch> m_prefBranch;
+};
+
+#endif

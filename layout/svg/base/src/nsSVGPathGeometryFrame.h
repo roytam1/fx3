@@ -52,8 +52,7 @@
 
 class nsPresContext;
 class nsIDOMSVGMatrix;
-class nsISVGRendererRegion;
-class nsISVGMarkerFrame;
+class nsSVGMarkerFrame;
 class nsISVGFilterFrame;
 struct nsSVGMarkerProperty;
 
@@ -117,7 +116,8 @@ protected:
   // nsISVGChildFrame interface:
   NS_IMETHOD PaintSVG(nsISVGRendererCanvas* canvas);
   NS_IMETHOD GetFrameForPointSVG(float x, float y, nsIFrame** hit);
-  NS_IMETHOD_(already_AddRefed<nsISVGRendererRegion>) GetCoveredRegion();
+  NS_IMETHOD_(nsRect) GetCoveredRegion();
+  NS_IMETHOD UpdateCoveredRegion();
   NS_IMETHOD InitialUpdate();
   NS_IMETHOD NotifyCanvasTMChanged(PRBool suppressInvalidation);
   NS_IMETHOD NotifyRedrawSuspended();
@@ -138,7 +138,7 @@ protected:
 
 private:
   nsSVGMarkerProperty *GetMarkerProperty();
-  void GetMarkerFromStyle(nsISVGMarkerFrame   **aResult,
+  void GetMarkerFromStyle(nsSVGMarkerFrame   **aResult,
                           nsSVGMarkerProperty *property,
                           nsIURI              *aURI);
   void UpdateMarkerProperty();

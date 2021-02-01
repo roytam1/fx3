@@ -47,8 +47,7 @@ nsMsgRecipientArray::nsMsgRecipientArray()
 
 nsMsgRecipientArray::~nsMsgRecipientArray()
 {
-	if (m_array)
-		delete m_array;
+  delete m_array;
 }
 
 /* the following macro actually implement addref, release and query interface for our class. */
@@ -56,13 +55,13 @@ NS_IMPL_ISUPPORTS1(nsMsgRecipientArray, nsIMsgRecipientArray)
 
 nsresult nsMsgRecipientArray::StringAt(PRInt32 idx, PRUnichar **_retval)
 {
-	if (!_retval || !m_array)
-		return NS_ERROR_NULL_POINTER;
-	
-	nsString aStr;
-	m_array->StringAt(idx, aStr);
-	*_retval = ToNewUnicode(aStr);
-	return NS_OK;
+  if (!_retval || !m_array)
+    return NS_ERROR_NULL_POINTER;
+  
+  nsString aStr;
+  m_array->StringAt(idx, aStr);
+  *_retval = ToNewUnicode(aStr);
+  return NS_OK;
 }
 
 nsresult nsMsgRecipientArray::AppendString(const PRUnichar *aString, PRBool *_retval)

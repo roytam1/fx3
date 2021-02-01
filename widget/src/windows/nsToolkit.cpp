@@ -45,6 +45,7 @@
 #include "nsGUIEvent.h"
 #include "nsIServiceManager.h"
 #include "nsComponentManagerUtils.h"
+#include "nsWidgetAtoms.h"
 #include <objbase.h>
 #include <initguid.h>
 
@@ -762,6 +763,8 @@ NS_METHOD nsToolkit::Init(PRThread *aThread)
         // create a thread where the message pump will run
         CreateUIThread();
     }
+
+    nsWidgetAtoms::RegisterAtoms();
 
 #ifndef WINCE
     // Hook window move messages so the toolkit can report when

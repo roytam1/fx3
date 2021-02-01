@@ -751,7 +751,7 @@ int main(int argc, char *argv[])
   OverrideComponents();
   
   NS_TIMELINE_ENTER("appStartup");
-  nsCOMPtr<nsIAppShell> appShell = do_CreateInstance(kAppShellCID);
+  nsCOMPtr<nsIAppShell> appShell = do_GetService(kAppShellCID);
   if (!appShell)
   {
     // if we can't get the nsIAppShell, then we should auto reg.
@@ -762,14 +762,12 @@ int main(int argc, char *argv[])
 
     registrar->AutoRegister(nsnull);
 
-	appShell = do_CreateInstance(kAppShellCID);
+	appShell = do_GetService(kAppShellCID);
 
 	if (!appShell)
 		return 1;
   }
 
-  appShell->Create(nsnull, nsnull);
-  
   ApplicationObserver *appObserver = new ApplicationObserver(appShell);
   if (!appObserver)
     return 1;

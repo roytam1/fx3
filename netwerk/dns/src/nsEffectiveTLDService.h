@@ -1,4 +1,4 @@
-/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+//* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -12,19 +12,19 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is the Mozilla SVG project.
+ * The Original Code is Mozilla TLD Service
  *
  * The Initial Developer of the Original Code is
- * Crocodile Clips Ltd.
- * Portions created by the Initial Developer are Copyright (C) 2002
+ * Google Inc.
+ * Portions created by the Initial Developer are Copyright (C) 2006
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
- *   Alex Fritze <alex.fritze@crocodile-clips.com> (original author)
+ *   Pamela Greene <pamg.bugs@gmail.com> (original author)
  *
  * Alternatively, the contents of this file may be used under the terms of
- * either of the GNU General Public License Version 2 or later (the "GPL"),
- * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
  * in which case the provisions of the GPL or the LGPL are applicable instead
  * of those above. If you wish to allow use of your version of this file only
  * under the terms of either the GPL or the LGPL, and not to allow others to
@@ -36,21 +36,18 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nsISupports.idl"
+#include "nsIEffectiveTLDService.h"
 
-/**
- * \addtogroup rendering_backend_interfaces Rendering Backend Interfaces
- * @{
- */
-
-/**
- * Interface handed to nsISVGRendererRegion::getRectangleScans() to
- * obtain an approximation of the region with rectangles.
- */
-[scriptable, uuid(0340df1d-1096-445f-bbf9-e1d1e5a10827)]
-interface nsISVGRectangleSink : nsISupports
+class nsEffectiveTLDService : public nsIEffectiveTLDService
 {
-  void sinkRectangle(in float x, in float y, in float width, in float height);
-};
+public:
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSIEFFECTIVETLDSERVICE
 
-/** @} */
+  nsEffectiveTLDService();
+  nsresult Init();
+
+private:
+  static nsEffectiveTLDService* sInstance;
+  ~nsEffectiveTLDService();
+};
